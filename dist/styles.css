@@ -1704,3 +1704,6 @@ input[aria-invalid="true"] {
 #workLesson[data-compare="true"] .real-speed { background:#e3f3ed; box-shadow:0 0 0 7px #e3f3ed; border-radius:3px; }
 #workLesson[data-compare="true"] .fixed-speed { background:#f0e9f7; box-shadow:0 0 0 7px #f0e9f7; border-radius:3px; }
 #workLesson[data-compare="true"] .speed-comparison b { transform:scale(1.2); transform-origin:left center; }
+
+/* Keep the expanded comparison value inside the panel with physical units. */
+#workLesson[data-compare="true"] .fixed-speed b { transform-origin:right center; }
