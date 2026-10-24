@@ -16,9 +16,11 @@
     }
     beginSearch() {
       this.phase = 'search'; this.elapsed = 0; this.accumulator = 0; this.target = null; this.event = null; this.impactAge = 0;
-      this.startTime = this.sim.time;
+      this.startTime = this.sim.time; this.startWidth = this.sim.width;
       const remaining = this.sim.motion ? this.sim.motion.duration - this.sim.motion.elapsed : Infinity;
-      this.leadMinimum = Math.min(.22, remaining * .20);
+      const averageSpeed = this.sim.motion ? Math.abs(this.sim.motion.targetWidth-this.sim.motion.startWidth)/this.sim.motion.duration : 0;
+      const lead = this.kind === 'work' ? Math.max(.6, .12/Math.max(averageSpeed,.03)) : .22;
+      this.leadMinimum = Math.min(lead, remaining * .20);
       this.quantum = Math.min(1 / 480, Math.max(1e-5, this.leadMinimum / 180));
       this.deadline = this.startTime + Math.min(8, this.kind === 'work' ? remaining : 8);
       this.probe = this.sim.fork(); this.probe.observeCollisions = true;
@@ -32,7 +34,7 @@
       const stage = this.stages[this.stageIndex];
       if (stage === 'heat-in') return e.thermal && e.heat > .08;
       if (stage === 'heat-out') return e.thermal && e.heat < -.08;
-      if (stage === 'work') return Math.abs(e.wallVelocity) > 1e-8 && Math.abs(e.work) > .005;
+      if (stage === 'work') return e.before.vx > .1 && Math.abs(e.wallVelocity) > 1e-8 && Math.abs(e.work) > .005;
       return e.impulse > .1 && e.wallVelocity === 0;
     }
     plan(budgetMs = 7) {
@@ -99,7 +101,7 @@
     }
     get view() {
       return { kind: this.kind, phase: this.phase, zoom: this.zoom, target: this.target,
-        event: this.event, elapsed: this.elapsed, impactAge: this.impactAge, rate: this.rate || 0,
+        startWidth: this.startWidth, event: this.event, elapsed: this.elapsed, impactAge: this.impactAge, rate: this.rate || 0,
         stage: Math.min(this.stageIndex + 1, this.stages.length), stages: this.stages.length };
     }
   }

@@ -79,21 +79,35 @@
     ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
   }
   const palette = ['#397bd1', '#479ac3', '#4caaa6', '#81b78a', '#c4b767', '#db9852', '#d76f47'];
-  function chamber(canvas, sim, { initialTemperature = 1.5, vectors = false, focus = null, maxWidth = 18, target = null, tour = null } = {}) {
-    const surface = setup(canvas); if (!surface) return;
-    const { ctx, w, h } = surface;
+  function chamberCamera(w, h, sim, { maxWidth = 18, tour = null } = {}) {
     const baseScale = Math.min((w - 58) / maxWidth, (h - 54) / sim.height);
     const ox = 26, oy = (h - sim.height * baseScale) / 2 + 3;
     const q = tour?.zoom || 0, hit = tour?.target;
-    const magnification = Math.max(1, Math.min(12, (h - 70) / (baseScale * 1.4)));
-    const zoom = 1 + q * (magnification - 1), scale = baseScale * zoom;
-    const cameraX = hit ? (hit.wall === 'right' ? sim.width : 0) : 0;
+    let magnification = Math.max(1, Math.min(12, (h - 70) / (baseScale * 1.4)));
+    // Fixed laboratory location chosen once, never the current piston position.
+    const cameraX = hit ? hit.x + (hit.wall === 'right' ? hit.radius : -hit.radius) : 0;
     const cameraY = hit?.y || 0;
+    if (hit && tour.kind === 'work') {
+      const travel = Math.abs(cameraX-tour.startWidth);
+      const room = cameraX < tour.startWidth ? .28*w-55 : .72*w-55;
+      if (travel>0) magnification = Math.max(1,Math.min(magnification,room/(travel*baseScale)));
+    }
+    const zoom = 1 + q * (magnification - 1), scale = baseScale * zoom;
     const anchorX = ox + cameraX * baseScale, anchorY = oy + (sim.height - cameraY) * baseScale;
     const tx = q * ((hit?.wall === 'left' ? .28 : .72) * w - anchorX) + (1 - zoom) * anchorX;
     const ty = q * (h * .51 - anchorY) + (1 - zoom) * anchorY;
-    const X = x => (ox + x * baseScale) * zoom + tx;
-    const Y = y => (oy + (sim.height - y) * baseScale) * zoom + ty;
+    return { q, hit, zoom, scale,
+      X: x => (ox + x * baseScale) * zoom + tx,
+      Y: y => (oy + (sim.height - y) * baseScale) * zoom + ty };
+  }
+  function stationaryReflection(event) {
+    const vx=-event.before.vx, vy=event.before.vy;
+    return { vx, vy, speed:Math.hypot(vx,vy), energy:.5*(vx*vx+vy*vy) };
+  }
+  function chamber(canvas, sim, { initialTemperature = 1.5, vectors = false, focus = null, maxWidth = 18, target = null, tour = null } = {}) {
+    const surface = setup(canvas); if (!surface) return;
+    const { ctx, w, h } = surface;
+    const { q, hit, zoom, scale, X, Y } = chamberCamera(w,h,sim,{maxWidth,tour});
     const left = X(0), right = X(sim.width), top = Y(sim.height), bottom = Y(0), end = X(maxWidth);
     ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = '#edf4f9'; ctx.fillRect(left, top, right - left, bottom - top);
@@ -131,6 +145,19 @@
     ctx.font='10px system-ui';ctx.textAlign='left';ctx.fillStyle='#476575';
     ctx.fillText('PARTICULE '+(hit.particleId+1)+' · ZOOM ×'+format(zoom,1),14,19);
     ctx.textAlign='right';ctx.fillText('Référentiel du laboratoire',w-14,19);
+    if (tour.kind === 'work') {
+      const origin=X(tour.startWidth), u=sim.metrics.pistonVelocity;
+      ctx.setLineDash([4,4]); line(ctx,origin,48,origin,h-62,'#7f939e',1.2); ctx.setLineDash([]);
+      ctx.font='10px system-ui';ctx.textAlign='left';ctx.fillStyle='#617987';
+      ctx.fillText('Position initiale · repère fixe',14,38);
+      arrow(ctx,right,60,Math.sign(u)*37,0,'#647f91',2);
+      ctx.textAlign='right';ctx.fillText('u = '+format(u)+' · Δx = '+format(sim.width-tour.startWidth,3),w-14,38);
+      // A laboratory ruler makes the wall translation readable before impact.
+      for(let x=Math.floor((tour.startWidth-3)*5)/5;x<tour.startWidth+3;x+=.2) {
+        const px=X(x);if(px<8||px>w-8)continue;
+        line(ctx,px,h-60,px,h-55,'#91a6b4',1);
+      }
+    }
     if (!e && particle) {
       const x=X(particle.x),y=Y(particle.y),v=Math.hypot(particle.vx,particle.vy);
       const f=Math.min(60,h*.20)/Math.max(v,.1);
@@ -152,13 +179,20 @@
       }
       ctx.restore();
     }
-    const f=Math.min(68,h*.22)/Math.max(Math.hypot(e.before.vx,e.before.vy),Math.hypot(e.after.vx,e.after.vy),.1);
+    const fixed=stationaryReflection(e);
+    const f=Math.min(68,h*.22)/Math.max(fixed.speed,Math.hypot(e.after.vx,e.after.vy),.1);
+    if (tour.kind==='work') {
+      ctx.setLineDash([5,4]);arrow(ctx,cx,cy,fixed.vx*f,-fixed.vy*f,'#9274ad',2);ctx.setLineDash([]);
+      const dt=Math.max(0,sim.time-e.time), gx=X(e.x+fixed.vx*dt), gy=Y(e.y+fixed.vy*dt);
+      ctx.setLineDash([3,3]);line(ctx,cx,cy,gx,gy,'#9274ad99',1.5);
+      ctx.strokeStyle='#9274ad';ctx.lineWidth=2;ctx.beginPath();ctx.arc(gx,gy,.04*scale+2,0,2*Math.PI);ctx.stroke();ctx.setLineDash([]);
+    }
     ctx.setLineDash([3,3]);arrow(ctx,cx-e.before.vx*f,cy+e.before.vy*f,e.before.vx*f,-e.before.vy*f,'#397fbe',2);ctx.setLineDash([]);
     arrow(ctx,cx,cy,e.after.vx*f,-e.after.vy*f,'#258d79',2.5);
     ctx.strokeStyle='#e3a34e';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,12+Math.min(1,tour.impactAge/.6)*16,0,2*Math.PI);ctx.stroke();
     // A common scale and laboratory velocities reveal the work asymmetry.
-    ctx.font='10px system-ui';ctx.textAlign='left';ctx.fillStyle='#397fbe';ctx.fillText('p avant · '+format(Math.hypot(e.before.vx,e.before.vy)),14,h-35);
-    ctx.fillStyle='#258d79';ctx.fillText('p après · '+format(Math.hypot(e.after.vx,e.after.vy)),14,h-19);
+    ctx.font='10px system-ui';ctx.textAlign='left';ctx.fillStyle=tour.kind==='work'?'#9274ad':'#397fbe';ctx.fillText((tour.kind==='work'?'v sortante si fixe · ':'p avant · ')+format(fixed.speed),14,h-35);
+    ctx.fillStyle='#258d79';ctx.fillText((tour.kind==='work'?'v sortante réelle · ':'p après · ')+format(Math.hypot(e.after.vx,e.after.vy)),14,h-19);
     const inward=e.wall==='left'?1:-1;
     if (tour.kind==='pressure') {
       arrow(ctx,cx,cy,-inward*65,0,'#ce8b37',3);ctx.fillStyle='#aa702e';ctx.textAlign='center';ctx.fillText('Poussée · J = '+format(e.impulse),Math.min(w-78,cx-inward*35),cy+35);
@@ -168,11 +202,7 @@
       const label=tour.kind==='heat' ? (energy>0?'Paroi → gaz':'Gaz → paroi') : (energy>0?'Piston → gaz':'Gaz → piston');
       ctx.fillStyle=energy>0?'#b57b35':'#3c75a5';ctx.textAlign='right';ctx.fillText(label,w-14,h-35);
       ctx.fillText((tour.kind==='heat'?'δQ':'δW reçu')+' = '+(energy>0?'+':'')+format(energy),w-14,h-19);
-      if(tour.kind==='work') {
-        const wx=X(sim.width);ctx.setLineDash([3,4]);line(ctx,cx,35,cx,h-55,'#9cb1bd',1);ctx.setLineDash([]);
-        arrow(ctx,wx,48,Math.sign(e.wallVelocity)*37,0,'#8198a6',2);
-        ctx.textAlign='center';ctx.fillStyle='#617987';ctx.fillText('Piston mobile · u = '+format(e.wallVelocity),Math.max(110,Math.min(w-110,wx)),38);
-      }
+
     }
   }
   function collision(canvas, event, { kind = 'pressure', pulse = 0 } = {}) {
@@ -256,5 +286,5 @@
     for (const b of actual.bins) { ctx.fillStyle = '#4b92c080'; ctx.fillRect(axes.X(b.min) + 1, axes.Y(b.density), Math.max(0, axes.X(b.max) - axes.X(b.min) - 2), axes.Y(0) - axes.Y(b.density)); }
     plotLine(ctx, axes, initial.bins.flatMap(b => [{ x: b.min, y: b.density }, { x: b.max, y: b.density }]), '#bd843e', { dashed: true });
   }
-  root.LabGraphics = { setup, chamber, collision, plot, histogram, dataRange };
+  root.LabGraphics = { setup, chamberCamera, stationaryReflection, chamber, collision, plot, histogram, dataRange };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

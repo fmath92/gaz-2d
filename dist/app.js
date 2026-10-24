@@ -207,7 +207,7 @@
     const step=tour.kind==='heat' ? (heating?'1/2 · Paroi → gaz':'2/2 · Gaz → paroi') : tour.kind==='work'?'Travail sur le piston':'Poussée sur le piston';
     $('tourStage').textContent=step+' · '+(phases[v.phase]||'');
     $('tourSpeed').textContent=v.phase==='search' ? 'Préparation' : 'Lecture ×'+format(v.rate,3);
-    let caption=v.phase==='search' ? 'Un choc à venir est repéré sans modifier les particules.' : v.phase==='approach' ? 'Suivez la particule entourée. La caméra se rapproche de son point de contact.' : v.phase==='return' ? 'La caméra recule ; le temps retrouve progressivement sa vitesse normale.' : '';
+    let caption=v.phase==='search' ? 'Un choc à venir est repéré sans modifier les particules.' : v.phase==='approach' ? tour.kind==='work' ? 'Le piston se déplace devant un repère fixe du laboratoire. Suivez la particule entourée jusqu’au choc.' : 'Suivez la particule entourée. La caméra se rapproche de son point de contact.' : v.phase==='return' ? 'La caméra recule ; le temps retrouve progressivement sa vitesse normale.' : '';
     if(!caption&&v.event) caption=tour.kind==='pressure' ? 'La particule rebondit et transmet une impulsion J = '+format(v.event.impulse)+' au piston. Cette poussée contribue à la pression.'
       : tour.kind==='heat' ? (v.event.heat>0?'La paroi donne de l’énergie à la particule.':'La particule cède de l’énergie à la paroi.')+' δQ reçu par le gaz = '+signed(v.event.heat)+'.'
       : (v.event.work>0?'Le piston communique de l’énergie à la particule.':'La particule communique de l’énergie au piston.')+' δW reçu par le gaz = '+signed(v.event.work)+'.';
@@ -303,6 +303,13 @@
     $('workExplanation').textContent = event?.kind === 'wall' && event.work !== 0
       ? 'δW reçu par le gaz = Ec après − Ec avant = ' + signed(event.work) + '. ' + (event.work > 0 ? 'Le piston donne de l’énergie à la particule.' : 'La particule donne de l’énergie au piston.')
       : (s.action === 'compression' ? 'En compression, le gaz reçoit un travail positif et se réchauffe.' : 'En détente, le gaz fournit de l’énergie au piston : son travail reçu est négatif et il se refroidit.') + ' Observez un choc avec le bouton d’illustration.';
+    const comparable = event?.kind === 'wall' && event.wall === 'right' && event.before.vx > 0;
+    $('realExitSpeed').textContent = comparable ? format(Math.hypot(event.after.vx,event.after.vy)) : '—';
+    $('fixedExitSpeed').textContent = comparable ? format(G.stationaryReflection(event).speed) : '—';
+    $('speedComparisonNote').textContent = comparable
+      ? 'Même vitesse incidente : v′ₓ = 2u − vₓ, contre −vₓ à piston fixe. Le violet en pointillés illustre ce second cas au même point de contact.'
+      : event?.kind === 'wall' && event.before.vx <= 0 ? 'Le piston rattrape ici une particule qui s’éloigne : un piston immobile ne produirait pas ce choc.'
+      : 'Le zoom reste fixe dans le laboratoire. Après le choc, comparez le rebond réel au rebond hypothétique sur un piston immobile.';
     $('heatFlux').textContent = 'Flux moyen à gauche : ' + signed(m.heatFluxByWall.left) + ' u.r. / (longueur × temps)';
     $('idealRatio').textContent = format(ratio(m),0); $('diskRatio').textContent = other ? format(ratio(other),0) : '—';
     $('pairCount').textContent = format(other?.pairCollisions ?? m.pairCollisions,0);

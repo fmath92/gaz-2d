@@ -1695,3 +1695,8 @@ input[aria-invalid="true"] {
   .tour-status { min-height: 78px; padding-top: 9px; padding-bottom: 9px; }
   .tour-status > p { font-size: 10px; margin: 6px 0 8px; }
 }
+
+.speed-comparison { display:flex; gap:16px; justify-content:space-between; margin:10px 0 6px; font-size:10px; }
+.speed-comparison b { display:block; font-size:17px; margin-top:3px; font-variant-numeric:tabular-nums; }
+.real-speed { color:#258d79; }
+.fixed-speed { color:#9274ad; }

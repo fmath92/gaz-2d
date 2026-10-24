@@ -86,3 +86,26 @@ test('the rebound keeps advancing physical time without an impact pause, with co
   }
   assert.ok(impactFrames>30);assert.ok(sawDeparture);assert.equal(tour.phase,'done');close(s.metrics.balancePressureError,0);
 });
+require('../dist/graphics.js');
+test('the zoom camera keeps laboratory landmarks fixed while the piston translates in both directions',()=>{
+  const {chamberCamera}=globalThis.LabGraphics;
+  for(const direction of [-1,1])for(const zoom of [.4,1]){
+    const sim=gas(),tour={kind:'work',zoom,startWidth:11,target:{wall:'right',x:11+direction*.2,y:3.5,radius:0}};
+    const before=chamberCamera(460,285,sim,{tour}),wallBefore=before.X(sim.width);
+    sim.width+=direction*.12;
+    const after=chamberCamera(460,285,sim,{tour});
+    close(after.X(11),before.X(11));close(after.X(7),before.X(7));close(after.Y(3.5),before.Y(3.5));
+    close(after.X(sim.width)-wallBefore,direction*.12*before.scale);
+    assert.ok(Math.abs(after.X(sim.width)-wallBefore)>5,'piston displacement must be visible at this zoom');
+  }
+});
+test('stationary-wall comparison preserves incident energy and differs from the real outgoing velocity by 2u',()=>{
+  for(const targetWidth of [8,15]){
+    const s=gas();s.setMotion({targetWidth,duration:10});const tour=new CollisionTour(s,{kind:'work'});
+    while(tour.phase==='search')tour.plan(Infinity);
+    const e=tour.target,fixed=globalThis.LabGraphics.stationaryReflection(e);
+    assert.ok(e.before.vx>.1,'the fixed-wall counterfactual must also be incident');
+    close(fixed.energy,e.energyBefore);close(e.after.vx-fixed.vx,2*e.wallVelocity);close(fixed.vy,e.after.vy);
+    assert.ok(targetWidth<11?Math.hypot(e.after.vx,e.after.vy)>fixed.speed:Math.hypot(e.after.vx,e.after.vy)<fixed.speed);
+  }
+});

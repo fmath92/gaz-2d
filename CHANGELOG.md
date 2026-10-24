@@ -1,5 +1,9 @@
 # Versions du démonstrateur
 
+## 0.6.2 — 24 octobre 2026
+
+Zoom du travail ancré dans le laboratoire, avec position initiale du piston et graduation fixes, vitesse et déplacement visibles avant le choc. Comparaison du rebond réel avec le rebond hypothétique sur un piston immobile au même contact : trajectoire violette, vitesses sortantes et relation v′x = 2u − vx. Choix de chocs incidents permettant cette comparaison, sans modifier la physique.
+
 ## 0.6.1 — 24 octobre 2026
 
 Suppression de l’arrêt sur image au choc dans les parcours animés. Le ralenti reste continu, avec une transition progressive de vitesse après le rebond. Une onde visuelle s’étend et s’atténue à l’intérieur du piston, sans modifier sa dynamique ni les échanges calculés.
