@@ -4,8 +4,12 @@
   const number = (value, digits = 2) => value == null || !Number.isFinite(value) ? '—' : value.toLocaleString('fr-FR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
   const sim = new GasSimulation();
   const chamber = $('chamber'), chart = $('chart');
-  let paused = false, direction = 'expansion', chartType = 'time';
-  let pressureSource = 'mean', gammaReference = 2, runCounter = 0, currentRun = null;
+  let paused = false, direction = 'expansion', chartType = 'pv';
+  let pressureSource = 'piston', gammaReference = 2, runCounter = 0, currentRun = null;
+  let cycles = [], activeCycle = null, cycleCounter = 0, cycleSelection = 'latest', cycleLimit = 5;
+  let cycleOptionsSignature = null;
+  const cycleColors = ['#245cdd', '#c67932', '#279380', '#9863bd', '#c35c7a', '#5e819e', '#88933b', '#c16c46'];
+  const cycleColor = record => cycleColors[(record.id - 1) % cycleColors.length];
   let baseWidth = sim.width, initial = sim.metrics, history = [], nextSample = 0;
   let lastTimestamp = 0, accumulator = 0, lastUi = 0, lastPlot = 0, hadMotion = false;
   const particleSnapshot = () => ({ speeds: sim.particles.map(p => Math.hypot(p.vx, p.vy)), energies: sim.particles.map(p => (p.vx ** 2 + p.vy ** 2) / 2) });
@@ -23,6 +27,105 @@
     if (currentRun && currentRun.type === 'free') result.reason = 'Une détente libre ne suit pas une transformation adiabatique quasi statique : pas d’ajustement de γ.';
     return result;
   }
+  function readSample() {
+    const m = sim.metrics;
+    return { ...m, pistonPressure: m.pressureByWall.right, pressureByWall: { ...m.pressureByWall }, ...runLeg(), moving: !!sim.motion, freeExpansion: currentRun?.type === 'free', cycleId: activeCycle?.id ?? 0 };
+  }
+  function appendCycleRow(row, turningPoint = false) {
+    if (!activeCycle) return;
+    const point = { ...row, turningPoint };
+    const last = activeCycle.rows.at(-1);
+    if (last && Math.abs(last.time - point.time) < 1e-9) {
+      point.turningPoint ||= last.turningPoint;
+      activeCycle.rows[activeCycle.rows.length - 1] = point;
+    } else activeCycle.rows.push(point);
+    // Conserver les extrémités et les retournements même lors de la décimation.
+    if (activeCycle.rows.length > 1200) activeCycle.rows = activeCycle.rows.filter((p, i, list) => i === 0 || i === list.length - 1 || p.turningPoint || i % 2 === 0);
+  }
+  function beginCycle(kind) {
+    if (cycles.length >= 100) cycles.shift();
+    activeCycle = { id: ++cycleCounter, kind, rows: [], complete: false };
+    appendCycleRow(readSample(), true);
+    cycleOptionsSignature = null;
+  }
+  function finishCycle(complete) {
+    if (!activeCycle) return;
+    activeCycle.complete = complete;
+    if (activeCycle.rows.length > 1) cycles.push(activeCycle);
+    if (cycles.length > 100) cycles.shift();
+    activeCycle = null;
+    cycleOptionsSignature = null;
+  }
+  function visibleCycles() {
+    return cycles.concat(activeCycle ? [activeCycle] : []).slice(-cycleLimit);
+  }
+  function selectedCycle() {
+    if (cycleSelection === 'active') return activeCycle || cycles.at(-1) || null;
+    if (cycleSelection === 'latest') return cycles.slice().reverse().find(c => c.complete) || activeCycle || cycles.at(-1) || null;
+    return cycles.find(c => String(c.id) === cycleSelection) || (String(activeCycle?.id) === cycleSelection ? activeCycle : null);
+  }
+  const summarize = record => GasCycles.buildCycleSummary(record?.rows || [], { complete: !!record?.complete, allowMixedRuns: record?.kind === 'manual' });
+  const reconstruct = record => GasCycles.workPressurePath(record?.rows || [], { allowMixedRuns: record?.kind === 'manual' });
+  function thermalControls() {
+    const settings = sim.thermal;
+    $('thermalSettings').hidden = $('thermalMode').value !== 'thermostat';
+    $('accommodationValue').value = $('accommodation').value + ' %';
+    $('thermalInfo').textContent = settings.mode === 'isolated' ? 'Chaleur nulle sur les prochains chocs ; le cumul Q conserve les échanges passés.' : 'Thermostat appliqué : T = ' + number(settings.temperature) + ' u.r. · ' + number(settings.accommodation * 100, 0) + ' % des chocs thermalisés' + (settings.pistonThermal ? ', piston inclus.' : ', piston isolé.');
+  }
+  function applyThermal() {
+    $('thermalSettings').hidden = $('thermalMode').value !== 'thermostat';
+    const temperature = Number($('bathTemperature').value);
+    const valid = Number.isFinite(temperature) && temperature >= 0.1 && temperature <= 10;
+    $('bathTemperature').setAttribute('aria-invalid', String(!valid));
+    if (!valid && $('thermalMode').value === 'thermostat') { notify('La température du thermostat doit être comprise entre 0,1 et 10.', true); return; }
+    sample();
+    sim.setThermal({ mode: $('thermalMode').value, temperature: valid ? temperature : sim.thermal.temperature, accommodation: +$('accommodation').value / 100, pistonThermal: $('thermalPiston').checked });
+    thermalControls(); updateGraphLabels(); updateReadings(); render();
+    notify(sim.thermal.mode === 'isolated' ? 'Parois isolées : les prochains chocs n’échangent plus de chaleur.' : 'Thermostat appliqué aux prochains chocs. W et Q restent comptés séparément.');
+  }
+  function updateCycleReadings() {
+    const records = visibleCycles();
+    const signature = records.map(c => c.id + (c === activeCycle ? 'a' : 's')).join(',');
+    if (signature !== cycleOptionsSignature) {
+      $('cycleSelect').innerHTML = '<option value="latest">Dernier cycle achevé, sinon en cours</option><option value="active">Parcours en cours</option>' + records.map(c => '<option value="' + c.id + '">Parcours ' + c.id + (c.complete ? ' · achevé' : c === activeCycle ? ' · en cours' : ' · interrompu') + '</option>').join('');
+      if (!['latest', 'active'].includes(cycleSelection) && !records.some(c => String(c.id) === cycleSelection)) cycleSelection = 'latest';
+      $('cycleSelect').value = cycleSelection;
+      cycleOptionsSignature = signature;
+    }
+    const record = selectedCycle(), summary = summarize(record), rebuilt = reconstruct(record);
+    $('cycleWork').textContent = number(summary.work);
+    $('cycleHeat').textContent = number(summary.heat);
+    $('cycleEnergy').textContent = number(summary.deltaEnergy);
+    $('cycleDiagramWork').textContent = number(summary.workFromDiagram);
+    $('cycleRebuiltWork').textContent = rebuilt.valid ? number(-rebuilt.integral) : '—';
+    $('cycleBalance').textContent = summary.balance == null ? '—' : Math.abs(summary.balance) < 1e-8 ? '≈ 0' : summary.balance.toExponential(2);
+    $('cycleArea').disabled = pressureSource !== 'piston';
+    $('cycleReconstruction').disabled = pressureSource !== 'piston';
+    $('cycleAreaHint').textContent = pressureSource !== 'piston' ? 'Pour relier l’aire au travail, choisissez la pression au piston. Les aires de P–T et V–T ne sont pas des travaux.' : 'Aire orientée dans P–V : W reçu ≈ −∫ P mesurée dV. Une fermeture dessinée à volume constant est géométrique ; elle n’ajoute aucun travail.';
+    $('cycleClosure').textContent = record ? 'Parcours ' + record.id + ' · ' + (record.complete ? 'période mécanique achevée' : record === activeCycle ? 'en cours' : 'interrompu') + ' · ΔV = ' + number(summary.closureGap.volume, 3) + ', ΔT = ' + number(summary.closureGap.temperature, 3) + ', ΔP au piston = ' + number(summary.closureGap.pressure, 3) + '. ' + (summary.reason || 'P et T proches à 5 % près ; ce critère ne prouve pas un retour exact à l’équilibre.') : 'Lancez un aller-retour périodique, ou une détente suivie d’un retour au volume de départ.';
+    $('cycleMemory').textContent = cycles.length + (activeCycle ? 1 : 0) + ' / 100 parcours conservés';
+    $('cycleLegend').hidden = !$('cycleOverlay').checked || !['pv', 'pt', 'vt'].includes(chartType);
+    $('cycleLegend').innerHTML = records.map(c => '<span><i style="background:' + cycleColor(c) + '"></i>' + c.id + (c === activeCycle ? ' · en cours' : '') + '</span>').join('');
+    $('cycleTable').innerHTML = records.slice().reverse().map(c => {
+      const s = summarize(c);
+      return '<tr><td><i class="cycle-dot" style="background:' + cycleColor(c) + '"></i>' + c.id + '</td><td>' + (c.complete ? 'Achevé' : c === activeCycle ? 'En cours' : 'Interrompu') + '</td><td>' + number(s.work) + '</td><td>' + number(s.heat) + '</td><td>' + number(s.deltaEnergy) + '</td><td>' + number(s.workFromDiagram) + '</td></tr>';
+    }).join('') || '<tr><td colspan="6">Aucun parcours enregistré.</td></tr>';
+  }
+  $('exportCycles').addEventListener('click', () => {
+    sample();
+    const records = cycles.concat(activeCycle ? [activeCycle] : []);
+    const keys = ['startTime', 'endTime', 'work', 'heat', 'heatIn', 'heatOut', 'deltaEnergy', 'balance', 'workFromDiagram', 'signedAreaReceived'];
+    const header = ['parcours_id', 'type', 'acheve', 'volume_revenu', 'etat_proche_5pct', 'debut_ut', 'fin_ut', 'W_recu_ur', 'Q_recue_ur', 'Q_absorbee_ur', 'Q_cedee_ur', 'delta_E_ur', 'ecart_bilan_ur', 'W_aire_P_mesuree_ur', 'aire_signee_recue_ur', 'W_reconstruit_Peff_ur', 'delta_V', 'delta_P_piston', 'delta_T'];
+    const numeric = n => Number.isFinite(n) ? n.toPrecision(10).replace('.', ',') : '';
+    const rows = records.map(c => {
+      const s = summarize(c), r = reconstruct(c);
+      return [c.id, c.kind, +c.complete, +s.closedVolume, +s.closedState].concat(keys.map(k => numeric(s[k])), [numeric(r.valid ? -r.integral : null), numeric(s.closureGap.volume), numeric(s.closureGap.pressure), numeric(s.closureGap.temperature)]).join(';');
+    });
+    const url = URL.createObjectURL(new Blob(['\uFEFF' + header.join(';') + '\r\n' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a'); a.href = url; a.download = 'gaz-2d-cycles.csv'; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    notify('Bilans des parcours conservés exportés. Les aires utilisent la pression au piston.');
+  });
   const duration = () => 0.2 * Math.pow(600, +$('duration').value / 100);
   const targetWidth = () => Math.max(3, Math.min(18, baseWidth * +$('target').value / 100));
   const freeMode = () => $('motion').value === 'free';
@@ -70,6 +173,7 @@
     const possible = expanding ? baseWidth < 17.999 : baseWidth > 3.001;
     $('start').disabled = moving || !possible || Math.abs(targetWidth() - baseWidth) < 0.001;
     $('stop').disabled = !moving;
+    $('returnCycle').disabled = moving || !activeCycle || Math.abs(activeCycle.rows[0].width - sim.width) < 1e-6;
     for (const id of ['expansion', 'compression', 'motion', 'target', 'duration']) $(id).disabled = moving;
     $('motion').querySelector('[value="free"]').disabled = !expanding;
     if (!possible && !moving) notify('Le piston a atteint la limite. Changez le sens de la transformation.');
@@ -89,9 +193,10 @@
     $('status').innerHTML = '<i></i>' + (paused ? 'En pause' : 'En cours');
     $('status').classList.toggle('paused', paused);
   }
-  function sample() {
-    const m = sim.metrics;
-    history.push({ ...m, pistonPressure: m.pressureByWall.right, pressureByWall: { ...m.pressureByWall }, ...runLeg(), moving: !!sim.motion, freeExpansion: currentRun?.type === 'free' });
+  function sample(turningPoint = false) {
+    const m = readSample();
+    history.push(m);
+    appendCycleRow(m, turningPoint);
     if (history.length > 6000) history.shift();
     nextSample = sim.time + 0.1;
   }
@@ -103,6 +208,7 @@
     initialParticles = particleSnapshot();
     currentRun = null;
     runCounter = 0;
+    cycles = []; activeCycle = null; cycleCounter = 0; cycleSelection = 'latest'; cycleOptionsSignature = null;
     history = [];
     nextSample = 0;
     hadMotion = false;
@@ -133,18 +239,31 @@
   $('pause').addEventListener('click', () => setPaused(!paused));
   $('reset').addEventListener('click', reset);
   $('applyInitial').addEventListener('click', reset);
+  for (const id of ['thermalMode', 'bathTemperature', 'accommodation', 'thermalPiston']) $(id).addEventListener('input', applyThermal);
+  $('cycleLimit').addEventListener('input', () => { cycleLimit = +$('cycleLimit').value; cycleOptionsSignature = null; render(); });
+  $('cycleOverlay').addEventListener('input', drawChart);
+  $('cycleSelect').addEventListener('input', () => { cycleSelection = $('cycleSelect').value; updateCycleReadings(); drawChart(); });
+  for (const id of ['cycleArea', 'cycleReconstruction']) $(id).addEventListener('input', () => {
+    if ($(id).checked && pressureSource !== 'piston') { pressureSource = 'piston'; $('pressureSource').value = 'piston'; updateReadings(); }
+    updateCycleReadings(); updateGraphLabels(); drawChart();
+  });
   $('start').addEventListener('click', () => {
     try {
       const target = targetWidth();
       sample();
-      currentRun = { id: ++runCounter, type: $('motion').value, start: sim.time, legId: 0, duration: duration() };
+      currentRun = { id: ++runCounter, type: $('motion').value, start: sim.time, legId: 0, duration: duration(), nextTurn: 1 };
       if (freeMode()) {
+        finishCycle(false);
         sim.freeExpand(target);
         sample();
-        notify('Détente libre : l’espace augmente sans travail. L’énergie cinétique est conservée.');
+        notify('Détente libre : l’ouverture seule conserve l’énergie et n’échange aucun travail. Le thermostat peut ensuite échanger de la chaleur.');
         configureTarget(true);
       } else {
         sim.setMotion({ type: $('motion').value, targetWidth: target, duration: duration() });
+        if ($('motion').value === 'oscillate') { finishCycle(false); beginCycle('periodic'); }
+        else if (!activeCycle) beginCycle('manual');
+        else activeCycle.kind = 'manual';
+        sample(true);
         hadMotion = true;
         notify($('motion').value === 'oscillate' ? 'Allers-retours en cours. Le travail cumulé tient compte de chaque choc sur le piston.' : 'Transformation en cours. Le travail reçu est positif si le gaz gagne de l’énergie.');
       }
@@ -154,12 +273,23 @@
     } catch (error) { notify(error.message, true); }
   });
   $('stop').addEventListener('click', () => {
-    sample();
+    sample(true);
     sim.stopMotion();
+    if (activeCycle) activeCycle.kind = 'manual';
     hadMotion = false;
     configureTarget(true);
     notify('Piston arrêté. Les particules continuent à se déplacer dans le volume atteint.');
     updateReadings();
+  });
+  $('returnCycle').addEventListener('click', () => {
+    if (!activeCycle || sim.motion) return;
+    sample(true);
+    const type = $('motion').value === 'smooth' ? 'smooth' : 'linear';
+    currentRun = { id: ++runCounter, type, start: sim.time, legId: 0, duration: duration(), nextTurn: 1 };
+    activeCycle.kind = 'manual';
+    sim.setMotion({ type, targetWidth: activeCycle.rows[0].width, duration: duration() });
+    hadMotion = true; sample(true); setPaused(false); updateControls();
+    notify('Retour au volume de départ. Le bilan inclura tous les trajets et les échanges intermédiaires.');
   });
   document.querySelectorAll('[data-chart]').forEach(button => button.addEventListener('click', () => {
     chartType = button.dataset.chart;
@@ -182,13 +312,13 @@
   });
   $('export').addEventListener('click', () => {
     sample();
-    const fields = ['time', 'volume', 'pressure', 'pistonPressure', 'pressureIdeal', 'temperature', 'temperatureX', 'temperatureY', 'energy', 'work', 'pressureWork', 'pressurePower', 'balancePressureError', 'pistonVelocity', 'measurementDuration', 'runId', 'legId'];
-    const headings = ['temps_ut', 'aire_ur2', 'pression_moyenne_parois_ur', 'pression_piston_ur', 'NkT_sur_V_comparateur_equilibre', 'T_cinetique_ur', 'Tx_ur', 'Ty_ur', 'energie_ur', 'travail_collisions_ur', 'travail_pression_recu_ur', 'puissance_pression_ur_par_ut', 'ecart_bilan_ur', 'vitesse_piston_ur_par_ut', 'duree_fenetre_ut', 'transformation_id', 'trajet_id'];
+    const fields = ['time', 'volume', 'pressure', 'pistonPressure', 'pressureIdeal', 'temperature', 'temperatureX', 'temperatureY', 'energy', 'work', 'pressureWork', 'pressurePower', 'heat', 'heatIn', 'heatOut', 'heatPower', 'balancePressureError', 'pistonVelocity', 'measurementDuration', 'runId', 'legId', 'cycleId', 'bathTemperature', 'accommodation'];
+    const headings = ['temps_ut', 'aire_ur2', 'pression_moyenne_parois_ur', 'pression_piston_ur', 'NkT_sur_V_comparateur_equilibre', 'T_cinetique_ur', 'Tx_ur', 'Ty_ur', 'energie_ur', 'travail_collisions_ur', 'travail_pression_recu_ur', 'puissance_pression_ur_par_ut', 'chaleur_recue_nette_ur', 'chaleur_absorbee_ur', 'chaleur_cedee_ur', 'puissance_thermique_ur_par_ut', 'ecart_bilan_ur', 'vitesse_piston_ur_par_ut', 'duree_fenetre_ut', 'transformation_id', 'trajet_id', 'cycle_id', 'temperature_thermostat', 'fraction_chocs_thermalises'];
     const numeric = value => value == null || !Number.isFinite(value) ? '' : value.toPrecision(10).replace('.', ',');
-    const csv = '\uFEFF' + headings.concat(['P_gauche', 'P_haut', 'P_bas', 'pression_selectionnee_ur', 'PV_ur', 'ln_V', 'ln_P_selectionnee', 'gamma_reference', 'PV_puissance_gamma', 'en_mouvement', 'detente_libre', 'debut_trajet_ut', 'source_pression']).join(';') + '\r\n' + history.map(row => {
+    const csv = '\uFEFF' + headings.concat(['P_gauche', 'P_haut', 'P_bas', 'pression_selectionnee_ur', 'PV_ur', 'ln_V', 'ln_P_selectionnee', 'gamma_reference', 'PV_puissance_gamma', 'en_mouvement', 'detente_libre', 'debut_trajet_ut', 'source_pression', 'mode_thermique', 'piston_thermalise']).join(';') + '\r\n' + history.map(row => {
       const p = pressureOf(row);
       const derived = [p, p == null ? null : p * row.volume, Math.log(row.volume), p > 0 ? Math.log(p) : null, gammaReference, p > 0 ? p * row.volume ** gammaReference : null, row.moving ? 1 : 0, row.freeExpansion ? 1 : 0, row.legStart];
-      return fields.map(key => numeric(row[key])).concat(['left', 'top', 'bottom'].map(key => numeric(row.pressureByWall[key])), derived.map(numeric), pressureSource).join(';');
+      return fields.map(key => numeric(row[key])).concat(['left', 'top', 'bottom'].map(key => numeric(row.pressureByWall[key])), derived.map(numeric), pressureSource, row.thermalMode, row.pistonThermal ? '1' : '0').join(';');
     }).join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a'); a.href = url; a.download = 'gaz-2d-mesures.csv'; a.click();
@@ -210,6 +340,12 @@
     $('work').textContent = (m.work > 0.005 ? '+' : '') + number(m.work);
     $('pressureWork').textContent = (m.pressureWork > 0.005 ? '+' : '') + number(m.pressureWork);
     $('pressurePower').textContent = number(m.pressurePower);
+    $('heat').textContent = (m.heat > 0.005 ? '+' : '') + number(m.heat);
+    $('heatIn').textContent = '+' + number(m.heatIn);
+    $('heatOut').textContent = number(m.heatOut);
+    $('heatPower').textContent = number(m.heatPower);
+    $('deltaEnergy').textContent = number(m.energy - initial.energy);
+    $('thermalState').textContent = m.thermalMode === 'isolated' ? 'parois isolées' : 'thermostat T = ' + number(m.bathTemperature);
     $('balance').textContent = Math.abs(m.balancePressureError) < 1e-8 ? '≈ 0' : m.balancePressureError.toExponential(2);
     $('pistonState').textContent = sim.motion ? 'Piston : u = ' + number(m.pistonVelocity) + ' u.r. / u.t.' : 'Piston immobile';
     $('anisotropy').textContent = 'Tₓ = ' + number(m.temperatureX) + ' · Tᵧ = ' + number(m.temperatureY) + ' u.r.';
@@ -219,6 +355,7 @@
       configureTarget(true);
       notify('Volume cible atteint. Le piston est immobile ; la pression reste mesurée par les collisions.');
     }
+    updateCycleReadings();
   }
   function setupCanvas(canvas) {
     const rect = canvas.getBoundingClientRect();
@@ -241,7 +378,7 @@
     const maxRight = ox + 18 * scale;
     ctx.fillStyle = '#d9e2e7';
     for (let x = 17; x < w; x += 18) for (let y = 16; y < h; y += 18) ctx.fillRect(x, y, 1, 1);
-    ctx.fillStyle = '#edf4fc'; ctx.fillRect(ox, oy, sim.width * scale, sim.height * scale);
+    ctx.fillStyle = sim.thermal.mode === 'thermostat' && sim.thermal.accommodation > 0 ? '#fdf3e5' : '#edf4fc'; ctx.fillRect(ox, oy, sim.width * scale, sim.height * scale);
     ctx.fillStyle = '#f5f5f2'; ctx.fillRect(right + 9, oy, Math.max(0, maxRight - right - 9), sim.height * scale);
     // Le rayon est graphique : le moteur simule des particules ponctuelles.
     ctx.save(); ctx.beginPath(); ctx.rect(ox, oy, sim.width * scale, sim.height * scale); ctx.clip();
@@ -272,7 +409,7 @@
     line(ctx, right + 10, (oy + bottom) / 2, Math.min(w - 12, maxRight + 17), (oy + bottom) / 2, '#a2b0b9', 8);
     line(ctx, right, oy - 5, right, bottom + 5, '#b66e3c', 1.5);
     ctx.font = '10px "DM Sans", sans-serif'; ctx.fillStyle = '#6c8090';
-    ctx.textAlign = 'left'; ctx.fillText('PAROI FIXE', ox, oy - 19);
+    ctx.textAlign = 'left'; ctx.fillText(sim.thermal.mode === 'thermostat' && sim.thermal.accommodation > 0 ? 'PAROI THERMALISÉE' : 'PAROI ISOLÉE', ox, oy - 19);
     ctx.textAlign = 'center';
     const pistonLabelX = Math.max(65, Math.min(w - 55, right + 5));
     ctx.fillStyle = '#b37243'; ctx.fillText('PISTON', pistonLabelX, oy - 19);
@@ -291,22 +428,29 @@
     const legends = {
       time: '<span class="legend-v">V / V₀</span><span class="legend-t">T / T₀</span><span class="legend-p">P / P₀</span>',
       pv: '<span class="legend-p">Pression mesurée</span>',
+      pt: '<span class="legend-p">P en fonction de T</span>',
+      vt: '<span class="legend-v">V en fonction de T</span>',
       pvt: '<span class="legend-p">PV mesuré</span><span class="legend-t">Référence PV = NT</span>',
       log: '<span class="legend-p">Mesures du dernier trajet</span><span class="legend-v">Ajustement</span><span class="legend-t">Référence γ</span>'
     };
     const hints = {
       time: 'Valeurs relatives à l’état initial. P₀ = NT₀/V₀ ; pression moyennée sur les 2 dernières u.t.',
-      pv: 'Parcours pression–volume. Le travail est calculé au piston, indépendamment de la pression choisie pour ce tracé.',
+      pv: 'P en fonction de V. Les flèches indiquent le parcours. Le travail reçu est l’opposé de l’intégrale de la pression au piston selon V.',
+      pt: 'P en fonction de T : l’aire de ce diagramme n’est pas directement un travail. Les couleurs suivent les périodes du piston.',
+      vt: 'V en fonction de T : l’aire de ce diagramme n’est pas directement un travail. Les couleurs suivent les périodes du piston.',
       pvt: 'Points : pression mesurée × volume instantané. Droite : NT, référence d’équilibre isotrope. Le lissage de P introduit un retard en régime rapide.',
       log: 'ln(P) en fonction de ln(V), dans les unités réduites. Une loi PVᵞ constante donne une pente −γ.'
     };
     const labels = {
       time: 'Évolution des grandeurs mesurées au cours du temps',
       pv: 'Parcours de la pression mesurée en fonction du volume',
+      pt: 'Diagramme de la pression mesurée en fonction de la température sur plusieurs cycles',
+      vt: 'Diagramme du volume en fonction de la température sur plusieurs cycles',
       pvt: 'Produit pression volume mesuré en fonction de la température cinétique',
       log: 'Logarithme de la pression mesurée en fonction du logarithme du volume'
     };
-    $('graphLegend').innerHTML = legends[chartType];
+    $('graphLegend').innerHTML = legends[chartType] + (chartType === 'pv' && $('cycleReconstruction').checked && pressureSource === 'piston' ? '<span class="legend-rebuilt">Peff déduite de W</span>' : '');
+    document.querySelectorAll('[data-chart]').forEach(button => { button.classList.toggle('selected', button.dataset.chart === chartType); button.setAttribute('aria-pressed', String(button.dataset.chart === chartType)); });
     $('chartHint').textContent = hints[chartType];
     $('logAnalysis').hidden = chartType !== 'log';
     chart.setAttribute('aria-label', labels[chartType]);
@@ -337,8 +481,8 @@
     ctx.textAlign = 'right'; ctx.fillText(xLabel, right, 11);
     return { X, Y, left, right, top, bottom };
   }
-  function plotLine(ctx, axes, points, color, { dashed = false, scatter = false, radius = 1.7 } = {}) {
-    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 1.7;
+  function plotLine(ctx, axes, points, color, { dashed = false, scatter = false, radius = 1.7, lineWidth = 1.7, arrows = false } = {}) {
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = lineWidth;
     ctx.setLineDash(dashed ? [5, 4] : []);
     ctx.beginPath(); let pen = false;
     for (const p of points) {
@@ -350,11 +494,24 @@
     }
     if (scatter) ctx.fill(); else ctx.stroke();
     ctx.setLineDash([]);
+    if (arrows && points.length > 3) {
+      for (let i = Math.max(1, Math.floor(points.length / 5)); i < points.length; i += Math.max(1, Math.floor(points.length / 4))) {
+        const a = points[i - 1], b = points[i];
+        if (![a.x, a.y, b.x, b.y].every(Number.isFinite)) continue;
+        let from = i - 1;
+        while (from > 0 && Math.hypot(axes.X(b.x) - axes.X(points[from].x), axes.Y(b.y) - axes.Y(points[from].y)) < 9) from--;
+        const p = points[from];
+        if (![p.x, p.y].every(Number.isFinite)) continue;
+        const x = axes.X(b.x), y = axes.Y(b.y), angle = Math.atan2(y - axes.Y(p.y), x - axes.X(p.x));
+        line(ctx, x, y, x - 5 * Math.cos(angle - 0.5), y - 5 * Math.sin(angle - 0.5), color, 1.4);
+        line(ctx, x, y, x - 5 * Math.cos(angle + 0.5), y - 5 * Math.sin(angle + 0.5), color, 1.4);
+      }
+    }
   }
   function drawChart() {
     const { ctx, w, h } = setupCanvas(chart);
     let series = [], xr, yr, xLabel, yLabel;
-    let fitData = null;
+    let fitData = null, areaPoints = null, reconstructedSeries = null;
     if (chartType === 'time') {
       const start = Math.max(0, sim.time - 60);
       const rows = history.filter(row => row.time >= start);
@@ -386,6 +543,23 @@
       }
       $('invariantSpread').textContent = spread == null ? '—' : number(spread, 1) + ' %';
       $('fitStatus').textContent = fitData.fit ? fitData.fit.count + ' fenêtres non recouvrantes sur le dernier trajet. Pente mesurée = ' + number(fitData.fit.slope, 3) + '. Variation = (max − min) / moyenne de PVᵞ.' : fitData.reason;
+    } else if (['pv', 'pt', 'vt'].includes(chartType)) {
+      const records = $('cycleOverlay').checked ? visibleCycles() : [];
+      const selected = selectedCycle();
+      const plotPoint = row => ({ x: chartType === 'pv' ? row.volume : row.temperature, y: chartType === 'vt' ? row.volume : pressureOf(row) ?? NaN });
+      series = records.length ? records.map(c => ({ color: cycleColor(c), lineWidth: c === selected ? 2.2 : 1.35, arrows: true, points: c.rows.map(plotPoint) })) : [{ color: '#349a87', arrows: true, points: history.map(plotPoint) }];
+      if (chartType === 'pv' && selected && pressureSource === 'piston') {
+        const summary = summarize(selected), rebuilt = reconstruct(selected);
+        if ($('cycleArea').checked && summary.complete && summary.closedVolume && summary.valid) areaPoints = summary.points.map(p => ({ x: p.volume, y: p.pressure }));
+        if ($('cycleReconstruction').checked && rebuilt.valid) {
+          reconstructedSeries = { color: '#172d3d', dashed: true, lineWidth: 1.4, points: rebuilt.points.map(p => ({ x: p.volume, y: p.pressure })) };
+          series.push(reconstructedSeries);
+        }
+      }
+      xr = dataRange(series.flatMap(s => s.points.map(p => p.x)), chartType === 'pv' ? [initial.volume * 0.8, initial.volume * 1.2] : [initial.temperature * 0.8, initial.temperature * 1.2]);
+      yr = dataRange(series.flatMap(s => s.points.map(p => p.y)), chartType === 'vt' ? [initial.volume * 0.8, initial.volume * 1.2] : [0, initial.pressureIdeal * 1.3], true);
+      xLabel = chartType === 'pv' ? 'V (u.r.²)' : 'T cinétique (u.r.)';
+      yLabel = chartType === 'vt' ? 'V (u.r.²)' : 'P (u.r.)';
     } else {
       const rows = history.filter(r => pressureOf(r) != null);
       const pvt = chartType === 'pvt';
@@ -399,6 +573,18 @@
     }
     const axes = plotAxes(ctx, w, h, xr, yr, xLabel, yLabel);
     ctx.save(); ctx.beginPath(); ctx.rect(axes.left, axes.top, axes.right - axes.left, axes.bottom - axes.top); ctx.clip();
+    function shade(points, color) {
+      if (!points?.length) return;
+      ctx.beginPath(); ctx.moveTo(axes.X(points[0].x), axes.Y(points[0].y));
+      for (const p of points.slice(1)) ctx.lineTo(axes.X(p.x), axes.Y(p.y));
+      ctx.closePath(); ctx.fillStyle = color; ctx.fill('evenodd');
+      const first = points[0], last = points.at(-1);
+      if (Math.abs(first.x - last.x) < 1e-5) {
+        ctx.setLineDash([3, 4]); line(ctx, axes.X(last.x), axes.Y(last.y), axes.X(first.x), axes.Y(first.y), '#82949f88'); ctx.setLineDash([]);
+      }
+    }
+    shade(areaPoints, '#3b9c8522');
+    if (reconstructedSeries && selectedCycle()?.complete && summarize(selectedCycle()).closedVolume) shade(reconstructedSeries.points, '#172d3d10');
     for (const s of series) plotLine(ctx, axes, s.points, s.color, s);
     ctx.restore();
   }
@@ -429,16 +615,33 @@
     $('meanEnergy').textContent = '⟨Ec⟩ = ' + number(energy.mean);
     $('distributionCount').textContent = sim.count.toLocaleString('fr-FR') + ' particules';
   }
-  function render() { drawChamber(); drawChart(); drawDistributions(); }
+  function render() { updateCycleReadings(); drawChamber(); drawChart(); drawDistributions(); }
+  function advanceSimulation(dt) {
+    const motion = sim.motion;
+    const boundary = motion && currentRun ? currentRun.start + currentRun.nextTurn * currentRun.duration : Infinity;
+    const untilBoundary = boundary - sim.time;
+    const step = Math.min(dt, untilBoundary > 1e-10 ? untilBoundary : dt);
+    sim.step(step);
+    // Capturer exactement chaque retournement et chaque période avant de
+    // poursuivre, même si plusieurs frontières arrivent dans une seule image.
+    if (motion && currentRun && sim.time >= boundary - 1e-9) {
+      sample(true);
+      currentRun.nextTurn++;
+      if (motion.type === 'oscillate' && (currentRun.nextTurn - 1) % 2 === 0) {
+        finishCycle(true); beginCycle('periodic');
+      } else if (!sim.motion && activeCycle?.kind === 'manual' && Math.abs(sim.width - activeCycle.rows[0].width) < 1e-6) finishCycle(true);
+    }
+    if (sim.time >= nextSample) sample();
+    return step;
+  }
   function frame(timestamp) {
     if (!lastTimestamp) lastTimestamp = timestamp;
     const elapsed = Math.min(0.06, (timestamp - lastTimestamp) / 1000);
     lastTimestamp = timestamp;
     if (!paused && !document.hidden) {
-      accumulator += elapsed;
+      accumulator += elapsed * (+$('timeScale').value || 1);
       while (accumulator >= 1 / 120) {
-        sim.step(1 / 120); accumulator -= 1 / 120;
-        if (sim.time >= nextSample) sample();
+        accumulator -= advanceSimulation(1 / 120);
       }
     }
     if (timestamp - lastUi > 100) { updateReadings(); lastUi = timestamp; }
@@ -448,7 +651,11 @@
   }
   document.addEventListener('visibilitychange', () => { lastTimestamp = 0; accumulator = 0; });
   window.addEventListener('resize', render);
-  configureTarget(true); sample(); updateGraphLabels(); updateReadings(); render(); requestAnimationFrame(frame);
+  $('pressureSource').value = pressureSource;
+  $('thermalMode').value = sim.thermal.mode;
+  $('timeScale').value = '1';
+  $('cycleLimit').value = '5';
+  configureTarget(true); sample(); thermalControls(); updateGraphLabels(); updateReadings(); render(); requestAnimationFrame(frame);
   // Diagnostic en lecture : pratique pour vérifier la simulation depuis la console.
-  Object.defineProperty(window, 'gaz2D', { value: { get metrics() { return { ...sim.metrics }; }, get paused() { return paused; }, get analysis() { return { chartType, pressureSource, gammaReference, ...runLeg(), logarithmic: logResult() }; } }, writable: false });
+  Object.defineProperty(window, 'gaz2D', { value: { get metrics() { return { ...sim.metrics }; }, get paused() { return paused; }, get analysis() { return { chartType, pressureSource, gammaReference, ...runLeg(), logarithmic: logResult(), cycles: visibleCycles().map(c => ({ id: c.id, kind: c.kind, complete: c.complete, rows: c.rows.map(p => ({ ...p })), summary: summarize(c), reconstruction: reconstruct(c) })), selectedCycleId: selectedCycle()?.id ?? null }; } }, writable: false });
 })();

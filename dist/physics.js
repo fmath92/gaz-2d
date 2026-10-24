@@ -1,7 +1,8 @@
 /* Gaz parfait ponctuel en 2D, m = kB = 1. Les disques de l'interface
  * n'ont pas de rayon physique et les particules ne s'entrechoquent pas.
  * La température cinétique scalaire est E/N ; hors équilibre Tx et Ty
- * peuvent différer. Le piston échange du travail, jamais de chaleur. */
+ * peuvent différer. Les parois peuvent être isolées ou diffuser les particules
+ * à la température d’un thermostat dans le référentiel local de la paroi. */
 (function (root) {
   'use strict';
   const EPS = 1e-11;
@@ -42,10 +43,13 @@
       if (!Number.isInteger(count) || count < 10 || count > 1000) throw new RangeError('Le nombre de particules doit être un entier compris entre 10 et 1000.');
       finite(temperature, 'La température');
       if (temperature <= 0) throw new RangeError('La température doit être positive.');
+      this.setThermal(options.thermal ?? this.thermal ?? {});
       this.width = checkWidth(options.width ?? 11);
       this.count = count;
       this.seed = options.seed ?? 314159;
       const random = randomGenerator(this.seed);
+      // Flux thermique reproductible, indépendant du tirage de l’état initial.
+      this._thermalRandom = randomGenerator((Number(this.seed) >>> 0) ^ 0xA53C9E17);
       this.particles = Array.from({ length: count }, () => ({
         x: (0.005 + 0.99 * random()) * this.width,
         y: (0.005 + 0.99 * random()) * this.height,
@@ -61,12 +65,29 @@
       this.time = 0;
       this.work = 0;
       this.pressureWork = 0;
+      this.heat = 0;
+      this.heatIn = 0;
+      this.heatOut = 0;
+      this.heatByWall = { left: 0, right: 0, top: 0, bottom: 0 };
       this.initialEnergy = count * temperature;
       this.motion = null;
       this._pistonVelocity = 0;
       this._events = [];
       this._segments = [];
       this._collisions = 0;
+      return this;
+    }
+    setThermal(options = {}) {
+      const config = { mode: 'isolated', temperature: 1.5, accommodation: 1, pistonThermal: true, ...this.thermal, ...options };
+      if (!['isolated', 'thermostat'].includes(config.mode)) throw new RangeError('Mode thermique inconnu.');
+      finite(config.temperature, 'La température du thermostat');
+      if (config.temperature <= 0) throw new RangeError('La température du thermostat doit être positive.');
+      finite(config.accommodation, 'Le coefficient d’accommodation');
+      if (config.accommodation < 0 || config.accommodation > 1) throw new RangeError('Le coefficient d’accommodation doit être compris entre 0 et 1.');
+      if (typeof config.pistonThermal !== 'boolean') throw new TypeError('Le réglage thermique du piston doit être booléen.');
+      // Changer les conditions aux limites n’applique aucun thermostat global :
+      // seuls les chocs suivants pourront échanger de la chaleur.
+      this.thermal = Object.freeze(config);
       return this;
     }
     setMotion({ type = 'linear', targetWidth, duration = 5 } = {}) {
@@ -96,9 +117,57 @@
       const phase = motion.type === 'oscillate' ? q : Math.min(1, q);
       return motion.startWidth + (motion.targetWidth - motion.startWidth) * (1 - Math.cos(Math.PI * phase)) / 2;
     }
-    _record(wall, impulse, time, work = 0) {
-      this._events.push({ wall, impulse, time, work });
+    _record(wall, impulse, time, work = 0, heat = 0) {
+      this._events.push({ wall, impulse, time, work, heat });
       this._collisions++;
+    }
+    _reflect(p, wall, time, pistonVelocity = 0) {
+      const oldVx = p.vx, oldVy = p.vy;
+      const thermal = this.thermal.mode === 'thermostat'
+        && (wall !== 'right' || this.thermal.pistonThermal)
+        && this.thermal.accommodation > 0
+        && (this.thermal.accommodation === 1 || this._thermalRandom() < this.thermal.accommodation);
+      let impulse, pressureWork = 0, heat = 0;
+      if (!thermal) {
+        // Chemin spéculaire inchangé : les cas isolés conservent leurs tirages
+        // et leur précision numérique antérieurs.
+        if (wall === 'left') { impulse = -2 * oldVx; p.vx = -oldVx; }
+        if (wall === 'right') {
+          impulse = 2 * (oldVx - pistonVelocity);
+          p.vx = 2 * pistonVelocity - oldVx;
+          this.work += 0.5 * (p.vx * p.vx - oldVx * oldVx);
+          pressureWork = -impulse * pistonVelocity;
+        }
+        if (wall === 'bottom') { impulse = -2 * oldVy; p.vy = -oldVy; }
+        if (wall === 'top') { impulse = 2 * oldVy; p.vy = -oldVy; }
+      } else {
+        const temperature = this.thermal.temperature;
+        // Une émission de paroi échantillonne un flux : la normale suit une
+        // loi de Rayleigh, et non la demi-gaussienne d’un volume à l’équilibre.
+        // Le tangentiel est gaussien. m = kB = 1.
+        const normal = Math.sqrt(-2 * temperature * Math.log(Math.max(1e-15, this._thermalRandom())));
+        const tangent = Math.sqrt(temperature) * gaussian(this._thermalRandom);
+        if (wall === 'left') { p.vx = normal; p.vy = tangent; impulse = p.vx - oldVx; }
+        if (wall === 'right') { p.vx = pistonVelocity - normal; p.vy = tangent; impulse = oldVx - p.vx; }
+        if (wall === 'bottom') { p.vx = tangent; p.vy = normal; impulse = p.vy - oldVy; }
+        if (wall === 'top') { p.vx = tangent; p.vy = -normal; impulse = oldVy - p.vy; }
+        const u = wall === 'right' ? pistonVelocity : 0;
+        const oldRelativeEnergy = 0.5 * ((oldVx - u) ** 2 + oldVy ** 2);
+        const newRelativeEnergy = 0.5 * ((p.vx - u) ** 2 + p.vy ** 2);
+        heat = newRelativeEnergy - oldRelativeEnergy;
+        if (wall === 'right') {
+          // ΔEc = W + Q ; Q est l’échange dans le référentiel de la paroi.
+          // Cette voie et -uJ constituent deux calculs indépendants de W.
+          if (u !== 0) this.work += 0.5 * (p.vx ** 2 + p.vy ** 2 - oldVx ** 2 - oldVy ** 2) - heat;
+          pressureWork = -u * impulse;
+        }
+        this.heat += heat;
+        this.heatIn += Math.max(0, heat);
+        this.heatOut += Math.min(0, heat);
+        this.heatByWall[wall] += heat;
+      }
+      this.pressureWork += pressureWork;
+      this._record(wall, impulse, time, pressureWork, heat);
     }
     _advanceParticle(p, dt, oldWidth, pistonVelocity) {
       let elapsed = 0;
@@ -116,33 +185,23 @@
         elapsed += travel;
         if (hit > remaining + EPS || !Number.isFinite(hit)) break;
         const collisionTime = this.time + elapsed;
-        // Les égalités traitent aussi un choc simultané dans un coin.
-        if (Math.abs(hit - leftTime) < EPS) {
+        // Dans un coin, une émission diffuse peut déjà éloigner la particule
+        // de l’autre paroi. Ne traiter celle-ci que si elle reste incidente.
+        if (Math.abs(hit - leftTime) < EPS && p.vx < -EPS) {
           p.x = 0;
-          this._record('left', -2 * p.vx, collisionTime);
-          p.vx = -p.vx;
+          this._reflect(p, 'left', collisionTime);
         }
-        if (Math.abs(hit - rightTime) < EPS) {
+        if (Math.abs(hit - rightTime) < EPS && p.vx - pistonVelocity > EPS) {
           p.x = oldWidth + pistonVelocity * elapsed;
-          const impulse = 2 * (p.vx - pistonVelocity);
-          const oldVelocity = p.vx;
-          p.vx = 2 * pistonVelocity - p.vx;
-          this.work += 0.5 * (p.vx * p.vx - oldVelocity * oldVelocity);
-          // Wpression = -∫ Ppiston dV = -Σ J u pour une force impulsionnelle.
-          // Le calcul est indépendant de la différence d'énergie ci-dessus.
-          const pressureWork = -impulse * pistonVelocity;
-          this.pressureWork += pressureWork;
-          this._record('right', impulse, collisionTime, pressureWork);
+          this._reflect(p, 'right', collisionTime, pistonVelocity);
         }
-        if (Math.abs(hit - bottomTime) < EPS) {
+        if (Math.abs(hit - bottomTime) < EPS && p.vy < -EPS) {
           p.y = 0;
-          this._record('bottom', -2 * p.vy, collisionTime);
-          p.vy = -p.vy;
+          this._reflect(p, 'bottom', collisionTime);
         }
-        if (Math.abs(hit - topTime) < EPS) {
+        if (Math.abs(hit - topTime) < EPS && p.vy > EPS) {
           p.y = this.height;
-          this._record('top', 2 * p.vy, collisionTime);
-          p.vy = -p.vy;
+          this._reflect(p, 'top', collisionTime);
         }
       }
       // Le résidu < EPS ne porte pas de choc résolu ; il est négligeable
@@ -198,11 +257,12 @@
       const duration = Math.min(this.time, this.measurementWindow);
       const cutoff = this.time - duration;
       const impulses = { left: 0, right: 0, top: 0, bottom: 0 };
-      let windowWork = 0;
+      let windowWork = 0, windowHeat = 0;
       for (const event of this._events) {
         if (event.time < cutoff - EPS) continue;
         impulses[event.wall] += event.impulse;
         windowWork += event.work;
+        windowHeat += event.heat;
       }
       let widthIntegral = 0;
       for (const s of this._segments) {
@@ -226,11 +286,17 @@
         temperatureX: 2 * ex / this.count, temperatureY: 2 * ey / this.count,
         pressure: perimeterIntegral > EPS ? sumImpulse / perimeterIntegral : null,
         pressureIdeal: energy / (this.width * this.height), pressureByWall,
-        work: this.work, balanceError: energy - this.initialEnergy - this.work,
+        work: this.work, balanceError: energy - this.initialEnergy - this.work - this.heat,
         pressureWork: this.pressureWork,
         pressurePower: duration > EPS ? windowWork / duration : null,
         pressureWorkError: this.pressureWork - this.work,
-        balancePressureError: energy - this.initialEnergy - this.pressureWork,
+        balancePressureError: energy - this.initialEnergy - this.pressureWork - this.heat,
+        heat: this.heat, heatIn: this.heatIn, heatOut: this.heatOut,
+        heatPower: duration > EPS ? windowHeat / duration : null,
+        heatByWall: { ...this.heatByWall },
+        firstLawError: energy - this.initialEnergy - this.pressureWork - this.heat,
+        thermalMode: this.thermal.mode, bathTemperature: this.thermal.temperature,
+        accommodation: this.thermal.accommodation, pistonThermal: this.thermal.pistonThermal,
         measurementDuration: duration, collisions: this._collisions,
         pistonVelocity: this._pistonVelocity
       };

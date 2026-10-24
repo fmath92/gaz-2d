@@ -6,6 +6,7 @@ import vm from 'node:vm';
 const html = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8');
 const physics = readFileSync(new URL('../dist/physics.js', import.meta.url), 'utf8');
 const analysis = readFileSync(new URL('../dist/analysis.js', import.meta.url), 'utf8');
+const cycles = readFileSync(new URL('../dist/cycles.js', import.meta.url), 'utf8');
 const app = readFileSync(new URL('../dist/app.js', import.meta.url), 'utf8');
 
 // Only DOM and drawing primitives are replaced. The production application,
@@ -55,7 +56,11 @@ function laboratory() {
   const freeOption = { disabled: false };
   const charts = [...html.matchAll(/<button\b([^>]*\bdata-chart="[^"]+"[^>]*)>/g)].map(match => element('button', attributes(match[1])));
   nodes.get('motion').value = 'linear';
-  nodes.get('pressureSource').value = 'mean';
+  nodes.get('pressureSource').value = 'piston';
+  nodes.get('thermalMode').value = 'isolated';
+  nodes.get('timeScale').value = '1';
+  nodes.get('cycleLimit').value = '5';
+  nodes.get('cycleSelect').value = 'latest';
   const document = {
     hidden: false,
     getElementById(id) { assert.ok(nodes.has(id), `Element ${id} exists in the real HTML`); return nodes.get(id); },
@@ -71,6 +76,7 @@ function laboratory() {
   });
   vm.runInContext(physics, scope, { filename: 'physics.js' });
   vm.runInContext(analysis, scope, { filename: 'analysis.js' });
+  vm.runInContext(cycles, scope, { filename: 'cycles.js' });
   const histogram = scope.GasAnalysis.histogram;
   scope.GasAnalysis.histogram = (...args) => {
     const result = histogram(...args);
@@ -88,6 +94,7 @@ function laboratory() {
     get analysis() { return window.gaz2D.analysis; },
     click(id) { nodes.get(id).click(); },
     input(id, value) { const node = nodes.get(id); assert.ok(!node.disabled, `${id} is available`); node.value = value; node.dispatch('input'); },
+    check(id, value) { const node = nodes.get(id); assert.ok(!node.disabled, `${id} is available`); node.checked = value; node.dispatch('input'); },
     advance(seconds) { for (let i = 0; i < Math.ceil(seconds * 60); i++) frame(); }
   };
 }
@@ -255,10 +262,10 @@ test('invalid particle entries leave the current state intact and a valid slider
   assert.equal(lab.metrics.count, 137);
 });
 
-test('all four chart tabs show the requested variables and logarithmic diagnostics only when selected', () => {
+test('all six chart tabs show the requested variables and logarithmic diagnostics only when selected', () => {
   const lab = laboratory(); lab.advance(0.4);
-  assert.equal(lab.charts.length, 4);
-  const labels = { time: /Évolution/, pv: /volume/, pvt: /température/, log: /Logarithme/ };
+  assert.equal(lab.charts.length, 6);
+  const labels = { time: /Évolution/, pv: /volume/, pvt: /température/, log: /Logarithme/, pt: /pression.*température/, vt: /volume.*température/ };
   for (const button of lab.charts) {
     button.click();
     const type = button.dataset.chart;
@@ -357,4 +364,213 @@ test('an oscillation inversion starts a new log leg and free expansion never reu
   assert.equal(lab.analysis.logarithmic.points.length, 0);
   lab.charts[3].click();
   assert.match(lab.nodes.get('fitStatus').textContent, /détente libre/);
+});
+
+function periodicLaboratory({ thermal = false, count = 40 } = {}) {
+  const lab = laboratory();
+  lab.input('particles', count); lab.click('applyInitial');
+  if (thermal) { lab.input('bathTemperature', 2.5); lab.input('thermalMode', 'thermostat'); }
+  lab.input('duration', 0); lab.input('motion', 'oscillate'); lab.click('start');
+  return lab;
+}
+
+function assertBalance(summary) {
+  const scale = Math.max(1, Math.abs(summary.deltaEnergy), Math.abs(summary.work), Math.abs(summary.heat));
+  assert.ok(Math.abs(summary.deltaEnergy - summary.work - summary.heat) <= 1e-9 * scale, `ΔE=${summary.deltaEnergy}, W=${summary.work}, Q=${summary.heat}`);
+}
+
+test('rapid periodic motion captures exact half-periods and complete periods across accelerated frames', () => {
+  const lab = periodicLaboratory({ thermal: true });
+  lab.input('timeScale', 8); lab.advance(0.2);
+  // The active path is sampled every 0.1 u.t.; export captures its current
+  // endpoint before comparing its cumulative counters with the live engine.
+  lab.click('export');
+  const records = lab.analysis.cycles, complete = records.filter(c => c.complete);
+  assert.ok(complete.length >= 3);
+  assert.ok(records.some(c => !c.complete));
+  for (const cycle of complete) {
+    assert.equal(cycle.kind, 'periodic');
+    const first = cycle.rows[0], last = cycle.rows.at(-1);
+    assert.ok(Math.abs(last.time - first.time - 0.4) < 1e-9);
+    assert.ok(Math.abs(first.width - 11) < 1e-9);
+    assert.ok(Math.abs(last.width - 11) < 1e-9);
+    const turn = cycle.rows.find(row => Math.abs(row.time - first.time - 0.2) < 1e-9);
+    assert.ok(turn?.turningPoint, 'The exact half-period survives sampling');
+    assert.ok(Math.abs(turn.width - 15.4) < 1e-9);
+    assertBalance(cycle.summary);
+    assert.equal(cycle.summary.closedVolume, true);
+    assert.equal(cycle.reconstruction.valid, true, cycle.reconstruction.reason);
+    assert.ok(Math.abs(-cycle.reconstruction.integral - cycle.summary.work) < Math.max(1e-8, Math.abs(cycle.summary.work) * 1e-9));
+  }
+  const totalWork = records.reduce((sum, c) => sum + c.summary.work, 0);
+  const totalHeat = records.reduce((sum, c) => sum + c.summary.heat, 0);
+  assert.ok(Math.abs(totalWork - lab.metrics.pressureWork) < 1e-7);
+  assert.ok(Math.abs(totalHeat - lab.metrics.heat) < 1e-7);
+});
+
+test('multiple P–V, P–T and V–T diagrams retain distinct complete paths and old-cycle selection', () => {
+  const lab = periodicLaboratory(); lab.advance(2.6);
+  assert.equal(lab.analysis.cycles.length, 5);
+  lab.input('cycleLimit', 10);
+  const records = lab.analysis.cycles;
+  assert.ok(records.length >= 7 && records.length <= 10);
+  assert.equal(new Set(records.map(c => c.id)).size, records.length);
+  const oldest = records[0];
+  lab.input('cycleSelect', oldest.id);
+  assert.equal(lab.analysis.selectedCycleId, oldest.id);
+  for (const type of ['pv', 'pt', 'vt']) {
+    lab.charts.find(button => button.dataset.chart === type).click();
+    assert.equal(lab.analysis.chartType, type);
+    assert.equal(lab.analysis.selectedCycleId, oldest.id);
+    assert.equal(lab.nodes.get('cycleLegend').hidden, false);
+    assert.match(lab.nodes.get('cycleLegend').innerHTML, /background:/);
+    if (type !== 'pv') assert.match(lab.nodes.get('chartHint').textContent, /pas directement un travail/);
+  }
+  assert.ok(new Set([...lab.nodes.get('cycleLegend').innerHTML.matchAll(/background:([^";]+)/g)].map(match => match[1])).size >= 5);
+  lab.input('cycleLimit', 5);
+  assert.equal(lab.analysis.cycles.length, 5);
+  assert.notEqual(lab.analysis.selectedCycleId, oldest.id, 'An evicted display selection falls back to a visible cycle');
+});
+
+test('cycle memory stays bounded while display limits and earlier visible cycles remain usable', () => {
+  const lab = periodicLaboratory();
+  lab.input('timeScale', 8); lab.advance(5.5);
+  assert.match(lab.nodes.get('cycleMemory').textContent, /^100 \/ 100/);
+  for (const limit of [5, 10, 20]) {
+    lab.input('cycleLimit', limit);
+    const records = lab.analysis.cycles;
+    assert.equal(records.length, limit);
+    assert.ok(records[0].id > 1, 'Old cycles are discarded after reaching capacity');
+    const complete = records.find(c => c.complete);
+    lab.input('cycleSelect', complete.id);
+    assert.equal(lab.analysis.selectedCycleId, complete.id);
+    assert.ok(records.every(record => record.rows.length <= 1200));
+    assertBalance(complete.summary);
+  }
+});
+
+test('live thermostat controls exchange Q only on subsequent collisions and isolation stops heat exchange', () => {
+  const lab = laboratory(); lab.advance(0.4);
+  const energyBefore = lab.metrics.energy, timeBefore = lab.metrics.time;
+  lab.input('bathTemperature', 4); lab.input('thermalMode', 'thermostat');
+  assert.equal(lab.metrics.energy, energyBefore);
+  assert.equal(lab.metrics.time, timeBefore);
+  assert.equal(lab.metrics.heat, 0);
+  assert.equal(lab.metrics.bathTemperature, 4);
+  assert.equal(lab.metrics.pistonThermal, true, 'The HTML checkbox includes the piston by default');
+  assert.equal(lab.nodes.get('thermalSettings').hidden, false);
+  lab.advance(2);
+  assert.notEqual(lab.metrics.heat, 0);
+  assert.ok(lab.metrics.heatIn > 0);
+  assert.ok(lab.metrics.temperature > 1.5);
+  assert.ok(Math.abs(lab.metrics.firstLawError) < 1e-8);
+  const heat = lab.metrics.heat;
+  lab.input('thermalMode', 'isolated'); lab.advance(1);
+  assert.equal(lab.metrics.heat, heat);
+  assert.equal(lab.nodes.get('thermalSettings').hidden, true);
+  assert.equal(lab.metrics.thermalMode, 'isolated');
+  assert.ok(Math.abs(lab.metrics.firstLawError) < 1e-8);
+});
+
+test('invalid thermostat temperature remains editable after switching isolation off and on', () => {
+  const lab = laboratory();
+  lab.input('bathTemperature', 2); lab.input('thermalMode', 'thermostat');
+  const energy = lab.metrics.energy;
+  for (const invalid of ['', 0]) {
+    lab.input('bathTemperature', invalid);
+    assert.equal(lab.nodes.get('bathTemperature').getAttribute('aria-invalid'), 'true');
+    lab.input('thermalMode', 'isolated');
+    assert.equal(lab.metrics.thermalMode, 'isolated');
+    assert.equal(lab.nodes.get('thermalSettings').hidden, true);
+    lab.input('thermalMode', 'thermostat');
+    assert.equal(lab.nodes.get('thermalSettings').hidden, false, 'The invalid field remains visible so it can be corrected');
+    assert.equal(lab.metrics.thermalMode, 'isolated', 'An invalid temperature does not activate a new thermostat');
+    lab.input('bathTemperature', 3);
+    assert.equal(lab.metrics.thermalMode, 'thermostat');
+    assert.equal(lab.metrics.bathTemperature, 3);
+    assert.equal(lab.nodes.get('bathTemperature').getAttribute('aria-invalid'), 'false');
+    assert.equal(lab.metrics.energy, energy);
+    assert.equal(lab.metrics.heat, 0);
+  }
+});
+
+test('thermostat temperature affects relaxation and reset preserves settings while clearing heat and cycles', () => {
+  const hot = laboratory(), cold = laboratory();
+  for (const [lab, temperature] of [[hot, 4], [cold, 0.5]]) {
+    lab.input('bathTemperature', temperature); lab.input('thermalMode', 'thermostat'); lab.advance(5);
+  }
+  assert.ok(hot.metrics.temperature > cold.metrics.temperature + 0.5);
+  hot.check('thermalPiston', false);
+  assert.equal(hot.metrics.pistonThermal, false);
+  hot.input('accommodation', 35);
+  hot.input('duration', 0); hot.input('motion', 'oscillate'); hot.click('start'); hot.advance(0.6);
+  assert.ok(hot.analysis.cycles.length >= 2);
+  hot.click('reset');
+  assert.equal(hot.analysis.cycles.length, 0);
+  assert.equal(hot.metrics.heat, 0);
+  assert.equal(hot.metrics.heatIn, 0);
+  assert.equal(hot.metrics.heatOut, 0);
+  assert.equal(hot.metrics.pressureWork, 0);
+  assert.equal(hot.metrics.thermalMode, 'thermostat');
+  assert.equal(hot.metrics.bathTemperature, 4);
+  assert.equal(hot.metrics.accommodation, 0.35);
+  assert.equal(hot.metrics.pistonThermal, false);
+  assert.equal(hot.metrics.time, 0);
+});
+
+test('a manual outward and return command closes the starting volume and includes intervening heat', () => {
+  const lab = laboratory();
+  lab.input('thermalMode', 'thermostat'); lab.input('bathTemperature', 3);
+  lab.input('duration', 0); lab.click('start'); lab.advance(0.5);
+  const firstRun = lab.analysis.runId;
+  assert.equal(lab.analysis.cycles.length, 1);
+  assert.equal(lab.nodes.get('returnCycle').disabled, false);
+  lab.advance(0.4);
+  lab.click('returnCycle'); lab.advance(0.4);
+  assert.ok(lab.analysis.runId > firstRun);
+  const cycle = lab.analysis.cycles.find(record => record.complete);
+  assert.ok(cycle);
+  assert.equal(cycle.kind, 'manual');
+  assert.equal(cycle.summary.closedVolume, true);
+  assert.ok(Math.abs(cycle.rows.at(-1).volume - cycle.rows[0].volume) < 1e-8);
+  assert.ok(new Set(cycle.rows.map(row => row.runId)).size >= 2);
+  assert.notEqual(cycle.summary.heat, 0);
+  assertBalance(cycle.summary);
+  assert.equal(cycle.reconstruction.valid, true, cycle.reconstruction.reason);
+  assert.equal(lab.nodes.get('returnCycle').disabled, true);
+});
+
+function csvData(text) {
+  assert.ok(!/NaN|Infinity/.test(text));
+  const lines = text.replace(/^\uFEFF/, '').trim().split(/\r?\n/), headings = lines.shift().split(';');
+  const rows = lines.map(line => {
+    const cells = line.split(';'); assert.equal(cells.length, headings.length);
+    return Object.fromEntries(headings.map((name, i) => [name, cells[i]]));
+  });
+  return { headings, rows, number: (row, key) => row[key] === '' ? null : Number(row[key].replace(',', '.')) };
+}
+
+test('measurement and cycle CSV exports preserve Q, first-law balances and reconstructed work', async () => {
+  const lab = periodicLaboratory({ thermal: true }); lab.advance(1.6);
+  lab.click('export');
+  const measurements = csvData(await lab.downloads.at(-1).blob.text());
+  const last = measurements.rows.at(-1), M = key => measurements.number(last, key);
+  assert.ok(measurements.headings.includes('chaleur_recue_nette_ur'));
+  assert.notEqual(M('chaleur_recue_nette_ur'), 0);
+  assert.ok(Math.abs(M('chaleur_recue_nette_ur') - lab.metrics.heat) < Math.max(1e-7, Math.abs(lab.metrics.heat) * 1e-9));
+  assert.ok(Math.abs(M('ecart_bilan_ur')) < 1e-7);
+  assert.equal(last.mode_thermique, 'thermostat');
+  assert.equal(last.piston_thermalise, '1');
+  lab.click('exportCycles');
+  assert.equal(lab.downloads.at(-1).download, 'gaz-2d-cycles.csv');
+  const exported = csvData(await lab.downloads.at(-1).blob.text());
+  assert.ok(exported.rows.length >= 4);
+  assert.ok(exported.headings.includes('W_reconstruit_Peff_ur'));
+  for (const row of exported.rows) {
+    const N = key => exported.number(row, key);
+    assert.ok(Math.abs(N('delta_E_ur') - N('W_recu_ur') - N('Q_recue_ur')) < Math.max(1e-6, Math.abs(N('W_recu_ur')) * 1e-8));
+    assert.ok(Math.abs(N('ecart_bilan_ur')) < 1e-7);
+    if (N('W_reconstruit_Peff_ur') != null) assert.ok(Math.abs(N('W_reconstruit_Peff_ur') - N('W_recu_ur')) < Math.max(1e-6, Math.abs(N('W_recu_ur')) * 1e-8));
+    if (row.acheve === '1') assert.equal(row.volume_revenu, '1');
+  }
 });
