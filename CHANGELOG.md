@@ -1,5 +1,15 @@
 # Versions du démonstrateur
 
+## 0.5 — 24 octobre 2026
+
+Visite guidée organisée par expériences, dans l’ordre : pression–travail, échanges thermiques, Joule–Gay–Lussac, détente adiabatique, compression adiabatique et comparaison des modèles. Simulation et courbes réunies sur le même écran de travail, avec basculement Évolution P/V/T ↔ PV/T. États et mesures conservés par onglet ; seule l’expérience affichée évolue. Retrait de l’expérience des cycles périodiques et de son interface.
+
+Nombre de particules fixé à 1 000 dans chaque gaz. Rayon graphique 0,04 dans les deux modèles. Deux simulations synchronisées pour comparer les points et les disques durs, courbes PV/T communes et export distinct des mesures de chaque modèle.
+
+Instrumentation des vrais événements : position et date, vitesses avant/après, impulsion, travail et chaleur. Zoom du choc, arrêt sur un nouvel événement, ralenti jusqu’à ×0,05 et pas de 0,02 u.t. Flèche d’impulsion ou de chaleur au point de contact. Jauge de pression calculée par ΣJ/(HΔt) et mise en évidence de δW = 0 à piston fixe. Thermostat sélectif (paroi gauche par défaut), chaleur par collision et flux moyen par unité de longueur. Le zoom des deux modèles distingue le choc calculé des disques du prolongement illustratif des trajectoires ponctuelles.
+
+Diagrammes avancés et distributions maintenus dans une section dépliable. Documentation et tests adaptés aux parcours guidés, à la conservation des états, au comptage de 1 000 particules, à l’instrumentation et aux exports comparatifs.
+
 ## 0.4 — 24 octobre 2026
 
 Interface organisée en quatre onglets : Expérimenter, Diagrammes, Particules et Comprendre. Presets Joule–Gay–Lussac, détente et compression adiabatiques, cycles périodiques et laboratoire libre. Les curseurs de volume, de durée et de température, les questions guidées et les détails dépliables permettent de découvrir progressivement les commandes. Toutes les analyses, tous les réglages et les exports de la version 0.3 sont conservés. Navigation clavier et présentation adaptée aux écrans étroits.

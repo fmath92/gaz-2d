@@ -71,6 +71,8 @@
       if (model === 'hard-disks' && this.height < 1) throw new RangeError('Les disques durs nécessitent une hauteur d’au moins 1.');
       this.particleModel = model;
       this.radius = model === 'hard-disks' ? 0.04 : 0;
+      this.observeCollisions = options.observeCollisions ?? this.observeCollisions ?? false;
+      this.observations = { sequence: 0, walls: {}, pair: null };
       this.setThermal(options.thermal ?? this.thermal ?? {});
       this.width = checkWidth(options.width ?? 11);
       this.count = count;
@@ -78,7 +80,8 @@
       const random = randomGenerator(this.seed);
       // Flux thermique reproductible, indépendant du tirage de l’état initial.
       this._thermalRandom = randomGenerator((Number(this.seed) >>> 0) ^ 0xA53C9E17);
-      this.particles = Array.from({ length: count }, () => ({
+      this.particles = Array.from({ length: count }, (_, id) => ({
+        id,
         x: (0.005 + 0.99 * random()) * this.width,
         y: (0.005 + 0.99 * random()) * this.height,
         vx: gaussian(random), vy: gaussian(random)
@@ -130,13 +133,15 @@
       return this;
     }
     setThermal(options = {}) {
-      const config = { mode: 'isolated', temperature: 1.5, accommodation: 1, pistonThermal: true, ...this.thermal, ...options };
+      const config = { mode: 'isolated', temperature: 1.5, accommodation: 1, pistonThermal: true, walls: WALLS, ...this.thermal, ...options };
       if (!['isolated', 'thermostat'].includes(config.mode)) throw new RangeError('Mode thermique inconnu.');
       finite(config.temperature, 'La température du thermostat');
       if (config.temperature <= 0) throw new RangeError('La température du thermostat doit être positive.');
       finite(config.accommodation, 'Le coefficient d’accommodation');
       if (config.accommodation < 0 || config.accommodation > 1) throw new RangeError('Le coefficient d’accommodation doit être compris entre 0 et 1.');
       if (typeof config.pistonThermal !== 'boolean') throw new TypeError('Le réglage thermique du piston doit être booléen.');
+      if (!Array.isArray(config.walls) || config.walls.some(wall => !WALLS.includes(wall))) throw new RangeError('Liste de parois thermiques invalide.');
+      config.walls = Object.freeze([...new Set(config.walls)]);
       // Changer les conditions aux limites n’applique aucun thermostat global :
       // seuls les chocs suivants pourront échanger de la chaleur.
       this.thermal = Object.freeze(config);
@@ -176,6 +181,7 @@
     _reflect(p, wall, time, pistonVelocity = 0, allowThermal = true) {
       const oldVx = p.vx, oldVy = p.vy;
       const thermal = allowThermal && this.thermal.mode === 'thermostat'
+        && this.thermal.walls.includes(wall)
         && (wall !== 'right' || this.thermal.pistonThermal)
         && this.thermal.accommodation > 0
         && (this.thermal.accommodation === 1 || this._thermalRandom() < this.thermal.accommodation);
@@ -220,6 +226,15 @@
       }
       this.pressureWork += pressureWork;
       this._record(wall, impulse, time, pressureWork, heat);
+      if (this.observeCollisions) {
+        const event = { kind: 'wall', sequence: ++this.observations.sequence, time, wall, particleId: p.id,
+          x: p.x, y: p.y, radius: this.radius, before: { vx: oldVx, vy: oldVy }, after: { vx: p.vx, vy: p.vy },
+          wallVelocity: wall === 'right' ? pistonVelocity : 0, impulse, work: pressureWork, heat, thermal,
+          energyBefore: 0.5 * (oldVx ** 2 + oldVy ** 2), energyAfter: 0.5 * (p.vx ** 2 + p.vy ** 2) };
+        // Le moteur ponctuel traite les particules l'une après l'autre :
+        // l'ordre d'appel n'est pas nécessairement l'ordre chronologique.
+        if (!this.observations.walls[wall] || time >= this.observations.walls[wall].time) this.observations.walls[wall] = event;
+      }
     }
     _advanceParticle(p, dt, oldWidth, pistonVelocity) {
       let elapsed = 0;
@@ -325,7 +340,7 @@
           // convention de contact multiple conserve exactement ΔE = W + Q.
           const absoluteTime = this.time + t;
           const allowed = absoluteTime - this._lastThermalContact[i] > 1e-10;
-          if (this.thermal.mode === 'thermostat' && this.thermal.accommodation > 0 && (e.wall !== 'right' || this.thermal.pistonThermal)) {
+          if (this.thermal.mode === 'thermostat' && this.thermal.accommodation > 0 && this.thermal.walls.includes(e.wall) && (e.wall !== 'right' || this.thermal.pistonThermal)) {
             if (allowed) this._lastThermalContact[i] = absoluteTime;
             else this._thermalContactFallbacks++;
           }
@@ -335,9 +350,15 @@
           const a = ps[i], b = ps[j], dx = b.x - a.x, dy = b.y - a.y;
           const distance = Math.hypot(dx, dy), nx = dx / distance, ny = dy / distance;
           const normalVelocity = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+          const before = this.observeCollisions ? [{ x: a.x, y: a.y, vx: a.vx, vy: a.vy }, { x: b.x, y: b.y, vx: b.vx, vy: b.vy }] : null;
           a.vx += normalVelocity * nx; a.vy += normalVelocity * ny;
           b.vx -= normalVelocity * nx; b.vy -= normalVelocity * ny;
           this._pairCollisions++;
+          if (this.observeCollisions) this.observations.pair = { kind: 'pair', sequence: ++this.observations.sequence,
+            time: this.time + t, ids: [a.id, b.id], radius, before,
+            after: [{ x: a.x, y: a.y, vx: a.vx, vy: a.vy }, { x: b.x, y: b.y, vx: b.vx, vy: b.vy }],
+            impulse: -normalVelocity, nx, ny };
+
           revisions[j]++;
         }
         revisions[i]++;
@@ -402,11 +423,13 @@
       const cutoff = this.time - duration;
       const impulses = { left: 0, right: 0, top: 0, bottom: 0 };
       let windowWork = 0, windowHeat = 0;
+      const windowHeatByWall = { left: 0, right: 0, top: 0, bottom: 0 };
       for (const event of this._events) {
         if (event.time < cutoff - EPS) continue;
         impulses[event.wall] += event.impulse;
         windowWork += event.work;
         windowHeat += event.heat;
+        windowHeatByWall[event.wall] += event.heat;
       }
       let widthIntegral = 0;
       for (const s of this._segments) {
@@ -416,11 +439,12 @@
         const widthAtStart = s.width0 + (s.width1 - s.width0) * (start - s.start) / span;
         widthIntegral += 0.5 * (widthAtStart + s.width1) * (s.end - start);
       }
-      const pressureByWall = {};
+      const pressureByWall = {}, heatFluxByWall = {};
       let sumImpulse = 0;
       for (const wall of WALLS) {
         const denominator = wall === 'left' || wall === 'right' ? this.height * duration : widthIntegral;
         pressureByWall[wall] = denominator > EPS ? impulses[wall] / denominator : null;
+        heatFluxByWall[wall] = denominator > EPS ? windowHeatByWall[wall] / denominator : null;
         sumImpulse += impulses[wall];
       }
       const perimeterIntegral = 2 * (this.height * duration + widthIntegral);
@@ -430,6 +454,7 @@
         temperatureX: 2 * ex / this.count, temperatureY: 2 * ey / this.count,
         pressure: perimeterIntegral > EPS ? sumImpulse / perimeterIntegral : null,
         pressureIdeal: energy / (this.width * this.height), pressureByWall,
+        impulseByWall: { ...impulses }, pistonLengthTime: this.height * duration,
         work: this.work, balanceError: energy - this.initialEnergy - this.work - this.heat,
         pressureWork: this.pressureWork,
         pressurePower: duration > EPS ? windowWork / duration : null,
@@ -437,9 +462,9 @@
         balancePressureError: energy - this.initialEnergy - this.pressureWork - this.heat,
         heat: this.heat, heatIn: this.heatIn, heatOut: this.heatOut,
         heatPower: duration > EPS ? windowHeat / duration : null,
-        heatByWall: { ...this.heatByWall },
+        heatByWall: { ...this.heatByWall }, heatFluxByWall,
         firstLawError: energy - this.initialEnergy - this.pressureWork - this.heat,
-        thermalMode: this.thermal.mode, bathTemperature: this.thermal.temperature,
+        thermalWalls: [...this.thermal.walls], thermalMode: this.thermal.mode, bathTemperature: this.thermal.temperature,
         accommodation: this.thermal.accommodation, pistonThermal: this.thermal.pistonThermal,
         measurementDuration: duration, collisions: this._collisions,
         particleModel: this.particleModel, particleRadius: this.radius, pairCollisions: this._pairCollisions,
