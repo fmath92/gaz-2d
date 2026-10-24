@@ -1,5 +1,6 @@
 (function (root) {
   'use strict';
+  const U = root.GasUnits;
   const format = (v, digits = 2) => Number.isFinite(v) ? v.toLocaleString('fr-FR', { maximumFractionDigits: digits, minimumFractionDigits: digits }) : '—';
   function dataRange(values, fallback, zero = false) {
     let min = Infinity, max = -Infinity;
@@ -12,7 +13,7 @@
     const left = 49, right = w - 20, top = 22, bottom = h - 29;
     const X = x => left + (x - xr[0]) / (xr[1] - xr[0]) * (right - left);
     const Y = y => bottom - (y - yr[0]) / (yr[1] - yr[0]) * (bottom - top);
-    const tick = (value, span) => Math.abs(value) >= 10000 ? value.toExponential(1) : format(value, span < 1 ? 2 : span < 8 ? 1 : 0);
+    const tick = (value, span) => Math.abs(value) >= 10000 ? value.toExponential(1) : format(value, span < 1 ? Math.min(6, Math.max(2, Math.ceil(-Math.log10(span)) + 1)) : span < 8 ? 1 : 0);
     ctx.font = '9px system-ui, sans-serif';
     for (let i = 0; i <= 4; i++) {
       const value = yr[0] + (yr[1] - yr[0]) * i / 4;
@@ -134,7 +135,7 @@
     ctx.font='10px system-ui'; ctx.fillStyle='#617b8d';ctx.textAlign='left';
     if (q < .1) {
       ctx.fillText(sim.thermal.mode==='thermostat' ? 'THERMOSTAT' : 'ISOLÉE',left,top-10);
-      ctx.textAlign='center';ctx.fillText('PISTON',right,top-10);ctx.fillText('V = '+format(sim.width*sim.height,1),(left+right)/2,bottom+19);
+      ctx.textAlign='center';ctx.fillText('PISTON',right,top-10);ctx.fillText('V = '+U.text('volume', sim.width*sim.height),(left+right)/2,bottom+19);
     }
     if (focus && !tour) {
       const p = focus.kind==='pair' ? focus.before[0] : focus;
@@ -151,7 +152,7 @@
       ctx.font='10px system-ui';ctx.textAlign='left';ctx.fillStyle='#617987';
       ctx.fillText('Position initiale · repère fixe',14,38);
       arrow(ctx,right,60,Math.sign(u)*37,0,'#647f91',2);
-      ctx.textAlign='right';ctx.fillText('u = '+format(u)+' · Δx = '+format(sim.width-tour.startWidth,3),w-14,38);
+      ctx.textAlign='right';ctx.fillText('u = '+U.text('velocity', u)+' · Δx = '+U.text('length', sim.width-tour.startWidth),w-14,38);
       // A laboratory ruler makes the wall translation readable before impact.
       for(let x=Math.floor((tour.startWidth-3)*5)/5;x<tour.startWidth+3;x+=.2) {
         const px=X(x);if(px<8||px>w-8)continue;
@@ -191,17 +192,17 @@
     arrow(ctx,cx,cy,e.after.vx*f,-e.after.vy*f,'#258d79',2.5);
     ctx.strokeStyle='#e3a34e';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,12+Math.min(1,tour.impactAge/.6)*16,0,2*Math.PI);ctx.stroke();
     // A common scale and laboratory velocities reveal the work asymmetry.
-    ctx.font='10px system-ui';ctx.textAlign='left';ctx.fillStyle=tour.kind==='work'?'#9274ad':'#397fbe';ctx.fillText((tour.kind==='work'?'v sortante si fixe · ':'p avant · ')+format(fixed.speed),14,h-35);
-    ctx.fillStyle='#258d79';ctx.fillText((tour.kind==='work'?'v sortante si mobile · ':'p après · ')+format(Math.hypot(e.after.vx,e.after.vy)),14,h-19);
+    ctx.font='10px system-ui';ctx.textAlign='left';ctx.fillStyle=tour.kind==='work'?'#9274ad':'#397fbe';ctx.fillText((tour.kind==='work'?'v sortante si fixe · ':'p avant · ')+U.text(tour.kind==='work'?'velocity':'momentum', fixed.speed),14,h-35);
+    ctx.fillStyle='#258d79';ctx.fillText((tour.kind==='work'?'v sortante si mobile · ':'p après · ')+U.text(tour.kind==='work'?'velocity':'momentum', Math.hypot(e.after.vx,e.after.vy)),14,h-19);
     const inward=e.wall==='left'?1:-1;
     if (tour.kind==='pressure') {
-      arrow(ctx,cx,cy,-inward*65,0,'#ce8b37',3);ctx.fillStyle='#aa702e';ctx.textAlign='center';ctx.fillText('Poussée · J = '+format(e.impulse),Math.min(w-78,cx-inward*35),cy+35);
+      arrow(ctx,cx,cy,-inward*65,0,'#ce8b37',3);ctx.fillStyle='#aa702e';ctx.textAlign='center';ctx.fillText('Poussée · J = '+U.text('momentum', e.impulse),Math.min(w-78,cx-inward*35),cy+35);
     } else {
       const energy=tour.kind==='heat'?e.heat:e.work,dx=inward*Math.sign(energy)*65;
       arrow(ctx,cx-dx/2,cy,dx,0,energy>0?'#d48d39':'#497fb9',4);
       const label=tour.kind==='heat' ? (energy>0?'Paroi → gaz':'Gaz → paroi') : (energy>0?'Piston → gaz':'Gaz → piston');
       ctx.fillStyle=energy>0?'#b57b35':'#3c75a5';ctx.textAlign='right';ctx.fillText(label,w-14,h-35);
-      ctx.fillText((tour.kind==='heat'?'δQ':'δW reçu')+' = '+(energy>0?'+':'')+format(energy),w-14,h-19);
+      ctx.fillText((tour.kind==='heat'?'δQ':'δW reçu')+' = '+(energy>0?'+':'')+U.text('energy', energy, 3),w-14,h-19);
 
     }
     if (tour.kind==='work' && tour.phase==='compare') {
@@ -211,7 +212,7 @@
       ctx.fillText('COMPAREZ LES VITESSES SORTANTES',w/2,h-76);
       for (const [x,label,value,color] of [[w*.27,'Si piston fixe',fixed.speed,'#9274ad'],[w*.73,'Si piston mobile',Math.hypot(e.after.vx,e.after.vy),'#258d79']]) {
         ctx.fillStyle=color;ctx.font='11px system-ui';ctx.fillText(label,x,h-55);
-        ctx.font='700 25px system-ui';ctx.fillText(format(value),x,h-23);
+        ctx.font='700 25px system-ui';ctx.fillText(U.text('velocity', value, 0),x,h-23);
       }
     }
   }
@@ -268,13 +269,13 @@
       const sign = Math.sign(event.heat), dx = inward * sign * Math.min(74, w * 0.17), y = cy;
       if (sign) arrow(ctx, wallX - dx / 2, y, dx, 0, sign > 0 ? '#cf8b3899' : '#598ac099', 4);
       ctx.fillStyle = sign > 0 ? '#b1712d' : '#4877a6'; ctx.textAlign = 'center';
-      ctx.fillText('δQ = ' + format(event.heat), w * 0.72, h * 0.50);
+      ctx.fillText('δQ = ' + U.text('energy', event.heat), w * 0.72, h * 0.50);
       ctx.fillText(sign > 0 ? 'La paroi donne de l’énergie' : sign < 0 ? 'Le gaz cède de l’énergie' : 'Pas de chaleur échangée', w * 0.72, h * 0.50 + 18);
     } else {
       const dx = -inward * Math.min(75, w * 0.17);
       arrow(ctx, wallX, cy, dx, 0, '#d4913b', 3);
-      ctx.fillStyle = '#b07a3b'; ctx.textAlign = 'center'; ctx.fillText('J = ' + format(event.impulse), wallX + dx / 2, cy + 22);
-      ctx.fillStyle = '#617c8d'; ctx.fillText('u = ' + format(event.wallVelocity), wallX, 14);
+      ctx.fillStyle = '#b07a3b'; ctx.textAlign = 'center'; ctx.fillText('J = ' + U.text('momentum', event.impulse), wallX + dx / 2, cy + 22);
+      ctx.fillStyle = '#617c8d'; ctx.fillText('u = ' + U.text('velocity', event.wallVelocity), wallX, 14);
       if (event.wallVelocity) arrow(ctx, wallX, 20, Math.sign(event.wallVelocity) * 30, 0, '#6f98ac', 1.5);
     }
   }
@@ -286,13 +287,13 @@
     for (const s of series) plotLine(ctx, axes, s.points, s.color, s);
     ctx.restore();
   }
-  function histogram(canvas, samples, references) {
+  function histogram(canvas, samples, references, label = 'Valeur') {
     const surface = setup(canvas); if (!surface) return;
     const { ctx, w, h } = surface;
     const max = Math.max(...samples, ...references, 1e-9) * 1.05;
     const actual = root.GasAnalysis.histogram(samples, { bins: 20, max });
     const initial = root.GasAnalysis.histogram(references, { bins: 20, max });
-    const axes = plotAxes(ctx, w, h, [0, max], [0, Math.max(...actual.bins.map(b => b.density), ...initial.bins.map(b => b.density), 0.01) * 1.15], 'u.r.', 'Densité');
+    const axes = plotAxes(ctx, w, h, [0, max], [0, Math.max(...actual.bins.map(b => b.density), ...initial.bins.map(b => b.density), 1e-12) * 1.15], label, label.includes('m/s') ? 'Densité (s/m)' : 'Densité (J⁻¹)');
     for (const b of actual.bins) { ctx.fillStyle = '#4b92c080'; ctx.fillRect(axes.X(b.min) + 1, axes.Y(b.density), Math.max(0, axes.X(b.max) - axes.X(b.min) - 2), axes.Y(0) - axes.Y(b.density)); }
     plotLine(ctx, axes, initial.bins.flatMap(b => [{ x: b.min, y: b.density }, { x: b.max, y: b.density }]), '#bd843e', { dashed: true });
   }

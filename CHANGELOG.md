@@ -1,3 +1,11 @@
+## 0.7.0 — Unités physiques à échelles fixes
+
+- Affichage en K, L, bar, J, m/s et ms ; état de référence à 300 K, 1 L et 1 bar.
+- Conversion cohérente des impulsions, du travail, de la chaleur, des flux, des zooms, des distributions et des exports CSV.
+- Diagnostic PV/(nRT) de référence 1, axes logarithmiques sans dimension et rappel 1 bar·L = 100 J.
+- 1 000 marqueurs représentent environ 0,0401 mol ; profondeur constante et approximation cinétique 2D documentées discrètement.
+- Moteur physique et animations inchangés ; vérification des conversions et des bilans.
+
 # Versions du démonstrateur
 
 ## 0.6.3 — 24 octobre 2026

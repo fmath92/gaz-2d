@@ -86,6 +86,7 @@ test('the rebound keeps advancing physical time without an impact pause, with co
   }
   assert.ok(impactFrames>30);assert.ok(sawDeparture);assert.equal(tour.phase,'done');close(s.metrics.balancePressureError,0);
 });
+require('../dist/units.js');
 require('../dist/graphics.js');
 test('the zoom camera keeps laboratory landmarks fixed while the piston translates in both directions',()=>{
   const {chamberCamera}=globalThis.LabGraphics;

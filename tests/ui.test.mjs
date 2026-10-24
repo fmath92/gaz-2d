@@ -82,6 +82,7 @@ function laboratory() {
   });
   vm.runInContext(physics, scope, { filename: 'physics.js' });
   vm.runInContext(analysis, scope, { filename: 'analysis.js' });
+  vm.runInContext(readFileSync(new URL('../dist/units.js', import.meta.url), 'utf8'), scope);
   vm.runInContext(graphics, scope, { filename: 'graphics.js' });
   const histogram = scope.GasAnalysis.histogram;
   scope.GasAnalysis.histogram = (...args) => {
@@ -158,22 +159,22 @@ test('thermal illustration shows both energy transfer signs in order and restore
 });
 test('thermal slider changes future collisions only; isolation stops Q without deleting past exchanges',()=>{
   const lab=laboratory();lab.click('tab-heat');lab.input('timeScale',1);lab.advance(.5);lab.click('pause');
-  const m=lab.metrics;lab.input('bathTemperature',50);assert.equal(lab.metrics.energy,m.energy);assert.equal(lab.metrics.heat,m.heat);assert.equal(lab.metrics.bathTemperature,.5);
+  const m=lab.metrics;lab.input('bathTemperature',100);assert.equal(lab.metrics.energy,m.energy);assert.equal(lab.metrics.heat,m.heat);assert.equal(lab.metrics.bathTemperature,.5);
   lab.input('thermalMode','isolated');lab.click('pause');lab.advance(.5);assert.equal(lab.metrics.heat,m.heat);assert.equal(lab.metrics.work,0);
 });
 test('Joule–Gay–Lussac doubles V without changing E or T, with simulation and plot visible together',()=>{
   const lab=laboratory();lab.click('tab-free');const before=lab.metrics;lab.advance(.2);lab.click('start');
   assert.equal(lab.metrics.width,18);assert.equal(lab.metrics.volume,2*before.volume);assert.equal(lab.metrics.energy,before.energy);assert.equal(lab.metrics.work,0);assert.equal(lab.metrics.heat,0);
   lab.advance(.5);assert.equal(lab.metrics.temperature,before.temperature);assert.ok(lab.nodes.has('chamber')&&lab.nodes.has('chart'));assert.equal(lab.nodes.get('zoomPanel').hidden,true);
-  lab.click('chart-ratio');assert.equal(lab.analysis.chartType,'ratio');assert.equal(lab.analysis.plot.yLabel,'PV / T');
-  assert.equal(lab.analysis.plot.series[0].points[0].y,1000);
+  lab.click('chart-ratio');assert.equal(lab.analysis.chartType,'ratio');assert.equal(lab.analysis.plot.yLabel,'PV / (nRT)');
+  assert.equal(lab.analysis.plot.series[0].points[0].y,1);
 });
 test('PV/T graph uses measured pressure and actual temperature rather than imposing the ideal reference',()=>{
   const lab=laboratory();lab.click('tab-free');lab.advance(.3);lab.click('chart-ratio');
   const row=lab.analysis.history.at(-1),last=lab.analysis.plot.series[1].points.at(-1);
-  assert.ok(Math.abs(last.y-row.pressure*row.volume/row.temperature)<1e-9);
-  assert.ok(Math.abs(last.y-1000)>1e-3);
-  lab.input('pressureSource','piston');const r=lab.analysis.history.at(-1);assert.ok(Math.abs(lab.analysis.plot.series[1].points.at(-1).y-r.pressureByWall.right*r.volume/r.temperature)<1e-9);
+  assert.ok(Math.abs(last.y-row.pressure*row.volume/(1000*row.temperature))<1e-9);
+  assert.ok(Math.abs(last.y-1)>1e-3);
+  lab.input('pressureSource','piston');const r=lab.analysis.history.at(-1);assert.ok(Math.abs(lab.analysis.plot.series[1].points.at(-1).y-r.pressureByWall.right*r.volume/(1000*r.temperature))<1e-9);
 });
 test('free expansion has a gap in P–V instead of a fictitious work segment',()=>{
   const lab=laboratory();lab.click('tab-free');lab.advance(.2);lab.click('start');lab.input('extraChart','pv');
@@ -205,7 +206,7 @@ test('slow playback changes elapsed simulated time, and single-step is 0.02 with
 });
 test('model and initial temperature changes reset only this experience and always keep N=1000',()=>{
   const lab=laboratory();lab.click('tab-free');lab.input('particleModel','hard-disks');assert.equal(lab.metrics.particleModel,'hard-disks');
-  lab.input('initialTemperature',200);lab.click('applyInitial');assert.equal(lab.metrics.count,1000);assert.ok(Math.abs(lab.metrics.temperature-2)<1e-10);
+  lab.input('initialTemperature',400);lab.click('applyInitial');assert.equal(lab.metrics.count,1000);assert.ok(Math.abs(lab.metrics.temperature-2)<1e-10);
   lab.click('start');assert.equal(lab.metrics.heat,0);assert.equal(lab.metrics.work,0);
   lab.click('tab-pressure');assert.equal(lab.metrics.particleModel,'ideal');assert.ok(Math.abs(lab.metrics.temperature-1.5)<1e-10);
 });
@@ -218,7 +219,7 @@ test('CSV comparison contains two measured models per instant, consistent PV/T a
   const lab=laboratory();lab.click('tab-comparison');lab.advance(.4);lab.click('export');const csv=await lab.downloads.at(-1).blob.text();
   const lines=csv.trim().replace(/^\uFEFF/,'').split(/\r?\n/);const headers=lines.shift().split(';');const rows=lines.map(line=>Object.fromEntries(line.split(';').map((v,i)=>[headers[i],v])));
   assert.equal(rows.length%2,0);assert.ok(rows.some(r=>r.modele==='ideal'));assert.ok(rows.some(r=>r.modele==='hard-disks'));
-  for(const row of rows){assert.equal(row.N,'1000');if(row.P_mesuree){const num=k=>Number(row[k].replace(',','.'));assert.ok(Math.abs(num('PV_sur_T')-num('P_mesuree')*num('aire_ur2')/num('T_cinetique'))<1e-5);assert.ok(Math.abs(num('ecart_bilan'))<1e-7);}}
+  for(const row of rows){assert.equal(row.N_marqueurs,'1000');if(row.P_mesuree_bar){const num=k=>Number(row[k].replace(',','.'));assert.ok(Math.abs(num('PV_sur_nRT')-100*num('P_mesuree_bar')*num('volume_L')/(num('T_K')/3))<1e-5);assert.ok(Math.abs(num('ecart_bilan_J'))<1e-7);}}
 });
 
 test('pause, reset and tab changes safely interrupt camera sequences without changing the selected speed',()=>{
@@ -231,4 +232,20 @@ test('pause, reset and tab changes safely interrupt camera sequences without cha
 test('thermal illustration is unavailable with insulation or zero accommodation',()=>{
   const lab=laboratory();lab.click('tab-heat');lab.input('thermalMode','isolated');assert.equal(lab.nodes.get('illustrate').disabled,true);
   lab.input('thermalMode','thermostat');assert.equal(lab.nodes.get('illustrate').disabled,false);lab.input('accommodation',0);assert.equal(lab.nodes.get('illustrate').disabled,true);
+});
+
+test('visible units and plot coordinates share fixed scales across presets and resets',()=>{
+  const lab=laboratory();
+  assert.equal(lab.nodes.get('volume').textContent,'1,00 L');
+  assert.equal(lab.nodes.get('temperature').textContent,'300,00 K');
+  lab.input('extraChart','pvt');
+  const ideal=lab.analysis.plot.series[0].points;
+  for(const point of ideal) assert.ok(Math.abs(point.y-point.x/3)<1e-9);
+  assert.equal(lab.analysis.plot.xLabel,'T (K)');assert.equal(lab.analysis.plot.yLabel,'PV (J)');
+  lab.click('tab-free');assert.equal(lab.nodes.get('volume').textContent,'0,82 L');
+  lab.click('start');assert.equal(lab.nodes.get('volume').textContent,'1,64 L');
+  assert.equal(lab.nodes.get('temperature').textContent,'300,00 K');
+  lab.click('tab-pressure');lab.input('initialTemperature',600);lab.click('applyInitial');
+  assert.equal(lab.nodes.get('temperature').textContent,'600,00 K');
+  assert.equal(lab.nodes.get('volume').textContent,'1,00 L');
 });
