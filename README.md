@@ -16,12 +16,14 @@ Puis ouvrir <http://localhost:8080>.
 
 ## Version en ligne et dépôt GitHub
 
-- Démonstrateur public : <https://fmath92.github.io/gaz-2d/>.
+- Adresse de publication prévue (GitHub Pages pas encore activé) : <https://fmath92.github.io/gaz-2d/>.
 - Code source et historique : <https://github.com/fmath92/gaz-2d>.
 
-GitHub Pages publie automatiquement la branche `main`, à partir de la racine du dépôt. Le fichier `index.html` à la racine redirige vers `dist/`, qui contient l’application autonome. Le fichier `.nojekyll` indique de servir les fichiers statiques sans transformation par Jekyll.
+La configuration est préparée pour publier automatiquement la branche `main`, à partir de la racine du dépôt. Le fichier `index.html` à la racine redirige vers `dist/`, qui contient l’application autonome. Le fichier `.nojekyll` indique de servir les fichiers statiques sans transformation par Jekyll.
 
-Pour mettre le site à jour, modifier les fichiers dans `dist/`, lancer `node --test tests/*.test.mjs`, puis enregistrer et pousser les changements sur `main`. La publication apparaît dans l’onglet **Actions** du dépôt et sa configuration dans **Settings → Pages**. Aucun serveur applicatif, secret de déploiement ou installation de dépendances n’est nécessaire.
+Le dépôt est actuellement privé. GitHub indique que le forfait actuel ne permet pas Pages pour ce dépôt privé. L’activation reste donc en attente du choix de rendre le dépôt public, ou de disposer d’un forfait compatible. Une fois ce choix effectué, sélectionner **Settings → Pages → Deploy from a branch → main → / (root)**.
+
+Une fois Pages activé, pour mettre le site à jour, modifier les fichiers dans `dist/`, lancer `node --test tests/*.test.mjs`, puis enregistrer et pousser les changements sur `main`. La publication apparaît dans l’onglet **Actions** du dépôt et sa configuration dans **Settings → Pages**. Aucun serveur applicatif, secret de déploiement ou installation de dépendances n’est nécessaire.
 
 Pour récupérer le projet :
 
