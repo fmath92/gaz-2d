@@ -1,6 +1,6 @@
-# Démonstrateur de gaz parfait en deux dimensions
+# Gaz 2D — Laboratoire de thermodynamique
 
-Ce démonstrateur relie le mouvement des particules aux mesures de pression, d’aire et d’énergie cinétique. Un piston permet de comparer des détentes, des compressions et une détente libre. Les parois peuvent être isolantes ou en contact avec un thermostat. Les distributions, les diagrammes et les bilans par période permettent d’explorer le lien entre l’état microscopique, le travail et la chaleur.
+Ce démonstrateur relie le mouvement des particules aux mesures de pression, d’aire et d’énergie cinétique. Un piston permet de comparer des détentes, des compressions et une détente libre. Les parois peuvent être isolantes ou en contact avec un thermostat. Le choix entre particules ponctuelles et disques durs à collisions élastiques permet de comparer deux modèles. Les distributions, les diagrammes et les bilans par période permettent d’explorer le lien entre l’état microscopique, le travail et la chaleur.
 
 ## Ouvrir le démonstrateur
 
@@ -34,20 +34,27 @@ cd gaz-2d
 
 ## Explorer en quelques minutes
 
-1. Choisir entre 10 et 1 000 particules, régler la température initiale, puis créer cet état. L’application réinitialise le piston, le temps, le travail, la chaleur et les mesures.
-2. Choisir des parois isolantes et laisser le piston immobile. L’énergie reste constante ; avec peu de particules, pression et histogrammes fluctuent davantage.
-3. Lancer une détente lente puis une compression. Comparer le travail de pression et la variation d’énergie : en mode isolé, `ΔE = W`.
-4. Choisir le mouvement périodique et laisser se dérouler plusieurs allers-retours. Examiner les diagrammes P–V, P–T et V–T, puis choisir combien de périodes afficher. Les couleurs et les flèches permettent de suivre les parcours successifs. Le réglage de lecture ×1, ×2, ×4 ou ×8 accélère le temps simulé à l’écran sans changer les équations ni le pas physique.
-5. Dans le diagramme P–V, comparer le travail reçu mesuré aux chocs et l’opposé de l’intégrale estimée sous le parcours de pression au piston. Examiner aussi les écarts entre états de début et de fin : un aller-retour du piston ne garantit pas un cycle thermodynamique fermé. Pour une suite de mouvements manuels, le bouton de retour au volume de départ permet de terminer le parcours en conservant les échanges intermédiaires.
-6. Réinitialiser, choisir des parois en contact avec le thermostat et fixer une température de paroi différente de celle du gaz. À volume fixe, observer la variation d’énergie et la chaleur reçue ou cédée : `W = 0` et `ΔE = Q`.
-7. Reprendre le mouvement périodique avec le thermostat. Comparer, par période, le travail, la chaleur et `ΔE`. Le bilan attendu est toujours `ΔE = W + Q`, y compris pendant les périodes transitoires.
-8. Comparer des mouvements lents et rapides, la fraction de chocs thermalisés et le choix d’isoler ou non le piston. Un contact thermique ne fixe pas instantanément la température du gaz.
-9. Essayer une détente libre. L’ouverture seule ne fournit ni travail ni chaleur et conserve les vitesses ; après l’ouverture, des parois en contact avec le thermostat peuvent échanger de la chaleur avec le gaz.
-10. Examiner `PV = f(T)` et `ln(P) = f(ln(V))`. La référence `PV = NT` suppose un état isotrope. La comparaison adiabatique `PV^γ = constante` n’est pertinente que si la chaleur échangée est négligeable et les autres hypothèses d’équilibre sont satisfaites.
+1. Dans **Expérimenter**, choisir **Joule–Gay–Lussac**, **Détente adiabatique**, **Compression adiabatique** ou **Cycles du piston**. Un preset prépare un nouvel état isolé et efface les mesures ; **Laboratoire libre** conserve l’état et ouvre les commandes personnalisées.
+2. Faire une prédiction. Régler le volume cible et, sauf en détente libre, la durée du trajet. Lancer l’expérience et observer le piston ainsi que P, V et T. Joule–Gay–Lussac part d’une largeur 9 et ouvre instantanément jusqu’à 18 : le volume double, W = Q = 0 et T reste constante.
+3. Dans **Diagrammes**, comparer P–V, P–T et V–T. Le bilan W, Q, ΔE apparaît à côté du graphique. Déplier les réglages pour changer le capteur de pression, la superposition ou le nombre de cycles ; déplier l’analyse du parcours pour les aires, reconstructions et bilans détaillés. Les six graphiques et les deux exports CSV restent disponibles.
+4. Dans **Particules**, regarder les distributions de vitesse et d’énergie. Régler de 10 à 1 000 particules et la température initiale. Choisir les collisions mutuelles, puis **Appliquer et recommencer**. Changer ce choix seul ne modifie pas le gaz en cours. Le modèle actif, les chocs mutuels, la fraction de surface occupée et Tx/Ty sont affichés.
+5. Comparer une détente adiabatique avec et sans collisions : les disques durs peuvent redistribuer l’énergie entre les directions. Leur taille finie apporte aussi un volume exclu ; il ne s’agit pas simplement du même gaz parfait muni de collisions.
+6. Revenir à **Expérimenter**, sélectionner le thermostat et régler sa température au curseur ou au clavier. À volume fixe, W = 0 et ΔE = Q. Reprendre les cycles pour comparer W, Q et ΔE par période. La température du gaz n’est pas imposée instantanément, même au contact du thermostat.
+7. Ouvrir **Comprendre** pour les explications et limites : unités réduites, température cinétique, gaz hors équilibre, pression lissée, aire d’un cycle, modèle de paroi et hypothèses adiabatiques.
+
+Changer d’onglet conserve les particules, la pause et les mesures. Pause/reprise, réinitialisation et vitesse de lecture restent accessibles en haut de chaque onglet. Les touches fléchées, Début et Fin permettent de parcourir les onglets au clavier. Le réglage ×1 à ×8 accélère le temps simulé sans changer le mouvement prescrit. Lorsque le calcul devient coûteux, la lecture ralentit pour préserver la réactivité de l’interface ; aucun pas physique n’est sauté.
 
 ## Modèle scientifique
 
-Les particules sont ponctuelles, de masse identique, sans interaction entre elles. Elles se déplacent en ligne droite entre les collisions avec les parois. Les petits disques dessinés sont des repères visuels : ils n’ont pas de volume exclu et peuvent se superposer. Ce choix représente la limite d’un gaz parfait sans collisions moléculaires.
+Par défaut, les particules sont ponctuelles, de masse identique, sans interaction entre elles. Elles se déplacent en ligne droite entre les collisions avec les parois. Les petits disques dessinés sont des repères visuels : ils n’ont pas de volume exclu et peuvent se superposer. Ce choix représente la limite d’un gaz parfait sans collisions moléculaires.
+
+Le modèle optionnel de **disques durs** donne à chaque particule un rayon physique de 0,04 u.r. Les centres restent à cette distance des parois et deux particules se heurtent lorsque leurs centres sont séparés de 0,08. Le placement initial est reproductible, sans recouvrement, et les vitesses initiales sont identiques à celles du mode ponctuel pour le même N, T et germe.
+
+Les chocs mutuels sont parfaitement élastiques, sans frottement ni rotation : la composante relative normale à la ligne des centres est inversée. La quantité de mouvement de la paire et son énergie cinétique sont conservées. Ces échanges internes n’ajoutent rien aux compteurs W ou Q. La surface occupée vaut `N π r² / V` ; elle permet d’évaluer la densité du modèle. Les disques sont dessinés à leur taille physique, les points du modèle idéal avec un rayon purement visuel.
+
+Le moteur résout les dates de contact dans chaque segment linéaire du piston. Une file de priorité traite les événements dans l’ordre et invalide les prédictions après chaque choc. Une grille spatiale filtre les paires initiales ; les prédictions des particules dont la vitesse change sont recalculées. Cette approche suit le principe de la [simulation événementielle de disques durs présenté par Princeton](https://algs4.cs.princeton.edu/61event/index.php). Aucun déplacement correctif de recouvrement ni rééchelonnement d’énergie n’est appliqué.
+
+La taille finie est un premier écart au modèle idéal : à densité élevée, `PV = NT` n’est plus une équation d’état exacte, même à l’équilibre. Il n’y a pas d’attraction ni d’énergie potentielle à distance. La détente libre isolée conserve donc l’énergie cinétique et T dans les deux modèles ; ces disques ne reproduisent pas le refroidissement ou l’échauffement de tous les gaz réels.
 
 En mode isolé, les collisions avec les parois sont élastiques. Une paroi fixe conserve l’énergie cinétique. Pour un piston isolé de vitesse horizontale `u`, la vitesse horizontale devient `vx′ = 2u − vx` et la composante verticale est conservée. Le choc conserve l’énergie cinétique dans le référentiel du piston, mais échange du travail avec le gaz dans le référentiel de l’enceinte.
 
@@ -59,7 +66,7 @@ La grandeur appelée volume est ici l’aire `V = L × H`. La pression en deux d
 
 La pression affichée est calculée à partir des collisions : l’impulsion normale transférée aux parois est divisée par la longueur de paroi et le temps de mesure. Une fenêtre glissante d’environ deux unités de temps réduit les fluctuations sans les supprimer. Le calcul tient compte de la longueur des parois pendant le déplacement du piston. Une lecture avant accumulation d’un temps de mesure suffisant est moins représentative.
 
-La pression utilisée dans la carte et les graphiques peut être la moyenne sur les quatre parois, pondérée par leur longueur, ou celle du piston. Les pressions des parois peuvent être différentes pendant une transformation. La relation `P = N T / V` est une référence d’équilibre isotrope ; elle ne sert pas à fabriquer la mesure de pression.
+La pression utilisée dans la carte et les graphiques peut être la moyenne sur les quatre parois, pondérée par leur longueur, ou celle du piston. Les pressions des parois peuvent être différentes pendant une transformation. La relation `P = N T / V` est une référence idéale d’équilibre isotrope ; elle ne sert pas à fabriquer la mesure de pression.
 
 La pression est une moyenne sur les instants précédents, tandis que le volume et la température sont instantanés. Pendant un déplacement rapide, cette fenêtre de mesure introduit donc un retard dans les graphiques. Un écart à une relation théorique peut venir de ce retard, des fluctuations ou de l’état hors équilibre du gaz.
 
@@ -69,7 +76,7 @@ L’énergie cinétique est `E = Σ (vx² + vy²) / 2`. L’indicateur de tempé
 
 Les composantes directionnelles sont `Tx = moyenne(vx²)` et `Ty = moyenne(vy²)`, avec `Tcin = (Tx + Ty) / 2`. Elles permettent de voir l’anisotropie créée par le piston. En mode isolé et sans collisions entre particules, cette anisotropie ne se résorbe pas spontanément. Les chocs diffus sur des parois thermalisées peuvent en revanche modifier les deux composantes et contribuer à leur relaxation. Pendant un état hors équilibre, `Tcin` est un indicateur d’énergie et ne garantit pas l’existence d’une température thermodynamique unique. Le mouvement collectif éventuel est inclus dans cet indicateur.
 
-Cette version permet d’explorer une loi adiabatique d’équilibre telle que `PV^γ = constante`, mais ne garantit pas ses conditions de validité. Il faudrait un mécanisme de rééquilibration et une transformation quasi statique pour confronter quantitativement le modèle à cette loi. La distinction entre détente libre et détente adiabatique quasi statique est présentée dans [OpenStax, Adiabatic Processes for an Ideal Gas](https://openstax.org/books/university-physics-volume-2/pages/3-6-adiabatic-processes-for-an-ideal-gas).
+Cette version permet d’explorer une loi adiabatique d’équilibre telle que `PV^γ = constante`, mais ne garantit pas ses conditions de validité. Les collisions mutuelles fournissent un mécanisme de rééquilibration, mais il faut encore un mouvement suffisamment lent et un gaz suffisamment dilué pour comparer à la référence idéale γ = 2. La distinction entre détente libre et détente adiabatique quasi statique est présentée dans [OpenStax, Adiabatic Processes for an Ideal Gas](https://openstax.org/books/university-physics-volume-2/pages/3-6-adiabatic-processes-for-an-ideal-gas).
 
 ### Distributions microscopiques
 
@@ -81,11 +88,13 @@ Les ordonnées sont des densités normalisées : l’aire totale des barres vaut
 
 En mode isolé, les parois ne transmettent pas de chaleur : `Q = 0`. En mode thermostat, elles représentent une surface à température `Tb` imposée par un réservoir d’énergie. Le piston peut être inclus dans ce contact thermique ou conserver une réflexion isolante.
 
-Le paramètre d’accommodation `α`, compris entre 0 et 1, est la probabilité qu’un choc soit diffus et thermalisé ; les autres chocs sont spéculaires. `α = 0` retrouve la réflexion isolante, et `α = 1` thermalise tous les chocs sur les parois concernées. C’est le principe du modèle de réflexion de Maxwell décrit dans la [documentation LAMMPS des parois stochastiques](https://docs.lammps.org/fix_wall_reflect_stochastic.html).
+Le paramètre d’accommodation `α`, compris entre 0 et 1, est la probabilité qu’un choc soit diffus et thermalisé ; les autres chocs sont spéculaires. `α = 0` retrouve la réflexion isolante, et `α = 1` thermalise les chocs sur les parois concernées, sous la réserve de contacts multiples décrite ci-dessous pour les disques durs. C’est le principe du modèle de réflexion de Maxwell décrit dans la [documentation LAMMPS des parois stochastiques](https://docs.lammps.org/fix_wall_reflect_stochastic.html).
 
 Pour un choc thermalisé, les vitesses sont tirées dans le référentiel de la paroi. La composante tangentielle est gaussienne, de variance `Tb`. La composante normale est dirigée vers l’intérieur et suit la distribution de flux : `|cn′| = √(−2 Tb ln U)`, avec `U` uniforme entre 0 et 1. Ce tirage normal tient compte du fait que les particules rapides rencontrent plus souvent les parois ; une simple demi-gaussienne ne donne pas le même thermostat.
 
 La température du thermostat, le mode thermique et l’accommodation peuvent changer pendant la simulation. Ces changements ne rééchelonnent pas les vitesses et n’ajoutent pas de chaleur instantanément : les échanges se produisent lors des collisions suivantes. Repasser en mode isolé n’efface pas la chaleur cumulée ; seuls les nouveaux échanges thermiques cessent. Il n’est donc pas garanti que `Tgaz = Tb` pendant un mouvement rapide. Le réservoir est idéal, sa température ne varie pas quand il échange de l’énergie, et sa capacité thermique n’est pas simulée.
+
+**Convention numérique pour les contacts multiples de disques durs.** Une compression très rapide peut amener des disques simultanément contre une paroi thermique et d’autres disques. Réémettre plusieurs fois à la même date peut alors créer une boucle sans vol libre. Une seule émission thermique est autorisée par particule à un même instant numérique (tolérance `10⁻¹⁰ u.t.`) ; les réflexions supplémentaires à cet instant sont spéculaires. Cette convention particulière conserve `ΔE = W + Q`, mais elle limite l’interprétation du thermostat dans les contacts multiples. Le compteur correspondant est accessible dans **Comprendre → Le modèle de disques durs** et dans le CSV.
 
 ### Travail, chaleur et bilan énergétique
 
@@ -150,4 +159,12 @@ L’export CSV contient au plus les 6 000 derniers relevés, pris environ tous l
 
 Les critères scientifiques sont la conservation de l’énergie à piston fixe, le confinement des particules, le bilan `E − E0 − Wreçu − Qreçue` pendant les mouvements et les échanges thermiques, la conservation d’énergie lors d’une détente libre isolée et la convergence statistique de la pression vers `NT/V` pour un gaz initial isotrope dans une enceinte fixe. Les mesures de pression nécessitent un temps d’observation suffisamment long.
 
-Les principales limites sont le petit nombre de particules, les fluctuations statistiques, l’absence d’interactions moléculaires, l’absence de rééquilibration moléculaire entre les directions, le modèle idéalisé de thermostat aux parois, les unités réduites et la géométrie bidimensionnelle. Le démonstrateur vise l’exploration des mécanismes microscopiques, sans prédire quantitativement le comportement d’un gaz réel.
+Les principales limites sont le petit nombre de particules, les fluctuations statistiques, l’absence d’attractions moléculaires, l’absence de rééquilibration entre directions dans le mode ponctuel, la convention de contacts multiples des disques durs, le modèle idéalisé de thermostat aux parois, les unités réduites et la géométrie bidimensionnelle. Le démonstrateur vise l’exploration des mécanismes microscopiques, sans prédire quantitativement le comportement d’un gaz réel.
+
+## Vérifier les modifications
+
+```sh
+node --test tests/*.test.mjs
+```
+
+Les tests couvrent les conservations physiques, les collisions obliques et rapides, les disques sans recouvrement jusqu’à 1 000 particules, le thermostat, les mouvements de piston, les cycles et les exports. Les scénarios d’interface exécutent le vrai moteur et les gestionnaires de commandes avec un DOM et un Canvas simulés ; l’apparence et les interactions sont également vérifiées dans un navigateur.

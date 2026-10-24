@@ -1,5 +1,5 @@
-/* Gaz parfait ponctuel en 2D, m = kB = 1. Les disques de l'interface
- * n'ont pas de rayon physique et les particules ne s'entrechoquent pas.
+/* Gaz 2D, m = kB = 1 : points indépendants ou disques durs de rayon 0,04.
+ * Les disques durs échangent une impulsion élastique à leur contact.
  * La température cinétique scalaire est E/N ; hors équilibre Tx et Ty
  * peuvent différer. Les parois peuvent être isolées ou diffuser les particules
  * à la température d’un thermostat dans le référentiel local de la paroi. */
@@ -29,6 +29,29 @@
   function gaussian(random) {
     return Math.sqrt(-2 * Math.log(Math.max(1e-15, random()))) * Math.cos(2 * Math.PI * random());
   }
+  // File des contacts prévus dans un segment de mouvement du piston.
+  class EventQueue {
+    constructor() { this.items = []; }
+    push(event) {
+      const a = this.items; let i = a.length; a.push(event);
+      while (i > 0) { const parent = (i - 1) >> 1; if (a[parent].t <= event.t) break; a[i] = a[parent]; i = parent; }
+      a[i] = event;
+    }
+    pop() {
+      const a = this.items, first = a[0], last = a.pop();
+      if (a.length) {
+        let i = 0;
+        while (2 * i + 1 < a.length) {
+          let child = 2 * i + 1;
+          if (child + 1 < a.length && a[child + 1].t < a[child].t) child++;
+          if (last.t <= a[child].t) break;
+          a[i] = a[child]; i = child;
+        }
+        a[i] = last;
+      }
+      return first;
+    }
+  }
   class GasSimulation {
     constructor(options = {}) {
       this.height = finite(options.height ?? 7.5, 'La hauteur');
@@ -43,6 +66,11 @@
       if (!Number.isInteger(count) || count < 10 || count > 1000) throw new RangeError('Le nombre de particules doit être un entier compris entre 10 et 1000.');
       finite(temperature, 'La température');
       if (temperature <= 0) throw new RangeError('La température doit être positive.');
+      const model = options.particleModel ?? this.particleModel ?? 'ideal';
+      if (!['ideal', 'hard-disks'].includes(model)) throw new RangeError('Modèle de particules inconnu.');
+      if (model === 'hard-disks' && this.height < 1) throw new RangeError('Les disques durs nécessitent une hauteur d’au moins 1.');
+      this.particleModel = model;
+      this.radius = model === 'hard-disks' ? 0.04 : 0;
       this.setThermal(options.thermal ?? this.thermal ?? {});
       this.width = checkWidth(options.width ?? 11);
       this.count = count;
@@ -55,6 +83,27 @@
         y: (0.005 + 0.99 * random()) * this.height,
         vx: gaussian(random), vy: gaussian(random)
       }));
+      if (this.radius) {
+        // Placement sans recouvrement. Un tirage séparé conserve les mêmes
+        // vitesses initiales dans les deux modèles pour faciliter la comparaison.
+        const positionRandom = randomGenerator((Number(this.seed) >>> 0) ^ 0x7AC319EF);
+        const cells = new Map(), diameter = 2 * this.radius;
+        const key = (x, y) => x + ',' + y;
+        for (const p of this.particles) {
+          let placed = false;
+          for (let attempt = 0; attempt < 20000 && !placed; attempt++) {
+            p.x = this.radius + positionRandom() * (this.width - diameter);
+            p.y = this.radius + positionRandom() * (this.height - diameter);
+            const cx = Math.floor(p.x / diameter), cy = Math.floor(p.y / diameter);
+            placed = true;
+            for (let dx = -1; dx <= 1 && placed; dx++) for (let dy = -1; dy <= 1 && placed; dy++)
+              for (const other of cells.get(key(cx + dx, cy + dy)) || [])
+                if ((p.x - other.x) ** 2 + (p.y - other.y) ** 2 < diameter ** 2) { placed = false; break; }
+            if (placed) { const k = key(cx, cy); if (!cells.has(k)) cells.set(k, []); cells.get(k).push(p); }
+          }
+          if (!placed) throw new RangeError('Enceinte trop dense pour placer les disques sans recouvrement.');
+        }
+      }
       // Normalisation séparée : état initial isotrope, sans dérive collective.
       for (const key of ['vx', 'vy']) {
         const mean = count > 1 ? this.particles.reduce((s, p) => s + p[key], 0) / count : 0;
@@ -75,6 +124,9 @@
       this._events = [];
       this._segments = [];
       this._collisions = 0;
+      this._pairCollisions = 0;
+      this._lastThermalContact = new Float64Array(count).fill(-Infinity);
+      this._thermalContactFallbacks = 0;
       return this;
     }
     setThermal(options = {}) {
@@ -121,9 +173,9 @@
       this._events.push({ wall, impulse, time, work, heat });
       this._collisions++;
     }
-    _reflect(p, wall, time, pistonVelocity = 0) {
+    _reflect(p, wall, time, pistonVelocity = 0, allowThermal = true) {
       const oldVx = p.vx, oldVy = p.vy;
-      const thermal = this.thermal.mode === 'thermostat'
+      const thermal = allowThermal && this.thermal.mode === 'thermostat'
         && (wall !== 'right' || this.thermal.pistonThermal)
         && this.thermal.accommodation > 0
         && (this.thermal.accommodation === 1 || this._thermalRandom() < this.thermal.accommodation);
@@ -207,6 +259,97 @@
       // Le résidu < EPS ne porte pas de choc résolu ; il est négligeable
       // à la précision du temps de vol et ne modifie aucune vitesse.
     }
+    _advanceDisks(dt, oldWidth, pistonVelocity) {
+      // Contacts exacts dans chaque segment linéaire : aucune correction de
+      // recouvrement, ni renormalisation d’énergie. Les événements périmés
+      // sont invalidés dès qu’une particule change de vitesse (Princeton §6.1).
+      const ps = this.particles, n = ps.length, radius = this.radius, diameter = 2 * radius;
+      const localTime = new Float64Array(n), revisions = new Uint32Array(n);
+      const queue = new EventQueue();
+      const move = (i, t) => { const p = ps[i], h = t - localTime[i]; p.x += h * p.vx; p.y += h * p.vy; localTime[i] = t; };
+      const scheduleWall = (i, t) => {
+        const p = ps[i];
+        const hits = [
+          ['left', p.vx < -EPS ? (radius - p.x) / p.vx : Infinity],
+          ['right', p.vx - pistonVelocity > EPS ? (oldWidth + pistonVelocity * t - radius - p.x) / (p.vx - pistonVelocity) : Infinity],
+          ['bottom', p.vy < -EPS ? (radius - p.y) / p.vy : Infinity],
+          ['top', p.vy > EPS ? (this.height - radius - p.y) / p.vy : Infinity]
+        ];
+        let nearest = null;
+        for (const hit of hits) if (!nearest || hit[1] < nearest[1]) nearest = hit;
+        const at = t + Math.max(0, nearest[1]);
+        if (at <= dt) queue.push({ t: at, i, j: -1, wall: nearest[0], ri: revisions[i] });
+      };
+      const schedulePair = (i, j, t) => {
+        const a = ps[i], b = ps[j];
+        const dx = b.x + b.vx * (t - localTime[j]) - a.x - a.vx * (t - localTime[i]);
+        const dy = b.y + b.vy * (t - localTime[j]) - a.y - a.vy * (t - localTime[i]);
+        const vx = b.vx - a.vx, vy = b.vy - a.vy, dot = dx * vx + dy * vy;
+        if (dot >= -EPS) return;
+        const speed2 = vx * vx + vy * vy, gap = dx * dx + dy * dy - diameter * diameter;
+        const discriminant = dot * dot - speed2 * gap;
+        if (discriminant <= 0) return; // tangence : aucune impulsion normale
+        // Racine stable, y compris à une distance très proche du contact.
+        const delay = Math.max(0, gap / (-dot + Math.sqrt(discriminant)));
+        const at = t + delay;
+        if (at <= dt) queue.push({ t: at, i, j, ri: revisions[i], rj: revisions[j] });
+      };
+      // Une grille élargie par la distance maximale parcourue filtre les paires
+      // initiales. Après un choc, on recalcule toutes les paires concernées :
+      // un rebond sur un piston rapide ne peut pas faire manquer un contact.
+      let maxSpeed = 0;
+      for (const p of ps) maxSpeed = Math.max(maxSpeed, Math.hypot(p.vx, p.vy));
+      const cellSize = diameter + 2 * maxSpeed * dt, cells = new Map();
+      const key = (x, y) => x + ',' + y;
+      for (let i = 0; i < n; i++) {
+        scheduleWall(i, 0);
+        const p = ps[i], cx = Math.floor(p.x / cellSize), cy = Math.floor(p.y / cellSize);
+        for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++)
+          for (const j of cells.get(key(cx + dx, cy + dy)) || []) schedulePair(i, j, 0);
+        const k = key(cx, cy); if (!cells.has(k)) cells.set(k, []); cells.get(k).push(i);
+      }
+      while (queue.items.length) {
+        const e = queue.pop(), { i, j, t } = e;
+        if (revisions[i] !== e.ri || (j >= 0 && revisions[j] !== e.rj)) continue;
+        move(i, t);
+        if (j < 0) {
+          const p = ps[i];
+          if (e.wall === 'left') p.x = radius;
+          if (e.wall === 'right') p.x = oldWidth + pistonVelocity * t - radius;
+          if (e.wall === 'bottom') p.y = radius;
+          if (e.wall === 'top') p.y = this.height - radius;
+          // Une réémission diffuse répétée à temps identique dans un contact
+          // multiple (paroi + plusieurs disques) peut boucler sans vol libre.
+          // On n'autorise qu'une émission thermique par particule et instant ;
+          // les réflexions suivantes à cet instant sont élastiques. Cette
+          // convention de contact multiple conserve exactement ΔE = W + Q.
+          const absoluteTime = this.time + t;
+          const allowed = absoluteTime - this._lastThermalContact[i] > 1e-10;
+          if (this.thermal.mode === 'thermostat' && this.thermal.accommodation > 0 && (e.wall !== 'right' || this.thermal.pistonThermal)) {
+            if (allowed) this._lastThermalContact[i] = absoluteTime;
+            else this._thermalContactFallbacks++;
+          }
+          this._reflect(p, e.wall, absoluteTime, pistonVelocity, allowed);
+        } else {
+          move(j, t);
+          const a = ps[i], b = ps[j], dx = b.x - a.x, dy = b.y - a.y;
+          const distance = Math.hypot(dx, dy), nx = dx / distance, ny = dy / distance;
+          const normalVelocity = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+          a.vx += normalVelocity * nx; a.vy += normalVelocity * ny;
+          b.vx -= normalVelocity * nx; b.vy -= normalVelocity * ny;
+          this._pairCollisions++;
+          revisions[j]++;
+        }
+        revisions[i]++;
+        scheduleWall(i, t);
+        for (let k = 0; k < n; k++) if (k !== i && k !== j) schedulePair(i, k, t);
+        if (j >= 0) {
+          scheduleWall(j, t);
+          for (let k = 0; k < n; k++) if (k !== i && k !== j) schedulePair(j, k, t);
+        }
+      }
+      for (let i = 0; i < n; i++) move(i, dt);
+    }
     step(dt) {
       finite(dt, 'Le pas de temps');
       if (dt < 0) throw new RangeError('Le pas de temps doit être positif.');
@@ -227,7 +370,8 @@
         const oldWidth = this.width;
         const nextWidth = m ? this._motionWidth(m, m.elapsed + h) : oldWidth;
         const velocity = (nextWidth - oldWidth) / h;
-        for (const particle of this.particles) this._advanceParticle(particle, h, oldWidth, velocity);
+        if (this.radius) this._advanceDisks(h, oldWidth, velocity);
+        else for (const particle of this.particles) this._advanceParticle(particle, h, oldWidth, velocity);
         this._segments.push({ start: this.time, end: this.time + h, width0: oldWidth, width1: nextWidth });
         this.width = nextWidth;
         this.time += h;
@@ -298,6 +442,9 @@
         thermalMode: this.thermal.mode, bathTemperature: this.thermal.temperature,
         accommodation: this.thermal.accommodation, pistonThermal: this.thermal.pistonThermal,
         measurementDuration: duration, collisions: this._collisions,
+        particleModel: this.particleModel, particleRadius: this.radius, pairCollisions: this._pairCollisions,
+        thermalContactFallbacks: this._thermalContactFallbacks,
+        packingFraction: this.count * Math.PI * this.radius ** 2 / (this.width * this.height),
         pistonVelocity: this._pistonVelocity
       };
     }

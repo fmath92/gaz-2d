@@ -1,5 +1,13 @@
 # Versions du démonstrateur
 
+## 0.4 — 24 octobre 2026
+
+Interface organisée en quatre onglets : Expérimenter, Diagrammes, Particules et Comprendre. Presets Joule–Gay–Lussac, détente et compression adiabatiques, cycles périodiques et laboratoire libre. Les curseurs de volume, de durée et de température, les questions guidées et les détails dépliables permettent de découvrir progressivement les commandes. Toutes les analyses, tous les réglages et les exports de la version 0.3 sont conservés. Navigation clavier et présentation adaptée aux écrans étroits.
+
+Modèle optionnel de disques durs de rayon 0,04 avec collisions mutuelles élastiques, placement sans recouvrement et résolution événementielle des contacts. Compteurs de collisions et de surface occupée, températures directionnelles et export du modèle. Le changement s’applique lors de la préparation d’un nouvel état. Les limites du modèle, dont la convention de contact thermique multiple à temps identique, sont documentées.
+
+Les sauts de volume d’une détente libre ne sont plus reliés par un segment dans les diagrammes classiques, afin de ne pas suggérer un travail de pression. Le budget de calcul par image préserve la réactivité pour les simulations coûteuses sans sauter de pas physique.
+
 ## 0.3 — 24 octobre 2026
 
 Diagrammes P–V, P–T et V–T sur plusieurs périodes du mouvement du piston, avec distinction des parcours successifs. Comparaison du travail mesuré aux chocs à l’intégrale estimée dans le diagramme P–V. Bilans de travail, de chaleur et d’énergie par période et export des cycles. Une période mécanique n’est pas supposée être un cycle thermodynamique fermé.

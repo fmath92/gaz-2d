@@ -21,14 +21,15 @@ function laboratory() {
     let storedValue = attrs.value ?? '';
     const node = {
       tagName: tag.toUpperCase(), attributes: { ...attrs }, dataset: {},
-      disabled: Object.hasOwn(attrs, 'disabled'), checked: Object.hasOwn(attrs, 'checked'), hidden: false,
+      disabled: Object.hasOwn(attrs, 'disabled'), checked: Object.hasOwn(attrs, 'checked'), hidden: Object.hasOwn(attrs, 'hidden'),
+      style: { setProperty() {} }, focus() { this.focused = true; },
       textContent: '', innerHTML: '', width: 0, height: 0,
       min: attrs.min ?? '', max: attrs.max ?? '', step: attrs.step ?? '',
       classList: { toggle(name, force) { const on = force ?? !classes.has(name); if (on) classes.add(name); else classes.delete(name); return on; }, contains: name => classes.has(name) },
       setAttribute(name, value) { this.attributes[name] = String(value); },
       getAttribute(name) { return this.attributes[name] ?? null; },
       addEventListener(name, listener) { if (!listeners.has(name)) listeners.set(name, []); listeners.get(name).push(listener); },
-      dispatch(name) { for (const listener of listeners.get(name) || []) listener({ target: this, type: name }); },
+      dispatch(name, event = {}) { for (const listener of listeners.get(name) || []) listener({ target: this, type: name, ...event }); },
       click() { if (!this.disabled) { this.dispatch('click'); if (tag === 'a') downloads.push({ href: this.href, download: this.download, blob: blobs.get(this.href) }); } },
       getBoundingClientRect: () => ({ width: 800, height: tag === 'canvas' && attrs.id === 'chart' ? 220 : 380 }),
       getContext: () => context2d,
@@ -44,7 +45,7 @@ function laboratory() {
         } else storedValue = String(value);
       }
     });
-    if (attrs['data-chart']) node.dataset.chart = attrs['data-chart'];
+    for (const key of ['chart', 'view', 'preset']) if (attrs['data-' + key]) node.dataset[key] = attrs['data-' + key];
     return node;
   }
   function attributes(text) {
@@ -64,12 +65,18 @@ function laboratory() {
   const document = {
     hidden: false,
     getElementById(id) { assert.ok(nodes.has(id), `Element ${id} exists in the real HTML`); return nodes.get(id); },
-    querySelectorAll(selector) { assert.equal(selector, '[data-chart]'); return charts; },
+    querySelectorAll(selector) {
+      if (selector === '[data-chart]') return charts;
+      if (selector === 'input[type="range"]') return [...nodes.values()].filter(n => n.attributes.type === 'range');
+      if (selector === '[data-view]') return [...nodes.values()].filter(n => n.dataset.view);
+      if (selector === '[data-preset]') return [...nodes.values()].filter(n => n.dataset.preset);
+      throw new Error('Unexpected selector ' + selector);
+    },
     createElement: tag => element(tag),
     addEventListener() {}
   };
   const window = { devicePixelRatio: 1, addEventListener() {} };
-  const scope = vm.createContext({ document, window, console, Blob,
+  const scope = vm.createContext({ document, window, console, Blob, performance: { now: () => 0 },
     URL: { createObjectURL(blob) { const key = 'blob:test-measures-' + blobs.size; blobs.set(key, blob); return key; }, revokeObjectURL() {} },
     setTimeout() {},
     requestAnimationFrame(callback) { pendingFrame = callback; }
@@ -182,7 +189,7 @@ test('reset applies the selected particle count and energy, clears work, and res
   assert.ok(Math.abs(lab.metrics.temperature - 2.5) < 1e-12);
   assert.equal(lab.metrics.pressure, null);
   assert.equal(lab.paused, false);
-  lab.charts[1].click();
+  lab.charts.find(button => button.dataset.chart === 'pv').click();
   assert.match(lab.nodes.get('chart').getAttribute('aria-label'), /volume/);
   lab.click('export');
   assert.equal(lab.downloads.length, 1);
@@ -293,7 +300,7 @@ test('pressure source, pressure work and CSV remain consistent with actual colli
     const p = source === 'piston' ? metrics.pressureByWall.right : metrics.pressure;
     assert.equal(lab.nodes.get('pressure').textContent, format(p));
     assert.match(lab.nodes.get('pressureLabel').textContent, source === 'piston' ? /piston/ : /moyenne/);
-    lab.charts[2].click(); lab.click('export');
+    lab.charts.find(button => button.dataset.chart === 'pvt').click(); lab.click('export');
     const text = await lab.downloads.at(-1).blob.text();
     assert.ok(!/NaN|Infinity/.test(text));
     const lines = text.replace(/^\uFEFF/, '').trim().split(/\r?\n/);
@@ -314,7 +321,7 @@ test('pressure source, pressure work and CSV remain consistent with actual colli
 
 test('a slow trajectory yields a descriptive log fit, and later rest does not add fit samples', () => {
   const lab = laboratory();
-  lab.input('duration', 64); lab.click('start'); lab.advance(8.5); lab.charts[3].click();
+  lab.input('duration', 64); lab.click('start'); lab.advance(8.5); lab.charts.find(button => button.dataset.chart === 'log').click();
   const during = lab.analysis.logarithmic;
   assert.ok(during.fit && during.fit.count >= 3);
   assert.ok(Number.isFinite(during.fit.slope));
@@ -331,7 +338,7 @@ test('a slow trajectory yields a descriptive log fit, and later rest does not ad
 
 test('changing the gamma reference changes analysis settings without changing gas dynamics', () => {
   const lab = laboratory(), control = laboratory();
-  for (const item of [lab, control]) { item.input('duration', 64); item.click('start'); item.advance(3); item.charts[3].click(); }
+  for (const item of [lab, control]) { item.input('duration', 64); item.click('start'); item.advance(3); item.charts.find(button => button.dataset.chart === 'log').click(); }
   lab.input('gamma', 3.2);
   assert.equal(lab.analysis.gammaReference, 3.2);
   assert.equal(control.analysis.gammaReference, 2);
@@ -362,7 +369,7 @@ test('an oscillation inversion starts a new log leg and free expansion never reu
   assert.equal(lab.metrics.pressureWork, previousWork);
   assert.equal(lab.analysis.logarithmic.fit, null);
   assert.equal(lab.analysis.logarithmic.points.length, 0);
-  lab.charts[3].click();
+  lab.charts.find(button => button.dataset.chart === 'log').click();
   assert.match(lab.nodes.get('fitStatus').textContent, /détente libre/);
 });
 
@@ -573,4 +580,63 @@ test('measurement and cycle CSV exports preserve Q, first-law balances and recon
     if (N('W_reconstruit_Peff_ur') != null) assert.ok(Math.abs(N('W_reconstruit_Peff_ur') - N('W_recu_ur')) < Math.max(1e-6, Math.abs(N('W_recu_ur')) * 1e-8));
     if (row.acheve === '1') assert.equal(row.volume_revenu, '1');
   }
+});
+
+test('main tabs preserve measurements and paused state; keyboard navigation has one selected panel', () => {
+  const lab = laboratory();lab.advance(.3);lab.click('start');lab.advance(.3);lab.click('pause');
+  const before = lab.metrics;
+  for (const view of ['diagrams','particles','understand','experience']) {
+    lab.click('tab-' + view);
+    assert.equal(lab.analysis.currentView,view);
+    for (const other of ['experience','diagrams','particles','understand']) {
+      assert.equal(lab.nodes.get('view-'+other).hidden,other!==view);
+      assert.equal(lab.nodes.get('tab-'+other).getAttribute('aria-selected'),String(other===view));
+    }
+    assert.equal(lab.metrics.time,before.time);assert.equal(lab.metrics.work,before.work);assert.equal(lab.paused,true);
+  }
+  lab.nodes.get('tab-experience').dispatch('keydown',{key:'ArrowRight',preventDefault(){}});
+  assert.equal(lab.analysis.currentView,'diagrams');assert.equal(lab.nodes.get('tab-diagrams').focused,true);
+  lab.nodes.get('tab-diagrams').dispatch('keydown',{key:'End',preventDefault(){}});
+  assert.equal(lab.analysis.currentView,'understand');
+});
+test('Joule–Gay–Lussac preset doubles the volume into vacuum with W = Q = ΔE = 0', () => {
+  const lab=laboratory();lab.input('thermalMode','thermostat');lab.advance(.3);
+  lab.click('preset-free');assert.equal(lab.metrics.width,9);assert.equal(lab.metrics.thermalMode,'isolated');
+  assert.equal(lab.metrics.time,0);assert.equal(lab.nodes.get('durationField').hidden,true);
+  const energy=lab.metrics.energy;lab.click('start');lab.advance(.5);
+  assert.equal(lab.metrics.width,18);assert.equal(lab.metrics.energy,energy);assert.equal(lab.metrics.heat,0);assert.equal(lab.metrics.work,0);
+  lab.click('reset');assert.equal(lab.metrics.width,9);lab.click('start');assert.equal(lab.metrics.width,18);
+});
+test('adiabatic presets enforce isolation, the expected direction and work sign', () => {
+  const lab=laboratory();
+  for (const preset of ['compression','expansion']) {
+    lab.click('preset-'+preset);assert.equal(lab.metrics.thermalMode,'isolated');assert.equal(lab.metrics.time,0);
+    lab.input('duration',0);lab.click('start');lab.advance(.6);
+    assert.ok(preset==='compression' ? lab.metrics.work>0 : lab.metrics.work<=0);
+    assert.equal(lab.metrics.heat,0);assert.ok(Math.abs(lab.metrics.balanceError)<1e-8);
+    assert.ok(preset==='compression' ? lab.metrics.width<11 : lab.metrics.width>11);
+  }
+});
+test('cycle preset records multiple periods, and free configuration preserves their measurements', () => {
+  const lab=laboratory();lab.click('preset-cycles');lab.input('duration',0);lab.click('start');lab.advance(1.5);
+  assert.ok(lab.analysis.cycles.filter(c=>c.complete).length>=3);
+  lab.click('pause');const before=lab.metrics;const count=lab.analysis.cycles.length;
+  lab.click('preset-custom');assert.equal(lab.analysis.selectedPreset,'custom');assert.equal(lab.nodes.get('customMotion').open,true);
+  assert.equal(lab.metrics.time,before.time);assert.equal(lab.analysis.cycles.length,count);
+});
+test('thermal changes exit a named adiabatic preset and the bath slider applies only to future impacts', () => {
+  const lab=laboratory();lab.click('preset-expansion');lab.click('pause');const before=lab.metrics.energy;
+  lab.input('thermalMode','thermostat');lab.input('bathSlider',300);
+  assert.equal(lab.metrics.bathTemperature,3);assert.equal(lab.metrics.energy,before);
+  assert.equal(lab.nodes.get('bathTemperature').value,'3');assert.equal(lab.analysis.selectedPreset,'custom');
+});
+test('hard disks require applying a new state, preserve particle count and export the model actually simulated', async () => {
+  const lab=laboratory();lab.input('particles',1000);lab.input('particleModel','hard-disks');
+  assert.equal(lab.metrics.particleModel,'ideal');assert.equal(lab.metrics.count,180);
+  lab.click('applyInitial');assert.equal(lab.metrics.particleModel,'hard-disks');assert.equal(lab.metrics.count,1000);
+  lab.advance(.3);assert.ok(lab.metrics.pairCollisions>0);assert.ok(Math.abs(lab.metrics.balanceError)<1e-7);
+  lab.click('export');const text=await lab.downloads.at(-1).blob.text();
+  assert.match(text,/modele_particules;rayon_particule_ur;chocs_entre_particules;fraction_surface_occupee/);assert.match(text,/hard-disks/);
+  lab.click('preset-free');assert.equal(lab.metrics.particleModel,'hard-disks');assert.equal(lab.metrics.count,1000);
+  lab.click('start');assert.equal(lab.metrics.width,18);assert.equal(lab.metrics.heat,0);assert.equal(lab.metrics.work,0);
 });
