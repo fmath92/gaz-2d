@@ -16,6 +16,15 @@ function confined(sim) {
 }
 function balanced(sim) {
   assert.ok(Math.abs(sim.metrics.balanceError) < Math.max(1e-8, sim.metrics.energy * 1e-11), `Bilan : ${sim.metrics.balanceError}`);
+  assert.ok(Math.abs(sim.metrics.balancePressureError) < Math.max(1e-8, sim.metrics.energy * 1e-11), `Bilan pression : ${sim.metrics.balancePressureError}`);
+  assert.ok(Math.abs(sim.metrics.pressureWorkError) < Math.max(1e-8, sim.metrics.energy * 1e-11), `Écart des travaux : ${sim.metrics.pressureWorkError}`);
+}
+function singleMovingParticle(options = {}) {
+  // Les autres particules sont immobiles : la collision analytique reste isolée
+  // tout en respectant le nombre minimal de particules du démonstrateur.
+  const sim = new GasSimulation({ ...options, count: 10 });
+  for (const p of sim.particles) Object.assign(p, { x: sim.width / 2, y: sim.height / 2, vx: 0, vy: 0 });
+  return sim;
 }
 
 test('initialisation reproductible et isotrope ; aucune pression fabriquée avant mesure', () => {
@@ -25,6 +34,22 @@ test('initialisation reproductible et isotrope ; aucune pression fabriquée avan
   assert.equal(a.metrics.pressureByWall.left, null);
   assert.ok(Math.abs(a.metrics.energy - 270) < 1e-10);
   assert.ok(Math.abs(a.metrics.temperatureX - a.metrics.temperatureY) < 1e-12);
+  assert.equal(a.metrics.pressureWork, 0);
+  assert.equal(a.metrics.pressurePower, null);
+});
+
+test('nombre de particules entier entre 10 et 1000, bornes incluses', () => {
+  for (const count of [10, 1000]) {
+    const sim = new GasSimulation({ count, temperature: 2 });
+    assert.equal(sim.particles.length, count);
+    assert.equal(sim.metrics.count, count);
+    assert.ok(Math.abs(sim.metrics.energy - 2 * count) < 1e-9);
+    sim.step(0.1);
+    confined(sim); balanced(sim);
+  }
+  for (const count of [0, 1, 9, 1001, 2000, 10.5, NaN]) {
+    assert.throws(() => new GasSimulation({ count }), /entier compris entre 10 et 1000/);
+  }
 });
 
 test('enceinte fixe isolée : conservation de l’énergie et confinement', () => {
@@ -38,7 +63,7 @@ test('enceinte fixe isolée : conservation de l’énergie et confinement', () =
 });
 
 test('mesure des impulsions : choc exact sur piston fixe puis sur piston mobile', () => {
-  const sim = new GasSimulation({ count: 1, width: 10, height: 5, temperature: 1 });
+  const sim = singleMovingParticle({ width: 10, height: 5, temperature: 1 });
   sim.particles[0] = { x: 9, y: 2, vx: 2, vy: 0 };
   sim.initialEnergy = 2;
   sim.step(0.6);
@@ -52,11 +77,36 @@ test('mesure des impulsions : choc exact sur piston fixe puis sur piston mobile'
   sim.step(1.1);
   assert.ok(Math.abs(sim.particles[0].vx) < 1e-8);
   assert.ok(Math.abs(sim.metrics.work + 2) < 1e-8);
+  // J = 2 m (vx-u) = 2 et u = 1 : -J u = -2.
+  assert.ok(Math.abs(sim.metrics.pressureWork + 2) < 1e-8);
+  assert.ok(Math.abs(sim.metrics.pressurePower + 2 / sim.time) < 1e-8);
   balanced(sim); confined(sim);
 });
 
+test('travail de pression analytique en compression et puissance sur fenêtre glissante', () => {
+  const sim = singleMovingParticle({ width: 10, height: 5, measurementWindow: 2 });
+  sim.particles[0] = { x: 9, y: 2, vx: 2, vy: 0 };
+  sim.initialEnergy = 2;
+  sim.setMotion({ type: 'linear', targetWidth: 8, duration: 2 });
+  sim.step(0.5);
+  // u=-1 ; choc à t=1/3 ; J=2(2-(-1))=6 ; -J u=+6.
+  assert.ok(Math.abs(sim.particles[0].vx + 4) < 1e-9);
+  assert.ok(Math.abs(sim.metrics.pressureWork - 6) < 1e-9);
+  assert.ok(Math.abs(sim.metrics.pressurePower - 12) < 1e-9);
+  balanced(sim);
+  sim.stopMotion();
+  assert.ok(Math.abs(sim.metrics.pressurePower - 12) < 1e-9, 'La puissance est une moyenne historique, pas Pmoyenne × u instantané.');
+  sim.step(2.1);
+  assert.equal(sim.metrics.pressurePower, 0, 'Le choc sort de la fenêtre de mesure.');
+  assert.ok(Math.abs(sim.metrics.pressureWork - 6) < 1e-9, 'Le travail cumulé conserve les anciens échanges.');
+  balanced(sim); confined(sim);
+  sim.reset({ count: 10 });
+  assert.equal(sim.metrics.pressureWork, 0);
+  assert.equal(sim.metrics.pressurePower, null);
+});
+
 test('rebonds multiples en un pas et choc dans un coin', () => {
-  const sim = new GasSimulation({ count: 1, width: 3, height: 3 });
+  const sim = singleMovingParticle({ width: 3, height: 3 });
   sim.particles[0] = { x: 1, y: 1, vx: 10000, vy: 10000 };
   sim.initialEnergy = 1e8;
   sim.step(0.02);
@@ -93,6 +143,8 @@ test('détente libre : ouverture immédiate, énergie inchangée et aucun travai
   run(sim, 30);
   assert.equal(sim.metrics.energy, before);
   assert.equal(sim.metrics.work, 0);
+  assert.equal(sim.metrics.pressureWork, 0);
+  assert.equal(sim.metrics.pressurePower, 0);
   assert.ok(sim.particles.some(p => p.x > 5));
   assert.throws(() => sim.freeExpand(4), /comprimer/);
   confined(sim); balanced(sim);
@@ -164,6 +216,7 @@ test('piston qui fuit plus vite que toutes les particules : détente sans choc n
   sim.step(duration);
   assert.equal(sim.metrics.energy, energy);
   assert.equal(sim.metrics.work, 0);
+  assert.equal(sim.metrics.pressureWork, 0);
   assert.equal(sim.metrics.pressureByWall.right, 0);
   confined(sim); balanced(sim);
 });
