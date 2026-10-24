@@ -14,6 +14,22 @@ python3 -m http.server 8080 --directory dist
 
 Puis ouvrir <http://localhost:8080>.
 
+## Version en ligne et dépôt GitHub
+
+- Démonstrateur public : <https://fmath92.github.io/gaz-2d/>.
+- Code source et historique : <https://github.com/fmath92/gaz-2d>.
+
+GitHub Pages publie automatiquement la branche `main`, à partir de la racine du dépôt. Le fichier `index.html` à la racine redirige vers `dist/`, qui contient l’application autonome. Le fichier `.nojekyll` indique de servir les fichiers statiques sans transformation par Jekyll.
+
+Pour mettre le site à jour, modifier les fichiers dans `dist/`, lancer `node --test tests/*.test.mjs`, puis enregistrer et pousser les changements sur `main`. La publication apparaît dans l’onglet **Actions** du dépôt et sa configuration dans **Settings → Pages**. Aucun serveur applicatif, secret de déploiement ou installation de dépendances n’est nécessaire.
+
+Pour récupérer le projet :
+
+```sh
+git clone https://github.com/fmath92/gaz-2d.git
+cd gaz-2d
+```
+
 ## Explorer en quelques minutes
 
 1. Choisir entre 10 et 1 000 particules avec le curseur ou le champ numérique, régler la température initiale, puis créer cet état. L’application réinitialise le piston, le temps, le travail et les mesures.
