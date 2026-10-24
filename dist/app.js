@@ -203,16 +203,17 @@
   function updateTourUI() {
     const tour=session().tour;if(!tour)return;
     const v=tour.view, heating=tour.stageIndex===0;
-    const phases={search:'Repérage du choc',approach:'Approche au ralenti',impact:'Rebond au ralenti',departure:'Après le choc',return:'Retour à la vue d’ensemble'};
+    const phases={search:'Repérage du choc',approach:'Approche au ralenti',impact:'Rebond au ralenti',departure:'Après le choc',compare:'Comparez les vitesses',return:'Retour à la vue d’ensemble'};
     const step=tour.kind==='heat' ? (heating?'1/2 · Paroi → gaz':'2/2 · Gaz → paroi') : tour.kind==='work'?'Travail sur le piston':'Poussée sur le piston';
     $('tourStage').textContent=step+' · '+(phases[v.phase]||'');
-    $('tourSpeed').textContent=v.phase==='search' ? 'Préparation' : 'Lecture ×'+format(v.rate,3);
+    $('tourSpeed').textContent=v.phase==='search' ? 'Préparation' : v.phase==='compare' ? 'Arrêt sur image · 2,5 s' : 'Lecture ×'+format(v.rate,3);
     let caption=v.phase==='search' ? 'Un choc à venir est repéré sans modifier les particules.' : v.phase==='approach' ? tour.kind==='work' ? 'Le piston se déplace devant un repère fixe du laboratoire. Suivez la particule entourée jusqu’au choc.' : 'Suivez la particule entourée. La caméra se rapproche de son point de contact.' : v.phase==='return' ? 'La caméra recule ; le temps retrouve progressivement sa vitesse normale.' : '';
+    if(v.phase==='compare'&&v.event) caption='V sortante si fixe : '+format(G.stationaryReflection(v.event).speed)+' ; si mobile : '+format(Math.hypot(v.event.after.vx,v.event.after.vy))+'. Le piston mobile '+(v.event.work>0?'accélère':'ralentit')+' la particule. Reprise automatique dans un instant.';
     if(!caption&&v.event) caption=tour.kind==='pressure' ? 'La particule rebondit et transmet une impulsion J = '+format(v.event.impulse)+' au piston. Cette poussée contribue à la pression.'
       : tour.kind==='heat' ? (v.event.heat>0?'La paroi donne de l’énergie à la particule.':'La particule cède de l’énergie à la paroi.')+' δQ reçu par le gaz = '+signed(v.event.heat)+'.'
       : (v.event.work>0?'Le piston communique de l’énergie à la particule.':'La particule communique de l’énergie au piston.')+' δW reçu par le gaz = '+signed(v.event.work)+'.';
     if($('tourCaption').textContent!==caption)$('tourCaption').textContent=caption;
-    const progress={search:0,approach:.15,impact:.55,departure:.7,return:.9}[v.phase]??1;
+    const progress={search:0,approach:.15,impact:.55,departure:.7,compare:.85,return:.9}[v.phase]??1;
     $('tourProgress').style.setProperty('width',(100*(tour.stageIndex+progress)/tour.stages.length)+'%');
   }
   function chartData() {
@@ -297,6 +298,7 @@
       $('heatDirection').textContent = 'En attente d’un choc';
       $('heatExplanation').textContent = 'La paroi est immobile : δW = 0. Comparez l’énergie de la particule avant et après le choc pour mesurer la chaleur échangée.';
     }
+    $('workLesson').setAttribute('data-compare', String(s.tour?.phase === 'compare'));
     $('workBefore').textContent = event?.kind === 'wall' ? format(event.energyBefore) : '—';
     $('workAfter').textContent = event?.kind === 'wall' ? format(event.energyAfter) : '—';
     $('workDirection').textContent = event?.work > 0 ? 'Piston → gaz' : event?.work < 0 ? 'Gaz → piston' : 'Q = 0';

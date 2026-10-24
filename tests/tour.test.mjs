@@ -109,3 +109,17 @@ test('stationary-wall comparison preserves incident energy and differs from the 
     assert.ok(targetWidth<11?Math.hypot(e.after.vx,e.after.vy)>fixed.speed:Math.hypot(e.after.vx,e.after.vy)<fixed.speed);
   }
 });
+test('work pauses only after departure to compare exit speeds, then automatically zooms out',()=>{
+  const s=gas();s.setMotion({targetWidth:8,duration:10});const tour=new CollisionTour(s,{kind:'work'});
+  let snapshot=null,frames=0,phaseBeforeHold=null;
+  for(let frame=0;frame<2000&&!tour.finished;frame++){
+    const phase=tour.phase;
+    tour.tick(1/60,h=>{s.step(h);return h;},Infinity);
+    if(tour.phase==='compare'){
+      if(!snapshot){snapshot=JSON.stringify({time:s.time,width:s.width,particles:s.particles,metrics:s.metrics,age:tour.impactAge});phaseBeforeHold=phase;}
+      assert.equal(JSON.stringify({time:s.time,width:s.width,particles:s.particles,metrics:s.metrics,age:tour.impactAge}),snapshot);
+      assert.equal(tour.zoom,1);assert.equal(tour.rate,0);frames++;
+    }
+  }
+  assert.equal(phaseBeforeHold,'departure');assert.ok(frames>=149&&frames<=152);assert.equal(tour.phase,'done');assert.equal(tour.zoom,0);
+});

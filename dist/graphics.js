@@ -192,7 +192,7 @@
     ctx.strokeStyle='#e3a34e';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,12+Math.min(1,tour.impactAge/.6)*16,0,2*Math.PI);ctx.stroke();
     // A common scale and laboratory velocities reveal the work asymmetry.
     ctx.font='10px system-ui';ctx.textAlign='left';ctx.fillStyle=tour.kind==='work'?'#9274ad':'#397fbe';ctx.fillText((tour.kind==='work'?'v sortante si fixe · ':'p avant · ')+format(fixed.speed),14,h-35);
-    ctx.fillStyle='#258d79';ctx.fillText((tour.kind==='work'?'v sortante réelle · ':'p après · ')+format(Math.hypot(e.after.vx,e.after.vy)),14,h-19);
+    ctx.fillStyle='#258d79';ctx.fillText((tour.kind==='work'?'v sortante si mobile · ':'p après · ')+format(Math.hypot(e.after.vx,e.after.vy)),14,h-19);
     const inward=e.wall==='left'?1:-1;
     if (tour.kind==='pressure') {
       arrow(ctx,cx,cy,-inward*65,0,'#ce8b37',3);ctx.fillStyle='#aa702e';ctx.textAlign='center';ctx.fillText('Poussée · J = '+format(e.impulse),Math.min(w-78,cx-inward*35),cy+35);
@@ -203,6 +203,16 @@
       ctx.fillStyle=energy>0?'#b57b35':'#3c75a5';ctx.textAlign='right';ctx.fillText(label,w-14,h-35);
       ctx.fillText((tour.kind==='heat'?'δQ':'δW reçu')+' = '+(energy>0?'+':'')+format(energy),w-14,h-19);
 
+    }
+    if (tour.kind==='work' && tour.phase==='compare') {
+      ctx.fillStyle='rgba(255,255,255,.97)';ctx.fillRect(10,h-93,w-20,85);
+      ctx.strokeStyle='#d3e2e7';ctx.lineWidth=1;ctx.strokeRect(10,h-93,w-20,85);
+      ctx.textAlign='center';ctx.font='600 11px system-ui';ctx.fillStyle='#314f5e';
+      ctx.fillText('COMPAREZ LES VITESSES SORTANTES',w/2,h-76);
+      for (const [x,label,value,color] of [[w*.27,'Si piston fixe',fixed.speed,'#9274ad'],[w*.73,'Si piston mobile',Math.hypot(e.after.vx,e.after.vy),'#258d79']]) {
+        ctx.fillStyle=color;ctx.font='11px system-ui';ctx.fillText(label,x,h-55);
+        ctx.font='700 25px system-ui';ctx.fillText(format(value),x,h-23);
+      }
     }
   }
   function collision(canvas, event, { kind = 'pressure', pulse = 0 } = {}) {

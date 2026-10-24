@@ -1700,3 +1700,7 @@ input[aria-invalid="true"] {
 .speed-comparison b { display:block; font-size:17px; margin-top:3px; font-variant-numeric:tabular-nums; }
 .real-speed { color:#258d79; }
 .fixed-speed { color:#9274ad; }
+
+#workLesson[data-compare="true"] .real-speed { background:#e3f3ed; box-shadow:0 0 0 7px #e3f3ed; border-radius:3px; }
+#workLesson[data-compare="true"] .fixed-speed { background:#f0e9f7; box-shadow:0 0 0 7px #f0e9f7; border-radius:3px; }
+#workLesson[data-compare="true"] .speed-comparison b { transform:scale(1.2); transform-origin:left center; }

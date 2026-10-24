@@ -60,7 +60,7 @@
       if (this.finished) return;
       if (this.phase === 'search') { this.plan(budgetMs); return; }
       this.elapsed += seconds;
-      if (this.event) this.impactAge += seconds;
+      if (this.event && this.phase !== 'compare') this.impactAge += seconds;
       if (this.phase === 'approach') {
         this.zoom = this.reducedMotion ? 1 : ease(this.elapsed / 1.1);
         this.rate = Math.min(this.lead / 3.2, this.normalSpeed / 2);
@@ -71,7 +71,14 @@
         if (this.elapsed >= .9) { this.phase = 'departure'; this.elapsed = 0; }
       } else if (this.phase === 'departure') {
         this.rate = Math.min(this.normalSpeed / 2, .24 / (2.2 * Math.max(1, Math.hypot(this.event.after.vx, this.event.after.vy))));
-        if (this.elapsed >= 2.2) { this.phase = 'return'; this.elapsed = 0; }
+        if (this.elapsed >= 2.2) {
+          this.phase = this.kind === 'work' ? 'compare' : 'return'; this.elapsed = 0;
+          if (this.phase === 'compare') { this.rate = 0; return; }
+        }
+      } else if (this.phase === 'compare') {
+        this.zoom = 1; this.rate = 0;
+        if (this.elapsed >= 2.5) { this.phase = 'return'; this.elapsed = 0; }
+        return;
       } else if (this.phase === 'return') {
         const q = ease(this.elapsed / 1.1);
         this.zoom = this.reducedMotion ? (q < 1 ? 1 : 0) : 1 - q;

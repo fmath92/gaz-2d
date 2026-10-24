@@ -2,7 +2,7 @@
 
 **[Ouvrir le démonstrateur](https://fmath92.github.io/gaz-2d/)** · [Code source](https://github.com/fmath92/gaz-2d)
 
-Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.6.2 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
+Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.6.3 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
 
 ## La visite
 
@@ -46,7 +46,7 @@ Les flèches `p avant` et `p après` sont des quantités de mouvement dans le **
 
 Pour le travail, la caméra se rapproche d’une **position fixe dans le laboratoire** et ne suit jamais la largeur courante du gaz. Une ligne marque la position initiale du piston ; une graduation fixe, sa vitesse et son déplacement permettent de voir le mouvement dès l’approche. Le cadrage tient compte du trajet avant le contact pour garder le piston visible.
 
-La trajectoire violette en pointillés représente un **rebond hypothétique sur un piston immobile**, au même point et avec la même vitesse incidente. À droite : v′x = 2u − vx pour le piston mobile, contre v′x = −vx pour le piston immobile, avec vy inchangée. Les deux vitesses sortantes sont affichées, et les flèches utilisent une échelle commune. Le cercle violet prolonge seulement le vol libre après ce rebond hypothétique : ce n’est pas une seconde simulation du gaz. Les chocs guidés sont sélectionnés avec vx incident positif, afin que la particule puisse aussi heurter un piston immobile. Un piston qui rattrape une particule s’éloignant de lui est signalé séparément dans les mesures ordinaires.
+La trajectoire violette en pointillés représente un **rebond hypothétique sur un piston immobile**, au même point et avec la même vitesse incidente. À droite : v′x = 2u − vx pour le piston mobile, contre v′x = −vx pour le piston immobile, avec vy inchangée. Les deux vitesses sortantes sont affichées, et les flèches utilisent une échelle commune. Juste avant le dézoom, un arrêt sur image de 2,5 secondes met en évidence les deux vitesses sortantes dans la cavité et dans le panneau de mesures. Le rebond reste continu ; seule cette comparaison finale est figée, puis la reprise est automatique. Le cercle violet prolonge seulement le vol libre après ce rebond hypothétique : ce n’est pas une seconde simulation du gaz. Les chocs guidés sont sélectionnés avec vx incident positif, afin que la particule puisse aussi heurter un piston immobile. Un piston qui rattrape une particule s’éloignant de lui est signalé séparément dans les mesures ordinaires.
 
 Le repérage emploie une copie indépendante du moteur, comprenant l’état du générateur aléatoire thermique, les positions, les vitesses, le mouvement du piston et les conditions aux limites. La copie cherche un événement suffisamment éloigné dans le futur pour laisser le temps de zoomer, hors des coins. Le moteur affiché emploie ensuite les mêmes pas physiques et confirme l’identifiant, la date et les échanges de la collision prévue. La recherche ne consomme aucun tirage du gaz affiché et ne modifie pas ses mesures. Le budget de calcul par image reste borné.
 

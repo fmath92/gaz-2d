@@ -1,5 +1,9 @@
 # Versions du démonstrateur
 
+## 0.6.3 — 24 octobre 2026
+
+Arrêt sur image de 2,5 secondes à la fin du parcours de travail, après le rebond et avant le dézoom. Les vitesses sortantes « si fixe » et « si mobile » sont agrandies et mises en évidence sur la cavité et dans les mesures, puis la lecture reprend automatiquement. Les autres parcours restent continus.
+
 ## 0.6.2 — 24 octobre 2026
 
 Zoom du travail ancré dans le laboratoire, avec position initiale du piston et graduation fixes, vitesse et déplacement visibles avant le choc. Comparaison du rebond réel avec le rebond hypothétique sur un piston immobile au même contact : trajectoire violette, vitesses sortantes et relation v′x = 2u − vx. Choix de chocs incidents permettant cette comparaison, sans modifier la physique.
