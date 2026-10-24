@@ -73,3 +73,16 @@ test('automatic close-up also slows a simulation already playing at 0.05 speed',
   assert.ok(tour.rate<.05);
   complete(tour);assert.equal(tour.normalSpeed,.05);
 });
+test('the rebound keeps advancing physical time without an impact pause, with continuous wave age',()=>{
+  const s=gas(),tour=new CollisionTour(s);let impactFrames=0,lastAge=0,sawDeparture=false;
+  for(let frame=0;frame<1500&&!tour.finished;frame++){
+    const phase=tour.phase,before=s.time;
+    tour.tick(1/60,h=>{s.step(h);return h;},Infinity);
+    if(phase==='impact'){
+      assert.ok(tour.rate>0);assert.ok(s.time>before,'the particles must keep moving through the rebound');impactFrames++;
+    }
+    if(tour.event){assert.ok(tour.view.impactAge>=lastAge);lastAge=tour.view.impactAge;}
+    if(phase==='impact'&&tour.phase==='departure'){assert.ok(tour.view.impactAge>=.9);sawDeparture=true;}
+  }
+  assert.ok(impactFrames>30);assert.ok(sawDeparture);assert.equal(tour.phase,'done');close(s.metrics.balancePressureError,0);
+});

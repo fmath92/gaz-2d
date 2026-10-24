@@ -203,10 +203,10 @@
   function updateTourUI() {
     const tour=session().tour;if(!tour)return;
     const v=tour.view, heating=tour.stageIndex===0;
-    const phases={search:'Repérage du choc',approach:'Approche au ralenti',impact:'Instant du choc',departure:'Après le choc',return:'Retour à la vue d’ensemble'};
+    const phases={search:'Repérage du choc',approach:'Approche au ralenti',impact:'Rebond au ralenti',departure:'Après le choc',return:'Retour à la vue d’ensemble'};
     const step=tour.kind==='heat' ? (heating?'1/2 · Paroi → gaz':'2/2 · Gaz → paroi') : tour.kind==='work'?'Travail sur le piston':'Poussée sur le piston';
     $('tourStage').textContent=step+' · '+(phases[v.phase]||'');
-    $('tourSpeed').textContent=v.phase==='search' ? 'Préparation' : v.phase==='impact'?'Arrêt sur l’instant du choc':'Lecture ×'+format(v.rate,3);
+    $('tourSpeed').textContent=v.phase==='search' ? 'Préparation' : 'Lecture ×'+format(v.rate,3);
     let caption=v.phase==='search' ? 'Un choc à venir est repéré sans modifier les particules.' : v.phase==='approach' ? 'Suivez la particule entourée. La caméra se rapproche de son point de contact.' : v.phase==='return' ? 'La caméra recule ; le temps retrouve progressivement sa vitesse normale.' : '';
     if(!caption&&v.event) caption=tour.kind==='pressure' ? 'La particule rebondit et transmet une impulsion J = '+format(v.event.impulse)+' au piston. Cette poussée contribue à la pression.'
       : tour.kind==='heat' ? (v.event.heat>0?'La paroi donne de l’énergie à la particule.':'La particule cède de l’énergie à la paroi.')+' δQ reçu par le gaz = '+signed(v.event.heat)+'.'

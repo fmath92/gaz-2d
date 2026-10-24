@@ -1,5 +1,9 @@
 # Versions du démonstrateur
 
+## 0.6.1 — 24 octobre 2026
+
+Suppression de l’arrêt sur image au choc dans les parcours animés. Le ralenti reste continu, avec une transition progressive de vitesse après le rebond. Une onde visuelle s’étend et s’atténue à l’intérieur du piston, sans modifier sa dynamique ni les échanges calculés.
+
 ## 0.6 — 24 octobre 2026
 
 Séquences animées dans la simulation : repérage d’un choc à venir, ralenti, zoom de la caméra, visualisation de l’impact et du transfert, dézoom et reprise automatique à la vitesse précédente. Le repérage utilise une copie indépendante du moteur et du générateur aléatoire thermique ; le choc est ensuite vérifié dans le gaz affiché. Paramètres verrouillés pendant la séquence, interruption par Pause, changement d’onglet, remise à zéro ou bouton dédié.

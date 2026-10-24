@@ -110,6 +110,9 @@
     }
     ctx.restore(); ctx.globalAlpha = 1;
     const wallColor = wall => sim.thermal.mode === 'thermostat' && sim.thermal.walls.includes(wall) && (wall !== 'right' || sim.thermal.pistonThermal) ? '#cf914e' : '#8da3b2';
+    const pistonThickness = 8 + 38 * q;
+    ctx.fillStyle = '#b7c9d4'; ctx.fillRect(right, top, pistonThickness, bottom-top);
+    ctx.fillStyle = '#dae5eb'; ctx.fillRect(right+pistonThickness*.65, top, pistonThickness*.35, bottom-top);
     line(ctx,left,top,end,top,wallColor('top'),3); line(ctx,left,bottom,end,bottom,wallColor('bottom'),3);
     line(ctx,left,top,left,bottom,wallColor('left'),6); line(ctx,right,top,right,bottom,wallColor('right'),8);
     line(ctx,right,(top+bottom)/2,end+12,(top+bottom)/2,'#a9b9c2',5);
@@ -137,10 +140,22 @@
     }
     if (!e) return;
     const cx=X(e.x),cy=Y(e.y);
+    // Visual stress pulse in the rigid piston, not an extra physical force.
+    // Its age is continuous across the rebound/departure phases.
+    if (e.wall === 'right') {
+      ctx.save(); ctx.beginPath(); ctx.rect(right,Math.max(0,top),pistonThickness,Math.min(h,bottom)-Math.max(0,top)); ctx.clip();
+      for (let i=0;i<3;i++) {
+        const age=tour.impactAge-i*.14;
+        if(age<0 || age>1.7)continue;
+        ctx.strokeStyle='rgba(221,143,45,'+(.85*(1-age/1.7))+')';ctx.lineWidth=4-i*.7;
+        ctx.beginPath();ctx.arc(right,cy,3+age*135,0,2*Math.PI);ctx.stroke();
+      }
+      ctx.restore();
+    }
     const f=Math.min(68,h*.22)/Math.max(Math.hypot(e.before.vx,e.before.vy),Math.hypot(e.after.vx,e.after.vy),.1);
     ctx.setLineDash([3,3]);arrow(ctx,cx-e.before.vx*f,cy+e.before.vy*f,e.before.vx*f,-e.before.vy*f,'#397fbe',2);ctx.setLineDash([]);
     arrow(ctx,cx,cy,e.after.vx*f,-e.after.vy*f,'#258d79',2.5);
-    ctx.strokeStyle='#e3a34e';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,12+Math.min(1,tour.elapsed/.6)*16,0,2*Math.PI);ctx.stroke();
+    ctx.strokeStyle='#e3a34e';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,12+Math.min(1,tour.impactAge/.6)*16,0,2*Math.PI);ctx.stroke();
     // A common scale and laboratory velocities reveal the work asymmetry.
     ctx.font='10px system-ui';ctx.textAlign='left';ctx.fillStyle='#397fbe';ctx.fillText('p avant · '+format(Math.hypot(e.before.vx,e.before.vy)),14,h-35);
     ctx.fillStyle='#258d79';ctx.fillText('p après · '+format(Math.hypot(e.after.vx,e.after.vy)),14,h-19);

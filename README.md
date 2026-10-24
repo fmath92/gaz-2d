@@ -2,7 +2,7 @@
 
 **[Ouvrir le démonstrateur](https://fmath92.github.io/gaz-2d/)** · [Code source](https://github.com/fmath92/gaz-2d)
 
-Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.6 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
+Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.6.1 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
 
 ## La visite
 
@@ -37,12 +37,12 @@ Dans les expériences de pression, de chaleur et de travail, le bouton d’illus
 
 1. Repérage d’une collision à venir, sans avancer le gaz affiché.
 2. Ralentissement et rapprochement progressif de la caméra du point de contact ; la particule suivie est entourée.
-3. Collision réelle, avec une courte tenue de l’instant d’impact pour lire les flèches et les valeurs.
+3. Collision réelle et rebond continu, sans arrêt sur image. Une onde visuelle se propage dans le piston pendant que la particule repart.
 4. Éloignement de la particule, recul de la caméra et reprise automatique à la vitesse de lecture choisie avant la séquence.
 
 Le parcours thermique effectue ces étapes deux fois : **δQ > 0 puis δQ < 0**, avec deux particules qui peuvent être différentes. Cela n’impose aucun échange : une paroi chaude peut recevoir de l’énergie lors d’un choc individuel. Pour le travail, le bouton lance le trajet choisi s’il n’a pas encore commencé, ou suit le piston déjà en mouvement. Le signe reste celui du **travail reçu par le gaz** : positif en compression, négatif en détente.
 
-Les flèches `p avant` et `p après` sont des quantités de mouvement dans le **référentiel du laboratoire**, avec m = 1 et une même échelle. Leurs longueurs peuvent donc différer au piston mobile. Une flèche supplémentaire représente l’impulsion reçue par la paroi, ou le sens du transfert d’énergie. Le piston et les autres particules continuent à être ceux de la simulation ; la caméra ne substitue pas un dessin indépendant au gaz.
+Les flèches `p avant` et `p après` sont des quantités de mouvement dans le **référentiel du laboratoire**, avec m = 1 et une même échelle. Leurs longueurs peuvent donc différer au piston mobile. Une flèche supplémentaire représente l’impulsion reçue par la paroi, ou le sens du transfert d’énergie. L’onde illustre la transmission de la poussée ; elle ne simule pas l’élasticité du solide et n’ajoute aucune force ni énergie au modèle. Le piston et les autres particules continuent à être ceux de la simulation ; la caméra ne substitue pas un dessin indépendant au gaz.
 
 Le repérage emploie une copie indépendante du moteur, comprenant l’état du générateur aléatoire thermique, les positions, les vitesses, le mouvement du piston et les conditions aux limites. La copie cherche un événement suffisamment éloigné dans le futur pour laisser le temps de zoomer, hors des coins. Le moteur affiché emploie ensuite les mêmes pas physiques et confirme l’identifiant, la date et les échanges de la collision prévue. La recherche ne consomme aucun tirage du gaz affiché et ne modifie pas ses mesures. Le budget de calcul par image reste borné.
 

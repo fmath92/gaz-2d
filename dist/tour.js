@@ -15,7 +15,7 @@
       this.message = ''; this.beginSearch();
     }
     beginSearch() {
-      this.phase = 'search'; this.elapsed = 0; this.accumulator = 0; this.target = null; this.event = null;
+      this.phase = 'search'; this.elapsed = 0; this.accumulator = 0; this.target = null; this.event = null; this.impactAge = 0;
       this.startTime = this.sim.time;
       const remaining = this.sim.motion ? this.sim.motion.duration - this.sim.motion.elapsed : Infinity;
       this.leadMinimum = Math.min(.22, remaining * .20);
@@ -58,11 +58,14 @@
       if (this.finished) return;
       if (this.phase === 'search') { this.plan(budgetMs); return; }
       this.elapsed += seconds;
+      if (this.event) this.impactAge += seconds;
       if (this.phase === 'approach') {
         this.zoom = this.reducedMotion ? 1 : ease(this.elapsed / 1.1);
         this.rate = Math.min(this.lead / 3.2, this.normalSpeed / 2);
       } else if (this.phase === 'impact') {
-        this.zoom = 1; this.rate = 0;
+        this.zoom = 1;
+        const outgoingRate = Math.min(this.normalSpeed / 2, .24 / (2.2 * Math.max(1, Math.hypot(this.event.after.vx, this.event.after.vy))));
+        this.rate = this.incomingRate + ease(this.elapsed / .9) * (outgoingRate - this.incomingRate);
         if (this.elapsed >= .9) { this.phase = 'departure'; this.elapsed = 0; }
       } else if (this.phase === 'departure') {
         this.rate = Math.min(this.normalSpeed / 2, .24 / (2.2 * Math.max(1, Math.hypot(this.event.after.vx, this.event.after.vy))));
@@ -89,14 +92,14 @@
             this.fail('La collision prévue a changé. Relancez l’illustration depuis cet état.'); break;
           }
           this.event = actual; this.events.push(actual); this.phase = 'impact'; this.elapsed = 0;
-          this.rate = 0; this.zoom = 1; this.accumulator = 0; break;
+          this.incomingRate = this.rate; this.impactAge = 0; this.zoom = 1; break;
         }
         if (performance.now() - started >= budgetMs) break;
       }
     }
     get view() {
       return { kind: this.kind, phase: this.phase, zoom: this.zoom, target: this.target,
-        event: this.event, elapsed: this.elapsed, rate: this.rate || 0,
+        event: this.event, elapsed: this.elapsed, impactAge: this.impactAge, rate: this.rate || 0,
         stage: Math.min(this.stageIndex + 1, this.stages.length), stages: this.stages.length };
     }
   }
