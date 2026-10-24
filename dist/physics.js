@@ -16,15 +16,17 @@
     if (width < 3 || width > 18) throw new RangeError('La largeur doit être comprise entre 3 et 18.');
     return width;
   };
-  function randomGenerator(seed) {
-    let a = (Number(seed) || 1) >>> 0;
-    return function () {
+  function randomGenerator(seed, state) {
+    let a = state ?? ((Number(seed) || 1) >>> 0);
+    const random = function () {
       a += 0x6D2B79F5;
       let t = a;
       t = Math.imul(t ^ t >>> 15, t | 1);
       t ^= t + Math.imul(t ^ t >>> 7, t | 61);
       return ((t ^ t >>> 14) >>> 0) / 4294967296;
     };
+    random.clone = () => randomGenerator(1, a);
+    return random;
   }
   function gaussian(random) {
     return Math.sqrt(-2 * Math.log(Math.max(1e-15, random()))) * Math.cos(2 * Math.PI * random());
@@ -131,6 +133,20 @@
       this._lastThermalContact = new Float64Array(count).fill(-Infinity);
       this._thermalContactFallbacks = 0;
       return this;
+    }
+    // Une prévision indépendante, avec le même état du thermostat aléatoire.
+    // Elle ne consomme aucun tirage ni aucune mesure du gaz observé.
+    fork() {
+      const copy = Object.assign(Object.create(GasSimulation.prototype), this);
+      copy.particles = this.particles.map(p => ({ ...p }));
+      copy.motion = this.motion ? { ...this.motion } : null;
+      copy.heatByWall = { ...this.heatByWall };
+      copy._events = this._events.map(e => ({ ...e }));
+      copy._segments = this._segments.map(s => ({ ...s }));
+      copy._lastThermalContact = new Float64Array(this._lastThermalContact);
+      copy._thermalRandom = this._thermalRandom.clone();
+      copy.observations = { sequence: this.observations.sequence, walls: {}, pair: null };
+      return copy;
     }
     setThermal(options = {}) {
       const config = { mode: 'isolated', temperature: 1.5, accommodation: 1, pistonThermal: true, walls: WALLS, ...this.thermal, ...options };

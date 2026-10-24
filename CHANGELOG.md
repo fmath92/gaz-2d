@@ -1,5 +1,13 @@
 # Versions du démonstrateur
 
+## 0.6 — 24 octobre 2026
+
+Séquences animées dans la simulation : repérage d’un choc à venir, ralenti, zoom de la caméra, visualisation de l’impact et du transfert, dézoom et reprise automatique à la vitesse précédente. Le repérage utilise une copie indépendante du moteur et du générateur aléatoire thermique ; le choc est ensuite vérifié dans le gaz affiché. Paramètres verrouillés pendant la séquence, interruption par Pause, changement d’onglet, remise à zéro ou bouton dédié.
+
+Premier onglet consacré à la pression sur un piston immobile. Parcours thermique montrant successivement une chaleur reçue puis cédée par le gaz. Détente et compression regroupées dans un onglet adiabatique, avec une illustration du travail sur le piston mobile. Les quantités de mouvement sont représentées dans le référentiel du laboratoire à la même échelle, et les variations d’énergie sont explicitées avec la convention du travail reçu par le gaz. Absence de choc signalée sans modifier la dynamique.
+
+Tests de fidélité des prévisions et des trajectoires, des deux signes de chaleur et de travail, y compris pour les disques durs, et des commandes de reprise ou d’interruption. Le schéma figé de comparaison des modèles reste disponible.
+
 ## 0.5 — 24 octobre 2026
 
 Visite guidée organisée par expériences, dans l’ordre : pression–travail, échanges thermiques, Joule–Gay–Lussac, détente adiabatique, compression adiabatique et comparaison des modèles. Simulation et courbes réunies sur le même écran de travail, avec basculement Évolution P/V/T ↔ PV/T. États et mesures conservés par onglet ; seule l’expérience affichée évolue. Retrait de l’expérience des cycles périodiques et de son interface.

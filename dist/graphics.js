@@ -79,43 +79,85 @@
     ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
   }
   const palette = ['#397bd1', '#479ac3', '#4caaa6', '#81b78a', '#c4b767', '#db9852', '#d76f47'];
-  function chamber(canvas, sim, { initialTemperature = 1.5, vectors = false, focus = null, maxWidth = 18, target = null } = {}) {
+  function chamber(canvas, sim, { initialTemperature = 1.5, vectors = false, focus = null, maxWidth = 18, target = null, tour = null } = {}) {
     const surface = setup(canvas); if (!surface) return;
     const { ctx, w, h } = surface;
-    const scale = Math.min((w - 58) / maxWidth, (h - 54) / sim.height);
-    const ox = 26, oy = (h - sim.height * scale) / 2 + 3;
-    const right = ox + sim.width * scale, bottom = oy + sim.height * scale, end = ox + maxWidth * scale;
-    ctx.fillStyle = '#f7fafc'; ctx.fillRect(ox, oy, end - ox, bottom - oy);
-    ctx.fillStyle = '#edf4f9'; ctx.fillRect(ox, oy, right - ox, bottom - oy);
+    const baseScale = Math.min((w - 58) / maxWidth, (h - 54) / sim.height);
+    const ox = 26, oy = (h - sim.height * baseScale) / 2 + 3;
+    const q = tour?.zoom || 0, hit = tour?.target;
+    const magnification = Math.max(1, Math.min(12, (h - 70) / (baseScale * 1.4)));
+    const zoom = 1 + q * (magnification - 1), scale = baseScale * zoom;
+    const cameraX = hit ? (hit.wall === 'right' ? sim.width : 0) : 0;
+    const cameraY = hit?.y || 0;
+    const anchorX = ox + cameraX * baseScale, anchorY = oy + (sim.height - cameraY) * baseScale;
+    const tx = q * ((hit?.wall === 'left' ? .28 : .72) * w - anchorX) + (1 - zoom) * anchorX;
+    const ty = q * (h * .51 - anchorY) + (1 - zoom) * anchorY;
+    const X = x => (ox + x * baseScale) * zoom + tx;
+    const Y = y => (oy + (sim.height - y) * baseScale) * zoom + ty;
+    const left = X(0), right = X(sim.width), top = Y(sim.height), bottom = Y(0), end = X(maxWidth);
+    ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#edf4f9'; ctx.fillRect(left, top, right - left, bottom - top);
     for (let x = 20; x < w; x += 20) for (let y = 16; y < h; y += 20) { ctx.fillStyle = '#dce7ed'; ctx.fillRect(x, y, 1, 1); }
-    ctx.save(); ctx.beginPath(); ctx.rect(ox, oy, right - ox, bottom - oy); ctx.clip();
+    ctx.save(); ctx.beginPath(); ctx.rect(Math.max(0,left), Math.max(0,top), Math.min(w,right)-Math.max(0,left), Math.min(h,bottom)-Math.max(0,top)); ctx.clip();
     for (const p of sim.particles) {
-      const x = ox + p.x * scale, y = bottom - p.y * scale;
+      const x = X(p.x), y = Y(p.y), selected = hit?.particleId === p.id;
+      if (x < -20 || x > w+20 || y < -20 || y > h+20) continue;
       const color = palette[Math.min(6, Math.floor(Math.hypot(p.vx, p.vy) / Math.sqrt(2 * initialTemperature) * 3))];
-      if (vectors) line(ctx, x, y, x + p.vx * scale * 0.1, y - p.vy * scale * 0.1, color + '80');
-      circle(ctx, x, y, 0.04 * scale, color); // Même rayon graphique pour les deux modèles.
+      ctx.globalAlpha = q && !selected ? 1 - q * .7 : 1;
+      if (vectors || selected) line(ctx, x, y, x + p.vx * scale * .06, y - p.vy * scale * .06, color + '80');
+      circle(ctx, x, y, .04 * scale, selected ? '#247f91' : color);
+      if (selected) { ctx.strokeStyle = '#dc9a3d'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x,y,.04*scale+4,0,2*Math.PI); ctx.stroke(); }
     }
-    ctx.restore();
-    const thermal = wall => sim.thermal.mode === 'thermostat' && sim.thermal.accommodation > 0 && sim.thermal.walls.includes(wall) && (wall !== 'right' || sim.thermal.pistonThermal);
-    line(ctx, ox, oy, end, oy, thermal('top') ? '#dc9855' : '#9bb0bf', 3);
-    line(ctx, ox, bottom, end, bottom, thermal('bottom') ? '#dc9855' : '#9bb0bf', 3);
-    line(ctx, ox, oy, ox, bottom, thermal('left') ? '#dc9855' : '#7590a3', 5);
-    line(ctx, right, oy - 3, right, bottom + 3, thermal('right') ? '#dc9855' : '#6f869f', 7);
-    line(ctx, right + 4, (oy + bottom) / 2, end + 15, (oy + bottom) / 2, '#a7b7c2', 5);
-    ctx.font = '10px system-ui'; ctx.textAlign = 'left'; ctx.fillStyle = thermal('left') ? '#b6793f' : '#6b8292';
-    ctx.fillText(thermal('left') ? 'THERMOSTAT' : 'ISOLÉE', ox, oy - 10);
-    ctx.textAlign = 'center'; ctx.fillStyle = '#5f7689'; ctx.fillText('PISTON', Math.max(ox + 70, right), oy - 10);
-    ctx.fillText('V = ' + format(sim.width * sim.height, 1), (ox + right) / 2, bottom + 18);
-    if (target != null && Math.abs(target - sim.width) > 0.05) {
-      ctx.setLineDash([3, 4]); line(ctx, ox + target * scale, oy + 5, ox + target * scale, bottom - 5, '#97ada780'); ctx.setLineDash([]);
+    ctx.restore(); ctx.globalAlpha = 1;
+    const wallColor = wall => sim.thermal.mode === 'thermostat' && sim.thermal.walls.includes(wall) && (wall !== 'right' || sim.thermal.pistonThermal) ? '#cf914e' : '#8da3b2';
+    line(ctx,left,top,end,top,wallColor('top'),3); line(ctx,left,bottom,end,bottom,wallColor('bottom'),3);
+    line(ctx,left,top,left,bottom,wallColor('left'),6); line(ctx,right,top,right,bottom,wallColor('right'),8);
+    line(ctx,right,(top+bottom)/2,end+12,(top+bottom)/2,'#a9b9c2',5);
+    if (target && q < .1 && Math.abs(target-sim.width)>.01) { ctx.setLineDash([4,5]); line(ctx,X(target),top,X(target),bottom,'#95b4c077',1); ctx.setLineDash([]); }
+    ctx.font='10px system-ui'; ctx.fillStyle='#617b8d';ctx.textAlign='left';
+    if (q < .1) {
+      ctx.fillText(sim.thermal.mode==='thermostat' ? 'THERMOSTAT' : 'ISOLÉE',left,top-10);
+      ctx.textAlign='center';ctx.fillText('PISTON',right,top-10);ctx.fillText('V = '+format(sim.width*sim.height,1),(left+right)/2,bottom+19);
     }
-    if (focus) {
-      const p = focus.kind === 'pair' ? focus.before[0] : focus;
-      const x = ox + p.x * scale, y = bottom - p.y * scale;
-      const size = Math.max(10, scale * 0.55);
-      ctx.strokeStyle = '#dd9c36'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
-      ctx.strokeRect(x - size / 2, y - size / 2, size, size); ctx.setLineDash([]);
-      circle(ctx, x, y, 2.5, '#df9c36');
+    if (focus && !tour) {
+      const p = focus.kind==='pair' ? focus.before[0] : focus;
+      ctx.strokeStyle='#dd9c36';ctx.setLineDash([3,3]);ctx.strokeRect(X(p.x)-8,Y(p.y)-8,16,16);ctx.setLineDash([]);
+    }
+    if (!hit || q < .2) return;
+    const particle=sim.particles.find(p=>p.id===hit.particleId), e=tour.event;
+    ctx.font='10px system-ui';ctx.textAlign='left';ctx.fillStyle='#476575';
+    ctx.fillText('PARTICULE '+(hit.particleId+1)+' · ZOOM ×'+format(zoom,1),14,19);
+    ctx.textAlign='right';ctx.fillText('Référentiel du laboratoire',w-14,19);
+    if (!e && particle) {
+      const x=X(particle.x),y=Y(particle.y),v=Math.hypot(particle.vx,particle.vy);
+      const f=Math.min(60,h*.20)/Math.max(v,.1);
+      arrow(ctx,x,y,particle.vx*f,-particle.vy*f,'#337db5',2);
+      ctx.fillStyle='#337db5';ctx.textAlign='center';ctx.fillText('Vers la paroi',Math.max(65,Math.min(w-65,x)),Math.max(42,Math.min(h-18,y-20)));
+      return;
+    }
+    if (!e) return;
+    const cx=X(e.x),cy=Y(e.y);
+    const f=Math.min(68,h*.22)/Math.max(Math.hypot(e.before.vx,e.before.vy),Math.hypot(e.after.vx,e.after.vy),.1);
+    ctx.setLineDash([3,3]);arrow(ctx,cx-e.before.vx*f,cy+e.before.vy*f,e.before.vx*f,-e.before.vy*f,'#397fbe',2);ctx.setLineDash([]);
+    arrow(ctx,cx,cy,e.after.vx*f,-e.after.vy*f,'#258d79',2.5);
+    ctx.strokeStyle='#e3a34e';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,12+Math.min(1,tour.elapsed/.6)*16,0,2*Math.PI);ctx.stroke();
+    // A common scale and laboratory velocities reveal the work asymmetry.
+    ctx.font='10px system-ui';ctx.textAlign='left';ctx.fillStyle='#397fbe';ctx.fillText('p avant · '+format(Math.hypot(e.before.vx,e.before.vy)),14,h-35);
+    ctx.fillStyle='#258d79';ctx.fillText('p après · '+format(Math.hypot(e.after.vx,e.after.vy)),14,h-19);
+    const inward=e.wall==='left'?1:-1;
+    if (tour.kind==='pressure') {
+      arrow(ctx,cx,cy,-inward*65,0,'#ce8b37',3);ctx.fillStyle='#aa702e';ctx.textAlign='center';ctx.fillText('Poussée · J = '+format(e.impulse),Math.min(w-78,cx-inward*35),cy+35);
+    } else {
+      const energy=tour.kind==='heat'?e.heat:e.work,dx=inward*Math.sign(energy)*65;
+      arrow(ctx,cx-dx/2,cy,dx,0,energy>0?'#d48d39':'#497fb9',4);
+      const label=tour.kind==='heat' ? (energy>0?'Paroi → gaz':'Gaz → paroi') : (energy>0?'Piston → gaz':'Gaz → piston');
+      ctx.fillStyle=energy>0?'#b57b35':'#3c75a5';ctx.textAlign='right';ctx.fillText(label,w-14,h-35);
+      ctx.fillText((tour.kind==='heat'?'δQ':'δW reçu')+' = '+(energy>0?'+':'')+format(energy),w-14,h-19);
+      if(tour.kind==='work') {
+        const wx=X(sim.width);ctx.setLineDash([3,4]);line(ctx,cx,35,cx,h-55,'#9cb1bd',1);ctx.setLineDash([]);
+        arrow(ctx,wx,48,Math.sign(e.wallVelocity)*37,0,'#8198a6',2);
+        ctx.textAlign='center';ctx.fillStyle='#617987';ctx.fillText('Piston mobile · u = '+format(e.wallVelocity),Math.max(110,Math.min(w-110,wx)),38);
+      }
     }
   }
   function collision(canvas, event, { kind = 'pressure', pulse = 0 } = {}) {

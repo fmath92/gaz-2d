@@ -7,6 +7,7 @@ const html = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8'
 const physics = readFileSync(new URL('../dist/physics.js', import.meta.url), 'utf8');
 const analysis = readFileSync(new URL('../dist/analysis.js', import.meta.url), 'utf8');
 const graphics = readFileSync(new URL('../dist/graphics.js', import.meta.url), 'utf8');
+const tour = readFileSync(new URL('../dist/tour.js', import.meta.url), 'utf8');
 const app = readFileSync(new URL('../dist/app.js', import.meta.url), 'utf8');
 
 // Only DOM and drawing primitives are replaced. The production application,
@@ -89,6 +90,7 @@ function laboratory() {
     if (histogramCalls.length > 8) histogramCalls.shift();
     return result;
   };
+  vm.runInContext(tour, scope, { filename: 'tour.js' });
   vm.runInContext(app, scope, { filename: 'app.js' });
   function frame() { const callback = pendingFrame; pendingFrame = null; callback(timestamp); timestamp += 1000 / 60; }
   frame();
@@ -101,6 +103,7 @@ function laboratory() {
     click(id) { nodes.get(id).click(); },
     input(id, value) { const node = nodes.get(id); assert.ok(!node.disabled, `${id} is available`); node.value = value; node.dispatch('input'); },
     check(id, value) { const node = nodes.get(id); assert.ok(!node.disabled, `${id} is available`); node.checked = value; node.dispatch('input'); },
+    finishTour() { for(let i=0;i<3000&&window.gaz2D.analysis.tour;i++)frame();assert.equal(window.gaz2D.analysis.tour,null);assert.equal(window.gaz2D.analysis.lastTour.phase,'done'); },
     advance(seconds) { for (let i = 0; i < Math.ceil(seconds * 60); i++) frame(); }
   };
 }
@@ -110,9 +113,9 @@ test('guided visit starts with pressure, fixes N at 1000 and removes particle co
   for(const id of ['particles','particleNumber','preset-cycles','cycleSelect'])assert.ok(!lab.nodes.has(id));
   lab.advance(.4);assert.ok(lab.metrics.pressure>0);assert.equal(lab.metrics.work,0);assert.equal(lab.metrics.heat,0);
 });
-test('all six experience tabs retain independent state, and only the visible experiment evolves',()=>{
+test('all five experience tabs retain independent state, and only the visible experiment evolves',()=>{
   const lab=laboratory();lab.advance(.4);lab.click('pause');const time=lab.metrics.time;
-  for(const key of ['heat','free','expansion','compression','comparison']){
+  for(const key of ['heat','free','adiabatic','comparison']){
     lab.click('tab-'+key);assert.equal(lab.analysis.experiment,key);assert.equal(lab.metrics.count,1000);lab.advance(.1);
     assert.equal(lab.nodes.get('workbench').getAttribute('aria-labelledby'),'tab-'+key);
   }
@@ -125,18 +128,14 @@ test('keyboard arrows, Home and End navigate experience tabs with correct focus'
   lab.nodes.get('tab-heat').dispatch('keydown',{key:'End',preventDefault(){}});assert.equal(lab.analysis.experiment,'comparison');
   lab.nodes.get('tab-comparison').dispatch('keydown',{key:'Home',preventDefault(){}});assert.equal(lab.analysis.experiment,'pressure');
 });
-test('isolating a collision advances to a new real event, pauses, and displays J while W remains zero',()=>{
-  const lab=laboratory();lab.click('capture');
-  // Stop on the first paused frame: the labels must already match the zoom,
-  // without waiting for the slower periodic readout refresh.
-  for(let i=0;i<20&&!lab.paused;i++)lab.advance(1/60);
-  assert.ok(lab.paused);assert.ok(!lab.analysis.seek);const event=lab.analysis.collision;
-  assert.equal(lab.analysis.history.at(-1).time,lab.metrics.time);
-  assert.equal(event.kind,'wall');assert.equal(event.wall,'right');assert.ok(event.impulse>0);assert.equal(event.wallVelocity,0);assert.ok(Math.abs(event.work)<1e-12);
-  assert.ok(Math.abs(event.energyAfter-event.energyBefore)<1e-10);
-  assert.equal(lab.nodes.get('collisionImpulse').textContent,event.impulse.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}));
-  const time=lab.metrics.time;lab.advance(.5);assert.equal(lab.metrics.time,time);
-  lab.click('capture');lab.advance(.2);assert.ok(lab.analysis.collision.time>event.time);assert.ok(lab.paused);
+test('pressure illustration follows a future collision, restores playback and keeps work controls out of this lesson',()=>{
+  const lab=laboratory();lab.input('timeScale',.25);const initial=lab.metrics.time;lab.click('illustrate');
+  assert.ok(lab.analysis.tour);assert.equal(lab.nodes.get('timeScale').disabled,true);
+  assert.equal(lab.nodes.get('energyBalance').hidden,true);assert.equal(lab.nodes.get('motionChoice').hidden,true);assert.equal(lab.nodes.get('workLesson').hidden,true);
+  lab.finishTour();const e=lab.analysis.lastTour.events[0];assert.ok(e.time>initial);assert.equal(e.wall,'right');assert.ok(e.impulse>0);assert.equal(e.wallVelocity,0);
+  assert.ok(Math.abs(e.energyAfter-e.energyBefore)<1e-10);assert.equal(lab.paused,false);
+  assert.equal(lab.nodes.get('timeScale').value,'0.25');assert.equal(lab.nodes.get('timeScale').disabled,false);assert.equal(lab.nodes.get('tourStatus').hidden,true);
+  const time=lab.metrics.time;lab.advance(.4);assert.ok(lab.metrics.time>time+.08&&lab.metrics.time<time+.12);
 });
 test('pressure gauge uses the true window impulse and piston length-time denominator',()=>{
   const lab=laboratory();lab.input('timeScale',1);lab.advance(2.5);const m=lab.metrics;
@@ -144,20 +143,18 @@ test('pressure gauge uses the true window impulse and piston length-time denomin
   assert.ok(Math.abs(m.pistonLengthTime-15)<1e-9);assert.equal(m.work,0);
   assert.match(lab.nodes.get('pressureCalculation').textContent,/P = ΣJ/);
 });
-test('moving piston collision explicitly separates impulse and received work; stopping eliminates later work',()=>{
-  const lab=laboratory();lab.input('motionAction','compression');lab.input('duration',40);lab.click('start');
-  lab.input('timeScale',1);lab.advance(.3);lab.click('capture');lab.advance(.3);
-  const e=lab.analysis.collision;assert.ok(e.wallVelocity<0);assert.ok(e.work>0);assert.ok(Math.abs(e.work+e.wallVelocity*e.impulse)<1e-9);
-  lab.click('stop');const work=lab.metrics.work;lab.click('pause');lab.advance(.5);assert.equal(lab.metrics.work,work);
+test('work illustration launches the selected moving piston, shows its energy exchange and can be stopped',()=>{
+  const lab=laboratory();lab.click('tab-adiabatic');lab.input('motionAction','compression');lab.input('duration',60);lab.click('illustrate');
+  assert.equal(lab.nodes.get('target').disabled,true);assert.equal(lab.nodes.get('motionAction').disabled,true);lab.finishTour();
+  const e=lab.analysis.lastTour.events[0];assert.ok(e.wallVelocity<0);assert.ok(e.work>0);assert.ok(Math.abs(e.work+e.wallVelocity*e.impulse)<1e-9);
+  assert.equal(lab.nodes.get('workLesson').hidden,false);assert.equal(lab.nodes.get('pressureLesson').hidden,true);
+  lab.click('stop');const work=lab.metrics.work;lab.advance(.5);assert.equal(lab.metrics.work,work);
 });
-test('thermal lesson uses only the left wall, and records actual signed heat without wall work',()=>{
-  const lab=laboratory();lab.click('tab-heat');lab.click('capture');
-  for(let i=0;i<30&&!lab.paused;i++)lab.advance(1/60);
-  const e=lab.analysis.collision;assert.equal(e.wall,'left');assert.equal(e.thermal,true);assert.equal(e.work,0);
-  assert.ok(Math.abs(e.heat-e.energyAfter+e.energyBefore)<1e-10);
-  assert.equal(lab.nodes.get('collisionBefore').textContent,e.energyBefore.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}));
-  assert.equal(lab.nodes.get('collisionAfter').textContent,e.energyAfter.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}));
-  assert.deepEqual(Array.from(lab.metrics.thermalWalls),['left']);assert.equal(lab.metrics.work,0);assert.ok(Math.abs(lab.metrics.balanceError)<1e-8);
+test('thermal illustration shows both energy transfer signs in order and restores editable controls',()=>{
+  const lab=laboratory();lab.click('tab-heat');lab.click('illustrate');assert.equal(lab.nodes.get('bathTemperature').disabled,true);lab.finishTour();
+  const events=lab.analysis.lastTour.events;assert.equal(events.length,2);assert.ok(events[0].heat>0&&events[1].heat<0);
+  for(const e of events){assert.equal(e.wall,'left');assert.equal(e.thermal,true);assert.equal(e.work,0);assert.ok(Math.abs(e.heat-e.energyAfter+e.energyBefore)<1e-10);}
+  assert.equal(lab.nodes.get('bathTemperature').disabled,false);assert.equal(lab.paused,false);assert.ok(Math.abs(lab.metrics.balanceError)<1e-8);
 });
 test('thermal slider changes future collisions only; isolation stops Q without deleting past exchanges',()=>{
   const lab=laboratory();lab.click('tab-heat');lab.input('timeScale',1);lab.advance(.5);lab.click('pause');
@@ -182,10 +179,10 @@ test('free expansion has a gap in P–V instead of a fictitious work segment',()
   const lab=laboratory();lab.click('tab-free');lab.advance(.2);lab.click('start');lab.input('extraChart','pv');
   assert.ok(lab.analysis.plot.series[0].points.some(p=>Number.isNaN(p.x)));assert.equal(lab.metrics.work,0);
 });
-test('both adiabatic experiences use insulated walls and have the correct sign of work',()=>{
+test('one adiabatic tab handles both directions with insulated walls and the correct work sign',()=>{
   const lab=laboratory();
   for(const key of ['expansion','compression']){
-    lab.click('tab-'+key);lab.input('duration',40);lab.input('timeScale',4);lab.click('start');lab.advance(.8);
+    lab.click('tab-adiabatic');lab.input('motionAction',key);lab.click('reset');lab.input('duration',40);lab.input('timeScale',4);lab.click('start');lab.advance(.8);
     assert.equal(lab.metrics.heat,0);assert.equal(lab.metrics.thermalMode,'isolated');assert.ok(Math.abs(lab.metrics.balanceError)<1e-7);
     assert.ok(key==='compression'?lab.metrics.work>0:lab.metrics.work<0);
   }
@@ -222,4 +219,16 @@ test('CSV comparison contains two measured models per instant, consistent PV/T a
   const lines=csv.trim().replace(/^\uFEFF/,'').split(/\r?\n/);const headers=lines.shift().split(';');const rows=lines.map(line=>Object.fromEntries(line.split(';').map((v,i)=>[headers[i],v])));
   assert.equal(rows.length%2,0);assert.ok(rows.some(r=>r.modele==='ideal'));assert.ok(rows.some(r=>r.modele==='hard-disks'));
   for(const row of rows){assert.equal(row.N,'1000');if(row.P_mesuree){const num=k=>Number(row[k].replace(',','.'));assert.ok(Math.abs(num('PV_sur_T')-num('P_mesuree')*num('aire_ur2')/num('T_cinetique'))<1e-5);assert.ok(Math.abs(num('ecart_bilan'))<1e-7);}}
+});
+
+test('pause, reset and tab changes safely interrupt camera sequences without changing the selected speed',()=>{
+  const lab=laboratory();lab.input('timeScale',2);lab.click('illustrate');lab.advance(.5);lab.click('pause');
+  assert.equal(lab.analysis.tour,null);assert.equal(lab.paused,true);assert.equal(lab.nodes.get('timeScale').value,'2');
+  const time=lab.metrics.time;lab.advance(.3);assert.equal(lab.metrics.time,time);
+  lab.click('illustrate');lab.advance(.3);lab.click('tab-free');lab.click('tab-pressure');assert.equal(lab.analysis.tour,null);assert.equal(lab.nodes.get('illustrate').disabled,false);
+  lab.click('illustrate');lab.advance(.3);lab.click('reset');assert.equal(lab.analysis.tour,null);assert.equal(lab.metrics.time,0);assert.equal(lab.nodes.get('tourStatus').hidden,true);
+});
+test('thermal illustration is unavailable with insulation or zero accommodation',()=>{
+  const lab=laboratory();lab.click('tab-heat');lab.input('thermalMode','isolated');assert.equal(lab.nodes.get('illustrate').disabled,true);
+  lab.input('thermalMode','thermostat');assert.equal(lab.nodes.get('illustrate').disabled,false);lab.input('accommodation',0);assert.equal(lab.nodes.get('illustrate').disabled,true);
 });

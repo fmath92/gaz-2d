@@ -2,18 +2,17 @@
 
 **[Ouvrir le démonstrateur](https://fmath92.github.io/gaz-2d/)** · [Code source](https://github.com/fmath92/gaz-2d)
 
-Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.5 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
+Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.6 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
 
 ## La visite
 
 | Étape | Expérience | À observer |
 | --- | --- | --- |
-| 01 | Pression et travail | Impulsion d’un choc, somme des impulsions, jauge de pression ; piston immobile puis mobile. |
-| 02 | Échanges thermiques | Choc sur la paroi gauche, énergie avant/après, chaleur signée et flux moyen ; thermostat ou isolation. |
+| 01 | Pression | Un choc à venir, sa poussée sur le piston immobile et sa contribution à la pression. |
+| 02 | Échanges thermiques | Parcours automatique de deux chocs : chaleur reçue par le gaz, puis chaleur cédée à la paroi. |
 | 03 | Joule–Gay–Lussac | Ouverture vers le vide (doublement du volume par défaut), énergie et température conservées en mode isolé. |
-| 04 | Détente adiabatique | Travail fourni par le gaz, refroidissement et influence de la durée du mouvement. |
-| 05 | Compression adiabatique | Travail reçu, échauffement et influence de la durée du mouvement. |
-| 06 | Comparer les modèles | Deux simulations simultanées : points sans interaction et disques durs, chacune avec 1 000 particules. |
+| 04 | Détente et compression adiabatiques | Choix du sens du mouvement ; zoom sur un choc au piston mobile et sur le travail reçu ou fourni. |
+| 05 | Comparer les modèles | Deux simulations simultanées : points sans interaction et disques durs, chacune avec 1 000 particules. |
 
 Toutes les expériences utilisent **1 000 particules** : aucun sélecteur de nombre n’est présent. Les points et les disques sont dessinés avec le même rayon 0,04. Ce rayon est seulement graphique pour les points ; il est physique pour les disques durs.
 
@@ -34,11 +33,22 @@ La lecture peut être ralentie jusqu’à ×0,05, accélérée jusqu’à ×4, m
 
 ## Les collisions à la loupe
 
-**Isoler un choc** fait avancer le calcul jusqu’à un nouvel événement enregistré, puis met en pause. La loupe affiche un schéma de cet impact, ses vitesses et ses échanges, avec son instant. La cavité montre l’état courant et un repère à l’emplacement enregistré. Les flèches bleues et vertes correspondent aux vitesses relatives à la paroi avant et après le choc ; à paroi fixe, elles sont aussi les vitesses dans le laboratoire.
+Dans les expériences de pression, de chaleur et de travail, le bouton d’illustration lance une **séquence automatique dans la cavité elle-même** :
 
-Les données du zoom proviennent du moteur : date, position, particule, vitesses entrantes et sortantes, impulsion, travail et chaleur. En mode ponctuel, les collisions de différentes particules sont calculées séparément : le moteur retient l’événement le plus récent **par sa date physique**, et non par son ordre d’appel. L’instrumentation ne change pas la dynamique ni le tirage aléatoire du thermostat.
+1. Repérage d’une collision à venir, sans avancer le gaz affiché.
+2. Ralentissement et rapprochement progressif de la caméra du point de contact ; la particule suivie est entourée.
+3. Collision réelle, avec une courte tenue de l’instant d’impact pour lire les flèches et les valeurs.
+4. Éloignement de la particule, recul de la caméra et reprise automatique à la vitesse de lecture choisie avant la séquence.
 
-Dans la comparaison, la partie « disques » du zoom représente un choc mutuel réellement calculé. La partie « points » est une illustration comparative : elle prolonge les mêmes vitesses entrantes sans interaction. Elle ne prétend pas être une collision enregistrée dans l’autre gaz. Les deux vues d’ensemble et les deux courbes PV/T proviennent, elles, de deux simulations indépendantes.
+Le parcours thermique effectue ces étapes deux fois : **δQ > 0 puis δQ < 0**, avec deux particules qui peuvent être différentes. Cela n’impose aucun échange : une paroi chaude peut recevoir de l’énergie lors d’un choc individuel. Pour le travail, le bouton lance le trajet choisi s’il n’a pas encore commencé, ou suit le piston déjà en mouvement. Le signe reste celui du **travail reçu par le gaz** : positif en compression, négatif en détente.
+
+Les flèches `p avant` et `p après` sont des quantités de mouvement dans le **référentiel du laboratoire**, avec m = 1 et une même échelle. Leurs longueurs peuvent donc différer au piston mobile. Une flèche supplémentaire représente l’impulsion reçue par la paroi, ou le sens du transfert d’énergie. Le piston et les autres particules continuent à être ceux de la simulation ; la caméra ne substitue pas un dessin indépendant au gaz.
+
+Le repérage emploie une copie indépendante du moteur, comprenant l’état du générateur aléatoire thermique, les positions, les vitesses, le mouvement du piston et les conditions aux limites. La copie cherche un événement suffisamment éloigné dans le futur pour laisser le temps de zoomer, hors des coins. Le moteur affiché emploie ensuite les mêmes pas physiques et confirme l’identifiant, la date et les échanges de la collision prévue. La recherche ne consomme aucun tirage du gaz affiché et ne modifie pas ses mesures. Le budget de calcul par image reste borné.
+
+Les paramètres physiques sont verrouillés pendant le parcours. **Quitter le zoom**, Pause, un changement d’onglet ou une remise à zéro l’interrompent sans revenir en arrière dans le temps. La vitesse antérieure est conservée. Une préférence système de réduction des animations supprime la transition progressive de caméra. Si aucun choc adapté n’existe dans l’horizon de recherche (8 u.t., ou la fin du trajet pour le travail), l’interface le signale ; elle ne fabrique aucun choc. Le bouton thermique est désactivé pour une paroi isolée ou une accommodation nulle.
+
+Dans la comparaison des modèles, **Isoler un choc mutuel** conserve le schéma figé précédent : la partie « disques » représente une collision réellement calculée, la partie « points » prolonge les mêmes vitesses entrantes sans interaction. Les deux vues d’ensemble et les deux courbes PV/T proviennent de deux simulations indépendantes.
 
 ## Pression, travail et chaleur
 
@@ -51,7 +61,7 @@ Ppiston = somme(J) / (H × durée de la fenêtre)
 δW reçu par le gaz = −u J
 ```
 
-La jauge utilise cette pression mesurée, avec une échelle visuelle de 0 à quatre fois la pression idéale initiale. La valeur numérique n’est pas plafonnée. À piston immobile, u = 0 : chaque choc peut transmettre une impulsion non nulle, mais son travail est nul. Lorsque le piston avance ou recule, le zoom affiche séparément son impulsion et le travail reçu par le gaz.
+La jauge utilise cette pression mesurée, avec une échelle visuelle de 0 à quatre fois la pression idéale initiale. La valeur numérique n’est pas plafonnée. À piston immobile, u = 0 : chaque choc peut transmettre une impulsion non nulle, mais son travail est nul. Le premier onglet garde le piston fixe et se concentre sur la pression. Le travail et les commandes du piston sont regroupés dans l’expérience adiabatique, où les énergies avant/après et δW sont affichés à côté du zoom.
 
 Le travail cumulé est calculé aux impacts et non à partir d’une pression déduite de l’équation d’état. Son lien avec un diagramme est W reçu = −∫Ppiston dV. Une intégrale utilisant la pression glissante reste une estimation, et les aires de P–T ou de V–T ne sont pas des travaux.
 
@@ -64,7 +74,7 @@ Lors d’un choc thermique, le moteur tire la vitesse sortante dans le référen
 flux thermique moyen 2D = somme(δQ) / (longueur × durée)
 ```
 
-La flèche thermique traverse le point de contact dans le sens de l’énergie échangée. Un choc peut chauffer ou refroidir, même avec un thermostat plus chaud que le gaz : c’est le bilan moyen qui détermine l’évolution de la température. Le flux affiché est celui de la paroi gauche sur la fenêtre de mesure, alors que Q cumule tous les échanges depuis l’état initial. Le premier principe est toujours vérifié : **ΔE = W + Q**. Le modèle de réflexion est celui décrit dans la [documentation LAMMPS des parois stochastiques](https://docs.lammps.org/fix_wall_reflect_stochastic.html).
+La flèche thermique traverse le point de contact dans le sens de l’énergie échangée. Un choc peut chauffer ou refroidir, même avec un thermostat plus chaud que le gaz : c’est le bilan moyen qui détermine l’évolution de la température. Le flux affiché est celui de la paroi gauche sur la fenêtre de mesure, alors que Q cumule tous les échanges depuis l’état initial. Le premier et le second choc du parcours sont sélectionnés par leur signe, sans modifier ces bilans. Le premier principe est toujours vérifié : **ΔE = W + Q**. Le modèle de réflexion est celui décrit dans la [documentation LAMMPS des parois stochastiques](https://docs.lammps.org/fix_wall_reflect_stochastic.html).
 
 ## Deux modèles et leurs limites
 
@@ -100,6 +110,6 @@ Puis ouvrir <http://localhost:8080>. Aucun build, dépendance applicative ou acc
 node --test tests/*.test.mjs
 ```
 
-Les tests vérifient les conservations, le confinement, les collisions, les thermostats sélectifs, les observations avant/après, les diagrammes et les commandes. Les scénarios d’interface exécutent le vrai moteur et le code applicatif avec un DOM et un Canvas simulés ; l’apparence est également contrôlée dans un navigateur. Le module d’analyse des cycles de la version précédente est conservé dans les sources, mais n’est plus chargé par l’interface.
+Les tests vérifient les conservations, le confinement, les collisions, les thermostats sélectifs, les observations avant/après, la fidélité des prévisions, les parcours de caméra, la reprise automatique, les interruptions, les diagrammes et les commandes. Les scénarios d’interface exécutent le vrai moteur et le code applicatif avec un DOM et un Canvas simulés ; l’apparence est également contrôlée dans un navigateur. Le module d’analyse des cycles de la version précédente est conservé dans les sources, mais n’est plus chargé par l’interface.
 
 GitHub Pages publie automatiquement la branche `main`, depuis la racine du dépôt. `index.html` redirige vers `dist/` et `.nojekyll` demande un service statique sans transformation. Le dépôt est public : pousser les changements sur `main` met à jour le démonstrateur.

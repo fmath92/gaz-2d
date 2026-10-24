@@ -1661,3 +1661,37 @@ input[aria-invalid="true"] {
     transition:none!important;
   }
 }
+
+/* Guided camera sequences share the actual simulation canvas. */
+.illustration-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 17px 13px;
+}
+.illustration-controls .button { white-space: normal; text-align: left; line-height: 1.4; }
+.tour-status { margin: 0 14px 14px; padding: 12px 14px; border-radius: 9px; background: #eaf3f3; min-height: 91px; }
+.tour-status > div:first-child { display: flex; justify-content: space-between; gap: 10px; font-size: 9px; color: #627e89; }
+.tour-stage { color: #176d68; font-weight: 650; }
+.tour-status > p { font-size: 11px; line-height: 1.5; margin: 7px 0 11px; }
+.tour-track { height: 3px; background: #d2e3e3; border-radius: 3px; overflow: hidden; }
+.tour-track > span { display: block; height: 100%; background: #238e83; transition: width .4s; }
+.impulse-reading { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 10px; margin: 10px 0; }
+.impulse-reading > b { font-size: 23px; color: #b87d34; }
+#pressureGaugeFill[data-impact="true"] { background: #d9983e; box-shadow: 0 0 12px #e3b66a; }
+#workbench:not([data-experience="comparison"]) #chamber { height: 285px; }
+#workbench[data-experience="pressure"] .micro-toolbar > button { display: none; }
+#workbench:not([data-experience="comparison"]) .micro-toolbar { padding-bottom: 10px; }
+@media (max-width: 620px) {
+  .illustration-controls { padding: 5px 14px 12px; gap: 12px; }
+  .illustration-controls .button { font-size: 11px; }
+  .tour-status { margin: 0 10px 12px; padding: 11px 12px; }
+  .tour-status > div:first-child { flex-wrap: wrap; font-size: 9px; }
+  .tour-status > p { font-size: 11px; }
+  #workbench:not([data-experience="comparison"]) #chamber { height: 265px; }
+}
+@media (min-width: 851px) and (max-height: 780px) {
+  #workbench:not([data-experience="comparison"]) #chamber { height: 225px; }
+  .tour-status { min-height: 78px; padding-top: 9px; padding-bottom: 9px; }
+  .tour-status > p { font-size: 10px; margin: 6px 0 8px; }
+}
