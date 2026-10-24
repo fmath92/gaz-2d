@@ -124,3 +124,12 @@ test('work pauses only after departure to compare exit speeds, then automaticall
   }
   assert.equal(phaseBeforeHold,'departure');assert.ok(frames>=149&&frames<=152);assert.equal(tour.phase,'done');assert.equal(tour.zoom,0);
 });
+
+test('piston impulse arrow is the vector difference of incoming and outgoing momentum',()=>{
+  for(const u of [0,.3,-.4]) {
+    const event={before:{vx:2,vy:.7},after:{vx:2*u-2,vy:.7}};
+    const j=globalThis.LabGraphics.impulseVector(event);
+    assert.equal(j.vx,4-2*u);assert.equal(j.vy,0);
+    assert.equal(j.vx+event.after.vx,event.before.vx);
+  }
+});

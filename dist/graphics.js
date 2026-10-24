@@ -101,6 +101,10 @@
       X: x => (ox + x * baseScale) * zoom + tx,
       Y: y => (oy + (sim.height - y) * baseScale) * zoom + ty };
   }
+  function impulseVector(event) {
+    // Same reduced mass (=1) and scale as the two momentum arrows.
+    return { vx:event.before.vx-event.after.vx, vy:event.before.vy-event.after.vy };
+  }
   function stationaryReflection(event) {
     const vx=-event.before.vx, vy=event.before.vy;
     return { vx, vy, speed:Math.hypot(vx,vy), energy:.5*(vx*vx+vy*vy) };
@@ -120,8 +124,8 @@
       const color = palette[Math.min(6, Math.floor(Math.hypot(p.vx, p.vy) / Math.sqrt(2 * initialTemperature) * 3))];
       ctx.globalAlpha = q && !selected ? 1 - q * .7 : 1;
       if (vectors || selected) line(ctx, x, y, x + p.vx * scale * .06, y - p.vy * scale * .06, color + '80');
-      circle(ctx, x, y, .04 * scale, selected ? '#247f91' : color);
-      if (selected) { ctx.strokeStyle = '#dc9a3d'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x,y,.04*scale+4,0,2*Math.PI); ctx.stroke(); }
+      circle(ctx, x, y, (sim.radius || .04) * scale, selected ? '#247f91' : color);
+      if (selected) { ctx.strokeStyle = '#dc9a3d'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x,y,(sim.radius || .04)*scale+4,0,2*Math.PI); ctx.stroke(); }
     }
     ctx.restore(); ctx.globalAlpha = 1;
     const wallColor = wall => sim.thermal.mode === 'thermostat' && sim.thermal.walls.includes(wall) && (wall !== 'right' || sim.thermal.pistonThermal) ? '#cf914e' : '#8da3b2';
@@ -181,7 +185,8 @@
       ctx.restore();
     }
     const fixed=stationaryReflection(e);
-    const f=Math.min(68,h*.22)/Math.max(fixed.speed,Math.hypot(e.after.vx,e.after.vy),.1);
+    const impulse = impulseVector(e);
+    const f=Math.min(68,h*.22)/Math.max(fixed.speed,Math.hypot(e.after.vx,e.after.vy),tour.kind==='pressure'?Math.hypot(impulse.vx,impulse.vy):0,.1);
     if (tour.kind==='work') {
       ctx.setLineDash([5,4]);arrow(ctx,cx,cy,fixed.vx*f,-fixed.vy*f,'#9274ad',2);ctx.setLineDash([]);
       const dt=Math.max(0,sim.time-e.time), gx=X(e.x+fixed.vx*dt), gy=Y(e.y+fixed.vy*dt);
@@ -196,7 +201,7 @@
     ctx.fillStyle='#258d79';ctx.fillText((tour.kind==='work'?'v sortante si mobile · ':'p après · ')+U.text(tour.kind==='work'?'velocity':'momentum', Math.hypot(e.after.vx,e.after.vy)),14,h-19);
     const inward=e.wall==='left'?1:-1;
     if (tour.kind==='pressure') {
-      arrow(ctx,cx,cy,-inward*65,0,'#ce8b37',3);ctx.fillStyle='#aa702e';ctx.textAlign='center';ctx.fillText('Poussée · J = '+U.text('momentum', e.impulse),Math.min(w-78,cx-inward*35),cy+35);
+      arrow(ctx,cx,cy,impulse.vx*f,-impulse.vy*f,'#ce8b37',3);ctx.fillStyle='#aa702e';ctx.textAlign='right';ctx.fillText('J = p avant − p après = '+U.text('momentum', e.impulse),w-14,Math.min(h-55,cy+35));
     } else {
       const energy=tour.kind==='heat'?e.heat:e.work,dx=inward*Math.sign(energy)*65;
       arrow(ctx,cx-dx/2,cy,dx,0,energy>0?'#d48d39':'#497fb9',4);
@@ -222,18 +227,17 @@
     ctx.font = '11px system-ui'; ctx.fillStyle = '#6a7e8d'; ctx.textAlign = 'center';
     if (!event) { ctx.fillText('Les prochains chocs apparaîtront ici.', w / 2, h / 2); return; }
     if (event.kind === 'pair') {
-      line(ctx, w / 2, 8, w / 2, h - 8, '#dce5e9');
-      for (let side = 0; side < 2; side++) {
-        const centerX = w * (side ? 0.75 : 0.25), centerY = h * 0.58;
-        ctx.fillStyle = side ? '#b57a38' : '#3679bd'; ctx.textAlign = 'center';
-        ctx.fillText(side ? 'Disques : déviation au contact' : 'Points : ils se traverseraient', centerX, 15);
+      {
+        const centerX = w / 2, centerY = h * 0.58;
+        ctx.fillStyle = '#3679bd'; ctx.textAlign = 'center';
+        ctx.fillText('Disques durs : redistribution des vitesses', centerX, 15);
         const center = { x: (event.before[0].x + event.before[1].x) / 2, y: (event.before[0].y + event.before[1].y) / 2 };
-        const radius = 9, scale = radius / 0.04;
+        const radius = 9, scale = radius / event.radius;
         const largest = Math.max(...event.before.concat(event.after).map(p => Math.hypot(p.vx, p.vy)), 1);
         const vectorScale = Math.min(44, w / 11) / largest;
         event.before.forEach((p, i) => {
           const x = centerX + (p.x - center.x) * scale, y = centerY - (p.y - center.y) * scale;
-          const after = side ? event.after[i] : p;
+          const after = event.after[i];
           ctx.setLineDash([3, 3]); arrow(ctx, x - p.vx * vectorScale, y + p.vy * vectorScale, p.vx * vectorScale, -p.vy * vectorScale, '#5488bd80', 1.2); ctx.setLineDash([]);
           arrow(ctx, x, y, after.vx * vectorScale, -after.vy * vectorScale, i ? '#bb7b39' : '#258c7a', 2);
           circle(ctx, x, y, radius, i ? '#e2b27580' : '#7cbbd480');
@@ -297,5 +301,5 @@
     for (const b of actual.bins) { ctx.fillStyle = '#4b92c080'; ctx.fillRect(axes.X(b.min) + 1, axes.Y(b.density), Math.max(0, axes.X(b.max) - axes.X(b.min) - 2), axes.Y(0) - axes.Y(b.density)); }
     plotLine(ctx, axes, initial.bins.flatMap(b => [{ x: b.min, y: b.density }, { x: b.max, y: b.density }]), '#bd843e', { dashed: true });
   }
-  root.LabGraphics = { setup, chamberCamera, stationaryReflection, chamber, collision, plot, histogram, dataRange };
+  root.LabGraphics = { setup, chamberCamera, impulseVector, stationaryReflection, chamber, collision, plot, histogram, dataRange };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

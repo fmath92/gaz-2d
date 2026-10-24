@@ -1,3 +1,11 @@
+## 0.8.0 — Impulsions et disques durs
+
+- Impulsion affichée en kg·m/s et expliquée par J = m(v avant − v après) ; flèche orange à la même échelle que les flèches de quantité de mouvement.
+- Disques durs avec collisions mutuelles dans les cinq expériences ; suppression du choix ponctuel dans l’interface.
+- Dernier onglet consacré au rayon : réglage, réinitialisation au même n/V/T initial, fraction de surface occupée et relevés conservés de PV/(nRT).
+- Rayon réel utilisé par le moteur, le dessin et l’export CSV ; zoom mutuel centré sur les seuls disques.
+- Vérification des rayons extrêmes, du confinement, des conservations et des séquences guidées.
+
 ## 0.7.0 — Unités physiques à échelles fixes
 
 - Affichage en K, L, bar, J, m/s et ms ; état de référence à 300 K, 1 L et 1 bar.

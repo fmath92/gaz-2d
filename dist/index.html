@@ -31,7 +31,7 @@
       <button id="tab-heat" data-experiment="heat" role="tab" aria-controls="workbench" aria-selected="false" tabindex="-1"><span>02</span> Échanges thermiques</button>
       <button id="tab-free" data-experiment="free" role="tab" aria-controls="workbench" aria-selected="false" tabindex="-1"><span>03</span> Joule–Gay–Lussac</button>
       <button id="tab-adiabatic" data-experiment="adiabatic" role="tab" aria-controls="workbench" aria-selected="false" tabindex="-1"><span>04</span> Détente &amp; compression</button>
-      <button id="tab-comparison" data-experiment="comparison" role="tab" aria-controls="workbench" aria-selected="false" tabindex="-1"><span>05</span> Comparer les modèles</button>
+      <button id="tab-comparison" data-experiment="comparison" role="tab" aria-controls="workbench" aria-selected="false" tabindex="-1"><span>05</span> Rayon & loi des gaz</button>
     </nav>
     <section id="workbench" role="tabpanel" aria-labelledby="tab-pressure">
       <div class="experiment-intro"><div><p id="stepLabel" class="eyebrow">01 / LES CHOCS FONT LA PRESSION</p><h1 id="experimentTitle">Des chocs microscopiques à la pression.</h1><p id="experimentDescription">Suivez une particule jusqu’au piston et observez la poussée au moment du choc.</p></div><span class="fixed-count">1 000 marqueurs <small>≈ 0,0401 mol par gaz</small></span></div>
@@ -43,9 +43,9 @@
       </div>
       <div class="bench-grid">
         <article class="panel microscope">
-          <div class="panel-heading"><h2 id="microTitle">Le gaz et son piston</h2><span id="modelBadge" class="small-tag">Gaz ponctuel</span></div>
+          <div class="panel-heading"><h2 id="microTitle">Le gaz et son piston</h2><span id="modelBadge" class="small-tag">Disques durs</span></div>
           <div id="singleChamber"><canvas id="chamber" aria-label="État microscopique du gaz et position du piston">Simulation des particules.</canvas></div>
-          <div id="comparisonChambers" class="comparison-chambers" hidden><div><span class="model-name ideal">Gaz ponctuel</span><canvas id="idealChamber" aria-label="Gaz ponctuel sans collisions mutuelles"></canvas></div><div><span class="model-name disks">Disques durs</span><canvas id="diskChamber" aria-label="Gaz avec collisions élastiques entre disques"></canvas></div></div>
+          <div id="comparisonChambers" class="comparison-chambers" hidden><div><span class="model-name ideal">Disques durs</span><canvas id="idealChamber" aria-label="Gaz de disques durs"></canvas></div><div><span class="model-name disks">Disques durs</span><canvas id="diskChamber" aria-label="Gaz avec collisions élastiques entre disques"></canvas></div></div>
           <div class="micro-toolbar"><span><i class="speed-ramp"></i> Couleur = vitesse</span><label><input id="vectors" type="checkbox"> Vitesses</label><label id="staticZoomControl"><input id="zoomEnabled" type="checkbox" checked> Zoom</label><button id="capture" class="text-button" hidden>Isoler un choc mutuel</button></div>
           <div class="illustration-controls" id="illustrationControls"><button id="illustrate" class="button primary">▶ Illustrer une poussée</button><button id="endIllustration" class="text-button" hidden>Quitter le zoom</button></div>
           <div id="tourStatus" class="tour-status" hidden><div><span id="tourStage" class="tour-stage"></span><span id="tourSpeed"></span></div><p id="tourCaption" role="status" aria-live="polite"></p><div class="tour-track"><span id="tourProgress"></span></div></div>
@@ -54,6 +54,7 @@
             <canvas id="collisionZoom" aria-label="Schéma agrandi d’une collision réelle, vitesses avant et après et transfert d’énergie"></canvas>
             <div class="zoom-footer"><span id="zoomHint">Bleu : avant · vert : après · orange : poussée sur la paroi.</span><span id="zoomScale">Schéma d’un choc enregistré</span></div>
           </div>
+        <div id="radiusControls" class="control slider-control" hidden><label for="particleRadius">Rayon des disques <output id="radiusValue">0,92 mm</output></label><input id="particleRadius" type="range" min="5" max="70" step="5" value="40"><button id="applyRadius" class="button secondary">Appliquer le rayon et recommencer</button><small>Même n, V et T initiale · nouveaux chocs et nouvelles mesures</small></div>
           <div id="microObservation" class="micro-observation" hidden><strong>À observer</strong><p id="microHint">Suivez les particules dans le volume nouvellement ouvert.</p></div>
         </article>
         <article class="panel measurements">
@@ -80,14 +81,16 @@
             <div class="speed-comparison"><span class="real-speed">V sortante si mobile <b id="realExitSpeed">—</b></span><span class="fixed-speed">V sortante si fixe <b id="fixedExitSpeed">—</b></span></div><p id="speedComparisonNote" class="lesson-note"></p>
           </div>
           <div id="comparisonLesson" class="lesson" hidden>
-            <div class="lesson-title"><strong>Même N, même V, même T initiale</strong><span id="packingFraction">Surface occupée : —</span></div>
-            <div class="comparison-values"><span class="ideal">Ponctuel <b id="idealRatio">—</b></span><span class="disks">Disques durs <b id="diskRatio">—</b></span><span>Chocs mutuels <b id="pairCount">0</b></span></div>
-            <p id="comparisonExplanation" class="lesson-note">Les chocs redistribuent les vitesses. La taille finie exclut du volume et peut faire dépasser la référence idéale PV/(nRT) = 1.</p>
+            <div class="lesson-title"><strong>Tester PV/(nRT) = 1</strong><span id="packingFraction">Surface occupée : —</span></div>
+            <div class="comparison-values"><span class="disks">Rapport mesuré <b id="diskRatio">—</b></span><span>Chocs mutuels <b id="pairCount">0</b></span></div>
+            <p id="radiusStatus" class="field-help"></p><button id="recordRadius" class="button secondary">Relever ce rayon</button><button id="clearRadiusRecords" class="text-button">Effacer les relevés</button><ul id="radiusRecords" class="field-help"></ul>
+            <p id="comparisonExplanation" class="lesson-note">Réduire le rayon rapproche le modèle du gaz parfait. Augmenter le rayon accroît la surface occupée et peut faire dépasser PV/(nRT) = 1. Les fluctuations et la durée de mesure comptent aussi.</p>
           </div>
           <div id="transformationLesson" class="lesson" hidden><div class="lesson-title"><strong id="predictionTitle">Votre prédiction</strong><span id="experimentTag">Q = 0</span></div><p id="predictionText" class="prediction-text"></p><p id="outcome" class="lesson-note"></p></div>
         </article>
       </div>
       <div id="experimentControls" class="control-strip panel">
+
         <div id="motionChoice" class="control"><label for="motionAction">Le piston</label><select id="motionAction"><option id="motionFixedOption" value="fixed">Immobile</option><option value="expansion">Détente</option><option value="compression">Compression</option></select></div>
         <div id="volumeControl" class="control slider-control"><label for="target">Volume cible <output id="targetValue">1,40 × V</output></label><input id="target" type="range" min="105" max="164" step="1" value="140"></div>
         <div id="durationControl" class="control slider-control"><label for="duration">Durée du trajet <output id="durationValue">2,3 ms</output></label><input id="duration" type="range" min="0" max="100" step="1" value="72"></div>
@@ -103,7 +106,7 @@
           <div class="panel advanced-controls"><h2>Mesures et modèle</h2>
             <label for="pressureSource">Pression tracée</label><select id="pressureSource"><option value="piston">Au piston</option><option value="mean">Moyenne de toutes les parois</option></select>
             <label for="extraChart">Autre représentation</label><select id="extraChart"><option value="time">Évolution P, V, T</option><option value="ratio">PV / (nRT) au cours du temps</option><option value="pv">P–V</option><option value="pt">P–T</option><option value="vt">V–T</option><option value="pvt">PV = f(T)</option><option value="log">ln(P) = f(ln(V))</option></select>
-            <div id="singleModelControl"><label for="particleModel">Modèle du gaz</label><select id="particleModel"><option value="ideal">Ponctuel sans collisions mutuelles</option><option value="hard-disks">Disques durs élastiques</option></select><p class="field-help">Le changement prépare un nouvel état dans cette expérience.</p></div>
+
             <label for="initialTemperature">Température initiale <output id="initialTemperatureValue">300 K</output></label><input id="initialTemperature" type="range" min="60" max="1000" value="300" step="10"><button id="applyInitial" class="button secondary">Appliquer et recommencer</button>
             <label id="profileLabel" for="motionProfile">Profil du déplacement</label><select id="motionProfile"><option value="linear">Vitesse constante</option><option value="smooth">Départ et arrêt progressifs</option></select>
             <div id="thermalAdvanced" hidden><label for="accommodation">Fraction de chocs thermalisés <output id="accommodationValue">100 %</output></label><input id="accommodation" type="range" min="0" max="100" step="1" value="100"><label class="checkbox"><input id="allWalls" type="checkbox"> Mettre toutes les parois au thermostat</label></div>
@@ -111,12 +114,13 @@
           </div>
           <div class="panel scientific-notes"><h2>Comprendre les mesures</h2>
             <p><strong>Des unités usuelles, un modèle 2D.</strong> Les 1 000 marqueurs représentent une quantité fixe n ≈ 0,0401 mol. Une profondeur constante de 2,30 cm transforme l’aire en volume et la longueur de paroi en surface. Les échelles fixes donnent à l’état de référence 300 K, 1 L et une pression idéale de 1 bar. La pression affichée reste mesurée aux chocs.</p><p>La dynamique conserve deux composantes de vitesse : E = nRT et γ = 2 pour le gaz idéal isotrope. Ce n’est pas la thermodynamique complète d’un gaz 3D. T inclut le mouvement collectif éventuel. Les énergies et impulsions d’un choc sont celles d’un marqueur représentatif, pas d’une molécule isolée. La lecture ×1 est déjà très ralentie : une seconde d’animation représente environ 0,115 ms physiques.</p>
+            <p><strong>Quantité de mouvement et impulsion.</strong> p = mv ; l’impulsion reçue par le piston est J = m(vₓ avant − vₓ après), en kg·m/s (équivalent à N·s). Les trois flèches utilisent une même échelle : orange = bleu − vert. m est la masse représentative d’un marqueur. La force moyenne vaut ΣJ/Δt et la pression ΣJ/(SΔt).</p>
             <p><strong>Une pression mesurée, puis lissée.</strong> Les impulsions sur les parois sont divisées par la surface de paroi intégrée sur la fenêtre de mesure (0,23 ms). Ce retard et les fluctuations expliquent une partie des écarts de PV/(nRT) à 1, surtout pendant une transformation.</p>
             <p><strong>Un choc à la loupe.</strong> Le bouton d’illustration repère un choc à venir, ralentit la simulation et rapproche la caméra de son point de contact. Vous voyez les véritables particules et le piston évoluer. La particule rebondit sans arrêt sur image ; une onde visuelle illustre la transmission de la poussée dans le piston rigide. La caméra recule et la vitesse de lecture précédente est rétablie. Dans l’expérience thermique, deux chocs sont suivis, avec δQ positif puis négatif. Les flèches de quantité de mouvement sont tracées dans le référentiel du laboratoire, avec la même échelle avant et après. Les réglages sont verrouillés pendant la séquence ; « Quitter le zoom » ou Pause permet de l’interrompre.</p>
             <p><strong>Travail et chaleur.</strong> Au piston, δW reçu = −uJ, y compris avec des parois thermiques. La chaleur est la variation d’énergie dans le référentiel de la paroi. À paroi immobile, δW = 0 ; à paroi isolée, δQ = 0. Le bilan complet vaut ΔE = W + Q.</p>
-            <p><strong>Deux modèles.</strong> Les points se traversent. Les disques de rayon équivalent 0,92 mm se heurtent élastiquement : l’énergie et la quantité de mouvement de chaque paire sont conservées. Tous les marqueurs sont dessinés avec le même rayon apparent ; dans le modèle ponctuel, ce rayon est seulement visuel. Il n’y a pas d’attraction, donc une détente libre isolée conserve T dans les deux modèles.</p>
-            <p><strong>Comparer sans imposer le résultat.</strong> Les deux gaz ont les mêmes vitesses initiales, N, V et T. Leurs positions diffèrent pour placer les disques sans recouvrement. La taille finie peut rendre PV/(nRT) supérieur à 1, même à l’équilibre. Le zoom des disques montre un vrai choc ; le panneau ponctuel prolonge les mêmes vitesses entrantes pour illustrer l’absence d’interaction.</p>
-            <p><strong>Adiabatique ne signifie pas toujours quasi statique.</strong> La référence γ = 2 suppose un gaz idéal 2D isotrope. Les points sans collisions mutuelles ne rééquilibrent pas spontanément Tₓ et Tᵧ. Les disques le permettent, mais leur taille finie peut aussi modifier la référence idéale.</p>
+            <p><strong>Disques durs.</strong> Les disques de rayon équivalent 0,92 mm se heurtent élastiquement : l’énergie et la quantité de mouvement de chaque paire sont conservées. Le rayon dessiné correspond au rayon de collision. Le dernier onglet permet de le faire varier ; les autres expériences gardent 0,92 mm. Il n’y a pas d’attraction, donc une détente libre isolée conserve T dans ce modèle.</p>
+            <p><strong>Tester la loi idéale.</strong> Les disques ont des collisions élastiques entre eux. Le dernier onglet change uniquement leur rayon, avec réinitialisation aux mêmes n, V et T initiale. Les relevés manuels sont conservés lors de ce changement. PV/(nRT) est calculé à partir de la pression mesurée, jamais imposé à 1. Le volume utilisé est celui de la cavité entière, pas un volume libre corrigé.</p>
+            <p><strong>Adiabatique ne signifie pas toujours quasi statique.</strong> La référence γ = 2 suppose un gaz idéal 2D isotrope. Les chocs entre disques redistribuent les vitesses ; leur taille finie et un déplacement rapide peuvent néanmoins écarter le gaz de cette référence.</p>
             <p id="directionTemperatures"></p><p id="thermalFallbacks" class="field-help"></p>
             <div id="logAnalysis" hidden><label for="gamma">γ de référence</label><input id="gamma" type="number" min="0.1" max="5" value="2" step="0.1"><p id="fitStatus"></p><p id="fitValues"></p></div>
             <p class="field-help">Les contacts thermiques multiples à un même instant numérique sont régularisés : une seule réémission thermique par particule, puis des réflexions élastiques. Les événements sont comptés dans l’export. <a href="https://algs4.cs.princeton.edu/61event/index.php" target="_blank" rel="noopener">Simulation de disques durs · Princeton ↗</a></p>
@@ -125,7 +129,7 @@
         <div class="panel distributions"><div><h2>Norme des vitesses</h2><canvas id="speedHistogram" aria-label="Distribution de la norme des vitesses"></canvas></div><div><h2>Énergie cinétique par marqueur</h2><canvas id="energyHistogram" aria-label="Distribution de l’énergie cinétique des particules"></canvas></div><p id="distributionLegend">État actuel et état initial, densités normalisées.</p></div>
       </details>
     </section>
-    <footer><span>Gaz 2D · version 0.7.0</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
+    <footer><span>Gaz 2D · version 0.8.0</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
   </main>
 </body>
 </html>

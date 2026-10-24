@@ -2,7 +2,7 @@
 
 **[Ouvrir le démonstrateur](https://fmath92.github.io/gaz-2d/)** · [Code source](https://github.com/fmath92/gaz-2d)
 
-Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.7.0 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
+Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.8.0 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
 
 ## La visite
 
@@ -12,9 +12,9 @@ Un laboratoire de thermodynamique pour relier les collisions microscopiques à l
 | 02 | Échanges thermiques | Parcours automatique de deux chocs : chaleur reçue par le gaz, puis chaleur cédée à la paroi. |
 | 03 | Joule–Gay–Lussac | Ouverture vers le vide (doublement du volume par défaut), énergie et température conservées en mode isolé. |
 | 04 | Détente et compression adiabatiques | Choix du sens du mouvement ; zoom sur un choc au piston mobile et sur le travail reçu ou fourni. |
-| 05 | Comparer les modèles | Deux simulations simultanées : points sans interaction et disques durs, chacune avec 1 000 particules. |
+| 05 | Rayon & loi des gaz | Une simulation de disques durs à rayon réglable ; relevés de PV/(nRT) à n, V et T initiale identiques. |
 
-Toutes les expériences utilisent **1 000 particules** : aucun sélecteur de nombre n’est présent. Les points et les disques sont dessinés avec le même rayon 0,04. Ce rayon est seulement graphique pour les points ; il est physique pour les disques durs.
+Toutes les expériences utilisent **1 000 disques durs** avec collisions élastiques mutuelles. Le rayon reste 0,04 unité interne (≈ 0,92 mm équivalents) dans les quatre premières expériences. Le dernier onglet propose de 0,005 à 0,07 unité (≈ 0,11 à 1,61 mm). Le rayon dessiné est le rayon de collision. Le modèle ponctuel reste disponible dans la bibliothèque et ses tests, mais n’est plus proposé dans l’interface.
 
 Chaque onglet garde son état, ses réglages, sa pause et ses mesures jusqu’au rechargement de la page. Seule l’expérience affichée évolue. « Recommencer » efface les données de l’expérience courante. L’expérience de cycles périodiques a été retirée de l’interface ; les déplacements proposés sont des trajets simples, à vitesse constante ou progressifs.
 
@@ -23,13 +23,13 @@ Chaque onglet garde son état, ses réglages, sa pause et ses mesures jusqu’au
 La cavité et les tracés restent côte à côte sur ordinateur. Sur écran étroit, les panneaux s’empilent. Le commutateur principal passe entre :
 
 - **Évolution P, V, T** : rapports P/P₀, V/V₀ et T/T₀, sur une même échelle. P₀ = nRT₀/V₀ est la référence idéale initiale, indépendante de la pression mesurée. V est tracé en pointillés pour rester identifiable lorsque V/V₀ et T/T₀ se superposent.
-- **PV/(nRT) au cours du temps** : pression réellement mesurée × volume / nRT, avec la référence idéale 1. Dans la comparaison, les deux gaz ont chacun leur courbe.
+- **PV/(nRT) au cours du temps** : pression réellement mesurée × volume / nRT, avec la référence idéale 1. Dans le dernier onglet, on compare les mesures à la référence idéale 1.
 
 Les cartes au-dessus donnent les valeurs instantanées. La pression est calculée sur une fenêtre glissante de 0,23 ms. La première fenêtre est partielle ; pendant une transformation, la pression garde aussi la mémoire des instants précédents. Un écart à PV/(nRT) = 1 peut donc venir des fluctuations, du retard de mesure, de l’anisotropie ou, pour les disques durs, de leur taille finie.
 
 Les autres diagrammes (P–V, P–T, V–T, PV = f(T), ln(P) = f(ln(V))), les histogrammes, le choix du capteur de pression, la température initiale et les explications sont regroupés dans **Approfondir**. Le graphique choisi y remplace le tracé principal, sans faire disparaître la cavité. Le saut de volume d’une détente libre n’est pas relié par un segment dans P–V : il ne définit pas un travail de pression.
 
-La lecture peut être ralentie jusqu’à ×0,05, accélérée jusqu’à ×4, mise en pause ou avancée par pas de 0,02 u.t. Le ralentissement change le temps simulé écoulé par seconde réelle ; il ne modifie ni les collisions ni les paramètres physiques. Pour garder une interface réactive, le calcul peut ralentir sous charge, sans sauter de pas physique. Les deux gaz de comparaison restent synchronisés.
+La lecture peut être ralentie jusqu’à ×0,05, accélérée jusqu’à ×4, mise en pause ou avancée par pas de 0,02 u.t. Le ralentissement change le temps simulé écoulé par seconde réelle ; il ne modifie ni les collisions ni les paramètres physiques. Pour garder une interface réactive, le calcul peut ralentir sous charge, sans sauter de pas physique. Les collisions mutuelles redistribuent les vitesses dans toutes les expériences.
 
 ## Les collisions à la loupe
 
@@ -42,6 +42,8 @@ Dans les expériences de pression, de chaleur et de travail, le bouton d’illus
 
 Le parcours thermique effectue ces étapes deux fois : **δQ > 0 puis δQ < 0**, avec deux particules qui peuvent être différentes. Cela n’impose aucun échange : une paroi chaude peut recevoir de l’énergie lors d’un choc individuel. Pour le travail, le bouton lance le trajet choisi s’il n’a pas encore commencé, ou suit le piston déjà en mouvement. Le signe reste celui du **travail reçu par le gaz** : positif en compression, négatif en détente.
 
+L’impulsion J est affichée en **kg·m/s**, unité équivalente à N·s : p = mv, J reçu par le piston = m(v avant − v après), composante normale à la paroi. La flèche orange emploie exactement la même échelle que les deux flèches de quantité de mouvement ; pour un choc frontal sur une paroi fixe, elle vaut deux fois la flèche entrante. La masse est celle du marqueur représentatif.
+
 Les flèches `p avant` et `p après` sont des quantités de mouvement dans le **référentiel du laboratoire**, avec une même masse représentative et une même échelle. Leurs longueurs peuvent donc différer au piston mobile. Une flèche supplémentaire représente l’impulsion reçue par la paroi, ou le sens du transfert d’énergie. L’onde illustre la transmission de la poussée ; elle ne simule pas l’élasticité du solide et n’ajoute aucune force ni énergie au modèle. Le piston et les autres particules continuent à être ceux de la simulation ; la caméra ne substitue pas un dessin indépendant au gaz.
 
 Pour le travail, la caméra se rapproche d’une **position fixe dans le laboratoire** et ne suit jamais la largeur courante du gaz. Une ligne marque la position initiale du piston ; une graduation fixe, sa vitesse et son déplacement permettent de voir le mouvement dès l’approche. Le cadrage tient compte du trajet avant le contact pour garder le piston visible.
@@ -52,7 +54,7 @@ Le repérage emploie une copie indépendante du moteur, comprenant l’état du 
 
 Les paramètres physiques sont verrouillés pendant le parcours. **Quitter le zoom**, Pause, un changement d’onglet ou une remise à zéro l’interrompent sans revenir en arrière dans le temps. La vitesse antérieure est conservée. Une préférence système de réduction des animations supprime la transition progressive de caméra. Si aucun choc adapté n’existe dans l’horizon de recherche (8 u.t., ou la fin du trajet pour le travail), l’interface le signale ; elle ne fabrique aucun choc. Le bouton thermique est désactivé pour une paroi isolée ou une accommodation nulle.
 
-Dans la comparaison des modèles, **Isoler un choc mutuel** conserve le schéma figé précédent : la partie « disques » représente une collision réellement calculée, la partie « points » prolonge les mêmes vitesses entrantes sans interaction. Les deux vues d’ensemble et les deux courbes PV/(nRT) proviennent de deux simulations indépendantes.
+Dans le dernier onglet, **Isoler un choc mutuel** présente uniquement le vrai choc entre deux disques, avec les flèches avant/après. Le réglage de rayon est une préparation d’expérience : « Appliquer le rayon et recommencer » reconstruit les positions sans recouvrement et réinitialise les mesures à n, V et T initiale identiques. Il ne gonfle pas des particules en pleine simulation et n’invente pas un travail associé. Les relevés manuels (30 derniers au plus) survivent à cette réinitialisation et sont effaçables. Un relevé devient possible après quatre unités internes (≈ 0,46 ms) ; cette durée ne garantit pas à elle seule l’équilibre, les fluctuations restent visibles. Les relevés donnent le rayon, PV/(nRT), T, t et le capteur utilisé. L’export CSV porte sur l’historique du rayon courant.
 
 ## Pression, travail et chaleur
 
@@ -99,15 +101,15 @@ flux thermique moyen 2D = somme(δQ) / (longueur × durée)
 
 La flèche thermique traverse le point de contact dans le sens de l’énergie échangée. Un choc peut chauffer ou refroidir, même avec un thermostat plus chaud que le gaz : c’est le bilan moyen qui détermine l’évolution de la température. Le flux affiché est celui de la paroi gauche sur la fenêtre de mesure, alors que Q cumule tous les échanges depuis l’état initial. Le premier et le second choc du parcours sont sélectionnés par leur signe, sans modifier ces bilans. Le premier principe est toujours vérifié : **ΔE = W + Q**. Le modèle de réflexion est celui décrit dans la [documentation LAMMPS des parois stochastiques](https://docs.lammps.org/fix_wall_reflect_stochastic.html).
 
-## Deux modèles et leurs limites
+## Disques durs et limites
 
-Le gaz ponctuel contient des particules sans interaction mutuelle. Les chocs isolés sur les parois sont élastiques ; au piston de vitesse u, vx après = 2u − vx avant. Un piston peut rendre les températures directionnelles différentes : Tx = moyenne(vx²), Ty = moyenne(vy²). Sans collisions mutuelles, leur différence ne se résorbe pas spontanément.
+Le modèle utilisé dans l’interface contient des disques durs en interaction élastique. Les chocs isolés sur les parois sont élastiques ; au piston de vitesse u, vx après = 2u − vx avant. Un piston peut rendre les températures directionnelles différentes : Tx = moyenne(vx²), Ty = moyenne(vy²). Les collisions mutuelles permettent leur rééquilibrage ; une compression rapide peut néanmoins créer une anisotropie transitoire.
 
-Les disques durs ont un rayon 0,04. Ils sont placés sans recouvrement et leur centre reste à cette distance des parois. Un choc entre deux disques conserve exactement, aux arrondis numériques près, l’énergie cinétique et la quantité de mouvement de la paire. L’énergie échangée entre particules n’est ni W ni Q, car elle reste interne au gaz.
+Les disques durs ont un rayon 0,04 par défaut, réglable dans la cinquième expérience. Ils sont placés sans recouvrement et leur centre reste à cette distance des parois. Un choc entre deux disques conserve exactement, aux arrondis numériques près, l’énergie cinétique et la quantité de mouvement de la paire. L’énergie échangée entre particules n’est ni W ni Q, car elle reste interne au gaz.
 
 Le moteur prédit les dates de contact, les traite dans une file de priorité et invalide les prédictions après les changements de vitesse. Une grille spatiale filtre les paires candidates initiales ; les paires impliquant des particules dont la vitesse a changé sont recalculées. Cette méthode suit le principe de la [simulation événementielle de disques durs de Princeton](https://algs4.cs.princeton.edu/61event/index.php). Aucun rééchelonnement global d’énergie ni déplacement correctif de recouvrement n’est appliqué.
 
-La comparaison commence avec les mêmes vitesses initiales, N, V et T. Les positions diffèrent pour placer les disques sans recouvrement. Leur fraction de surface est Nπr²/V, affichée dans l’interface. Leur taille finie introduit un volume exclu : PV/(nRT) peut dépasser 1 même à l’équilibre. Les collisions élastiques seules ne définissent pas toutes les propriétés d’un gaz réel. Il n’y a pas d’attraction ni d’énergie potentielle à distance : une détente libre isolée conserve donc T dans les deux modèles.
+La fraction de surface est Nπr²/V (variables internes 2D). La taille finie introduit un volume exclu : PV/(nRT) peut dépasser 1 même à l’équilibre. Réduire le rayon permet d’explorer la limite diluée ; à très petit rayon, les collisions mutuelles sont moins fréquentes. Le volume affiché est toujours celui de la cavité entière. Il n’y a pas d’attraction ni d’énergie potentielle à distance : une détente libre isolée conserve T.
 
 Tcin = Ec/N est un indicateur d’énergie, incluant le mouvement collectif éventuel. Une loi adiabatique idéale PV^γ = constante suppose une évolution quasi statique et un gaz isotrope ; γ = 2 est la référence idéale 2D à deux degrés de liberté. L’ajustement logarithmique utilise le dernier trajet, au moins trois fenêtres de pression entièrement incluses dans ce trajet et non recouvrantes. Il produit un exposant apparent, sans prouver ces hypothèses. La détente libre est exclue de cet ajustement. Voir [OpenStax : processus adiabatiques](https://openstax.org/books/university-physics-volume-2/pages/3-6-adiabatic-processes-for-an-ideal-gas).
 
@@ -115,9 +117,9 @@ Tcin = Ec/N est un indicateur d’énergie, incluant le mouvement collectif éve
 
 ## Export et conservation des données
 
-L’export CSV regroupe les relevés de l’expérience courante : pressions mesurées, température, volume, PV/(nRT), travail, chaleur, bilan, modèle, collisions et conditions thermiques. La comparaison produit une ligne par gaz et par instant, permettant de vérifier les deux bilans séparément. Les valeurs sont séparées par des points-virgules, avec une virgule décimale.
+L’export CSV regroupe les relevés de l’expérience courante : pressions mesurées, température, volume, PV/(nRT), travail, chaleur, bilan, modèle, collisions et conditions thermiques. Chaque ligne indique également le rayon en mm. Les valeurs sont séparées par des points-virgules, avec une virgule décimale.
 
-Chaque expérience conserve au plus 6 000 relevés, environ un tous les 0,1 u.t., plus les commandes et arrêts sur événement. Les deux histogrammes utilisent des densités normalisées et les mêmes classes pour les états comparés. Dans la comparaison, les barres représentent le gaz ponctuel et les pointillés les disques ; ailleurs, les pointillés représentent l’état initial. Les mesures ne sont pas sauvegardées après fermeture de la page.
+Chaque expérience conserve au plus 6 000 relevés, environ un tous les 0,1 u.t., plus les commandes et arrêts sur événement. Les deux histogrammes utilisent des densités normalisées et les mêmes classes pour les états comparés. Les barres représentent l’état actuel et les pointillés l’état initial. Les mesures ne sont pas sauvegardées après fermeture de la page.
 
 ## Exécution, validation et publication
 

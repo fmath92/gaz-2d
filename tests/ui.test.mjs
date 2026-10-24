@@ -120,7 +120,7 @@ test('all five experience tabs retain independent state, and only the visible ex
     lab.click('tab-'+key);assert.equal(lab.analysis.experiment,key);assert.equal(lab.metrics.count,1000);lab.advance(.1);
     assert.equal(lab.nodes.get('workbench').getAttribute('aria-labelledby'),'tab-'+key);
   }
-  assert.equal(lab.comparisonMetrics.count,1000);
+  assert.equal(lab.comparisonMetrics,null);assert.equal(lab.metrics.particleModel,'hard-disks');
   lab.click('tab-pressure');assert.equal(lab.metrics.time,time);assert.equal(lab.paused,true);
 });
 test('keyboard arrows, Home and End navigate experience tabs with correct focus',()=>{
@@ -164,8 +164,8 @@ test('thermal slider changes future collisions only; isolation stops Q without d
 });
 test('Joule–Gay–Lussac doubles V without changing E or T, with simulation and plot visible together',()=>{
   const lab=laboratory();lab.click('tab-free');const before=lab.metrics;lab.advance(.2);lab.click('start');
-  assert.equal(lab.metrics.width,18);assert.equal(lab.metrics.volume,2*before.volume);assert.equal(lab.metrics.energy,before.energy);assert.equal(lab.metrics.work,0);assert.equal(lab.metrics.heat,0);
-  lab.advance(.5);assert.equal(lab.metrics.temperature,before.temperature);assert.ok(lab.nodes.has('chamber')&&lab.nodes.has('chart'));assert.equal(lab.nodes.get('zoomPanel').hidden,true);
+  assert.equal(lab.metrics.width,18);assert.equal(lab.metrics.volume,2*before.volume);assert.ok(Math.abs(lab.metrics.energy-before.energy)<1e-8);assert.equal(lab.metrics.work,0);assert.equal(lab.metrics.heat,0);
+  lab.advance(.5);assert.ok(Math.abs(lab.metrics.temperature-before.temperature)<1e-9);assert.ok(lab.nodes.has('chamber')&&lab.nodes.has('chart'));assert.equal(lab.nodes.get('zoomPanel').hidden,true);
   lab.click('chart-ratio');assert.equal(lab.analysis.chartType,'ratio');assert.equal(lab.analysis.plot.yLabel,'PV / (nRT)');
   assert.equal(lab.analysis.plot.series[0].points[0].y,1);
 });
@@ -188,37 +188,37 @@ test('one adiabatic tab handles both directions with insulated walls and the cor
     assert.ok(key==='compression'?lab.metrics.work>0:lab.metrics.work<0);
   }
 });
-test('the model comparison advances two genuine 1000-particle systems with equal V and initial T',()=>{
-  const lab=laboratory();lab.click('tab-comparison');const a=lab.metrics,b=lab.comparisonMetrics;
-  assert.equal(a.particleModel,'ideal');assert.equal(b.particleModel,'hard-disks');assert.equal(a.count,b.count);assert.equal(a.volume,b.volume);assert.equal(a.temperature,b.temperature);
-  lab.advance(.4);assert.equal(lab.metrics.time,lab.comparisonMetrics.time);assert.ok(lab.comparisonMetrics.pairCollisions>0);assert.equal(lab.metrics.pairCollisions,0);
-  assert.ok(Math.abs(lab.comparisonMetrics.balanceError)<1e-7);assert.equal(lab.analysis.plot.series.length,3);
+test('radius experiment uses one interacting gas, records measurements and resets only its radius',()=>{
+  const lab=laboratory();lab.click('tab-comparison');
+  assert.equal(lab.comparisonMetrics,null);assert.equal(lab.metrics.particleModel,'hard-disks');
+  lab.input('timeScale',4);lab.advance(1.3);assert.ok(lab.metrics.pairCollisions>0);
+  lab.click('recordRadius');assert.match(lab.nodes.get('radiusRecords').innerHTML,/PV/);
+  const old=lab.metrics;lab.input('particleRadius',70);assert.equal(lab.metrics.particleRadius,.04);
+  lab.click('applyRadius');assert.equal(lab.metrics.particleRadius,.07);assert.equal(lab.metrics.time,0);
+  assert.equal(lab.metrics.volume,old.volume);assert.ok(Math.abs(lab.metrics.temperature-1.5)<1e-9);
+  assert.match(lab.nodes.get('radiusRecords').innerHTML,/PV/);assert.equal(lab.nodes.get('recordRadius').disabled,true);
   lab.click('capture');lab.advance(.2);assert.ok(lab.paused);assert.equal(lab.analysis.collision.kind,'pair');
-});
-test('comparison piston commands remain synchronized and preserve each gas energy balance',()=>{
-  const lab=laboratory();lab.click('tab-comparison');lab.input('motionAction','compression');lab.input('duration',50);lab.input('timeScale',1);lab.click('start');lab.advance(.4);
-  assert.ok(lab.metrics.work>0&&lab.comparisonMetrics.work>0);assert.equal(lab.metrics.width,lab.comparisonMetrics.width);
-  assert.ok(Math.abs(lab.comparisonMetrics.balanceError)<1e-7);
+  lab.click('tab-pressure');assert.equal(lab.metrics.particleRadius,.04);
 });
 test('slow playback changes elapsed simulated time, and single-step is 0.02 without unpausing',()=>{
   const lab=laboratory();lab.input('timeScale',.05);lab.advance(1);assert.ok(lab.metrics.time>=.04&&lab.metrics.time<.06);
   lab.click('pause');const time=lab.metrics.time;lab.click('step');assert.ok(Math.abs(lab.metrics.time-time-.02)<1e-10);assert.ok(lab.paused);
 });
 test('model and initial temperature changes reset only this experience and always keep N=1000',()=>{
-  const lab=laboratory();lab.click('tab-free');lab.input('particleModel','hard-disks');assert.equal(lab.metrics.particleModel,'hard-disks');
+  const lab=laboratory();lab.click('tab-free');assert.equal(lab.metrics.particleModel,'hard-disks');
   lab.input('initialTemperature',400);lab.click('applyInitial');assert.equal(lab.metrics.count,1000);assert.ok(Math.abs(lab.metrics.temperature-2)<1e-10);
   lab.click('start');assert.equal(lab.metrics.heat,0);assert.equal(lab.metrics.work,0);
-  lab.click('tab-pressure');assert.equal(lab.metrics.particleModel,'ideal');assert.ok(Math.abs(lab.metrics.temperature-1.5)<1e-10);
+  lab.click('tab-pressure');assert.equal(lab.metrics.particleModel,'hard-disks');assert.ok(Math.abs(lab.metrics.temperature-1.5)<1e-10);
 });
 test('all seven charts remain available and gamma input is validated',()=>{
   const lab=laboratory();lab.advance(.2);
   for(const key of ['time','ratio','pv','pt','vt','pvt','log']){lab.input('extraChart',key);assert.equal(lab.analysis.chartType,key);assert.ok(lab.analysis.plot.series.length);}
   lab.input('gamma',0);assert.equal(lab.nodes.get('gamma').getAttribute('aria-invalid'),'true');lab.input('gamma',1.4);assert.equal(lab.nodes.get('gamma').getAttribute('aria-invalid'),'false');
 });
-test('CSV comparison contains two measured models per instant, consistent PV/T and first-law balances',async()=>{
+test('CSV contains hard-disk radius, measured ratios and first-law balances',async()=>{
   const lab=laboratory();lab.click('tab-comparison');lab.advance(.4);lab.click('export');const csv=await lab.downloads.at(-1).blob.text();
   const lines=csv.trim().replace(/^\uFEFF/,'').split(/\r?\n/);const headers=lines.shift().split(';');const rows=lines.map(line=>Object.fromEntries(line.split(';').map((v,i)=>[headers[i],v])));
-  assert.equal(rows.length%2,0);assert.ok(rows.some(r=>r.modele==='ideal'));assert.ok(rows.some(r=>r.modele==='hard-disks'));
+  assert.ok(rows.length>0);assert.ok(rows.every(r=>r.modele==='hard-disks'));assert.ok(rows.every(r=>Number(r.rayon_mm.replace(',','.'))>0));
   for(const row of rows){assert.equal(row.N_marqueurs,'1000');if(row.P_mesuree_bar){const num=k=>Number(row[k].replace(',','.'));assert.ok(Math.abs(num('PV_sur_nRT')-100*num('P_mesuree_bar')*num('volume_L')/(num('T_K')/3))<1e-5);assert.ok(Math.abs(num('ecart_bilan_J'))<1e-7);}}
 });
 

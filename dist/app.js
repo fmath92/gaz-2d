@@ -8,7 +8,7 @@
     heat: { index: '02', label: 'LA CHALEUR PASSE PAR LES PAROIS', title: 'Un choc peut réchauffer ou refroidir le gaz.', description: 'Le piston reste fixe. Seule la paroi gauche échange de la chaleur avec un thermostat réglable.', width: 11, action: 'fixed', source: 'mean', chart: 'time', zoom: false, speed: 1 },
     free: { index: '03', label: 'DÉTENTE DE JOULE–GAY–LUSSAC', title: 'Plus de place. La même température ?', description: 'Ouvrez vers le vide, puis regardez le gaz occuper le nouvel espace. Les parois sont isolées.', width: 9, action: 'expansion', source: 'mean', chart: 'time', zoom: false, speed: 1 },
     adiabatic: { index: '04', label: 'LE TRAVAIL DU PISTON', title: 'Détendre ou comprimer : l’énergie change de côté.', description: 'Choisissez le sens du mouvement, puis suivez un choc sur le piston mobile. Les parois sont isolées.', width: 11, action: 'expansion', source: 'mean', chart: 'time', zoom: false, speed: 1 },
-    comparison: { index: '05', label: 'POINTS ET DISQUES DURS', title: 'Les collisions changent-elles la loi des gaz parfaits ?', description: 'Deux gaz comparables, calculés simultanément. Les disques se heurtent et occupent une partie du volume.', width: 8, action: 'fixed', source: 'mean', chart: 'ratio', zoom: true, speed: 0.25 }
+    comparison: { index: '05', label: 'LE RAYON DES PARTICULES', title: 'La taille des particules change-t-elle PV = nRT ?', description: 'Faites varier le rayon des disques, à quantité de gaz, volume et température initiale identiques. Comparez PV/(nRT) à 1.', width: 11, action: 'fixed', source: 'mean', chart: 'ratio', zoom: false, speed: 1 }
   };
   const sessions = new Map();
   let active = 'pressure', previousFrame = 0, accumulator = 0, lastUI = 0;
@@ -21,15 +21,15 @@
   const snapshots = sim => ({ speeds: sim.particles.map(p => Math.hypot(p.vx, p.vy)), energies: sim.particles.map(p => (p.vx ** 2 + p.vy ** 2) / 2) });
   function createSession(key, previous) {
     const config = experiments[key];
-    const s = { key, model: previous?.model || 'ideal', initialTemperature: previous?.initialTemperature || 1.5,
+    const s = { key, model: 'hard-disks', radius: key === 'comparison' ? (previous?.radius ?? .04) : .04, radiusRecords: previous?.radiusRecords ?? [], initialTemperature: previous?.initialTemperature || 1.5,
       action: previous?.action ?? config.action, duration: 72, ratio: key === 'free' ? 200 : (previous?.action ?? config.action) === 'compression' ? 70 : 140,
       source: config.source, chart: config.chart, zoom: config.zoom, speed: config.speed, playing: true, vectors: false,
       bath: previous?.bath ?? 3, accommodation: previous?.accommodation ?? 1, allWalls: previous?.allWalls ?? false,
       thermalMode: previous?.thermalMode ?? (key === 'heat' ? 'thermostat' : 'isolated'), profile: previous?.profile || 'linear',
       gamma: previous?.gamma || 2, history: [], nextSample: 0, focus: null, focusAt: -Infinity, seek: null, tour: null, lastTour: null, run: null, runId: 0 };
     const thermal = { mode: key === 'heat' ? s.thermalMode : 'isolated', temperature: s.bath, accommodation: s.accommodation, pistonThermal: s.allWalls, walls: s.allWalls ? ['left', 'right', 'top', 'bottom'] : ['left'] };
-    s.sim = new GasSimulation({ count: N, width: config.width, temperature: s.initialTemperature, particleModel: key === 'comparison' ? 'ideal' : s.model, thermal, observeCollisions: true, seed: 314159 });
-    s.other = key === 'comparison' ? new GasSimulation({ count: N, width: config.width, temperature: s.initialTemperature, particleModel: 'hard-disks', observeCollisions: true, seed: 314159 }) : null;
+    s.sim = new GasSimulation({ count: N, width: config.width, temperature: s.initialTemperature, particleModel: 'hard-disks', particleRadius: s.radius, thermal, observeCollisions: true, seed: 314159 });
+    s.other = null;
     s.initial = s.sim.metrics; s.otherInitial = s.other?.metrics; s.initialParticles = snapshots(s.sim); s.baseWidth = config.width;
     sample(s); return s;
   }
@@ -70,17 +70,19 @@
     $('experimentTitle').textContent = e.title; $('experimentDescription').textContent = e.description;
     $('singleChamber').hidden = !!s.other; $('comparisonChambers').hidden = !s.other;
     $('pressureLesson').hidden = active !== 'pressure'; $('heatLesson').hidden = active !== 'heat';
-    $('comparisonLesson').hidden = !s.other; $('transformationLesson').hidden = active !== 'free'; $('workLesson').hidden = active !== 'adiabatic';
-    $('motionChoice').hidden = !['adiabatic', 'comparison'].includes(active);
+    $('comparisonLesson').hidden = active !== 'comparison'; $('transformationLesson').hidden = active !== 'free'; $('workLesson').hidden = active !== 'adiabatic';
+    $('motionChoice').hidden = active !== 'adiabatic';
     $('motionFixedOption').hidden = $('motionFixedOption').disabled = active === 'adiabatic';
     $('heatControls').hidden = active !== 'heat'; $('thermalAdvanced').hidden = active !== 'heat';
-    $('singleModelControl').hidden = !!s.other;
+    $('radiusControls').hidden = active !== 'comparison';
+    $('particleRadius').value = Math.round(s.radius * 1000);
+    $('radiusValue').value = format(s.radius * U.scales.length * 1000) + ' mm';
     $('microTitle').textContent = s.other ? 'Deux états microscopiques' : active === 'heat' ? 'Le gaz et la paroi gauche' : 'Le gaz et son piston';
-    $('zoomTitle').textContent = s.other ? 'Zoom · se traverser ou se heurter' : active === 'heat' ? 'Zoom · un échange sur la paroi gauche' : 'Zoom · une poussée sur le piston';
-    $('zoomHint').textContent = s.other ? 'Pointillés : avant · traits pleins : après. À gauche : comparaison illustrative.' : 'Bleu : avant · vert : après. Vitesses relatives à la paroi.';
+    $('zoomTitle').textContent = active === 'comparison' ? 'Zoom · un choc entre deux disques' : active === 'heat' ? 'Zoom · un échange sur la paroi gauche' : 'Zoom · une poussée sur le piston';
+    $('zoomHint').textContent = active === 'comparison' ? 'Pointillés : avant · traits pleins : après. Les vitesses se redistribuent.' : 'Bleu : avant · vert : après. Vitesses relatives à la paroi.';
     $('zoomScale').textContent = 'Schéma d’un choc enregistré';
     $('timeScale').value = s.speed; $('motionAction').value = s.action; $('duration').value = s.duration;
-    $('pressureSource').value = s.source; $('extraChart').value = s.chart; $('particleModel').value = s.model;
+    $('pressureSource').value = s.source; $('extraChart').value = s.chart;
     $('thermalMode').value = s.thermalMode; $('bathTemperature').value = s.bath * 200; $('accommodation').value = s.accommodation * 100;
     $('allWalls').checked = s.allWalls; $('vectors').checked = s.vectors; $('zoomEnabled').checked = s.zoom;
     $('initialTemperature').value = s.initialTemperature * 200; $('initialTemperatureValue').value = U.text('temperature', s.initialTemperature);
@@ -90,10 +92,10 @@
     $('experimentTag').textContent = active === 'free' ? 'W = Q = 0' : 'Q = 0';
     $('microHint').textContent = active === 'free' ? 'L’espace vide se remplit sans travail du piston. Attendez le retour à un état homogène pour interpréter PV/(nRT).' : 'Les flèches de vitesse et le zoom permettent de relier l’évolution de la température aux chocs sur le piston.';
     $('illustrationControls').hidden = !['pressure','heat','adiabatic'].includes(active);
-    $('staticZoomControl').hidden = !s.other; $('capture').hidden = !s.other;
+    $('staticZoomControl').hidden = active !== 'comparison'; $('capture').hidden = active !== 'comparison';
     $('illustrate').textContent = active === 'heat' ? '▶ Illustrer les deux sens de la chaleur' : active === 'adiabatic' ? '▶ Illustration du travail sur le piston' : '▶ Illustrer une poussée';
-    $('experimentControls').hidden = active === 'pressure'; $('energyBalance').hidden = active === 'pressure';
-    $('profileLabel').hidden = $('motionProfile').hidden = ['pressure','heat','free'].includes(active);
+    $('experimentControls').hidden = ['pressure','comparison'].includes(active); $('energyBalance').hidden = ['pressure','comparison'].includes(active);
+    $('profileLabel').hidden = $('motionProfile').hidden = ['pressure','heat','free','comparison'].includes(active);
     $('nextExperience').textContent = active === 'comparison' ? 'Retour au début de la visite ↻' : 'Étape suivante →';
     updateControls();
   }
@@ -109,17 +111,17 @@
     $('bathValue').value = U.text('temperature', s.bath); $('accommodationValue').value = Math.round(s.accommodation * 100) + ' %';
     const fixed = s.action === 'fixed';
     $('volumeControl').hidden = fixed || active === 'heat'; $('durationControl').hidden = fixed || active === 'free' || active === 'heat';
-    $('start').hidden = active === 'heat' || active === 'pressure'; $('stop').hidden = !moving;
+    $('start').hidden = ['heat','pressure','comparison'].includes(active); $('stop').hidden = !moving;
     $('start').textContent = active === 'free' ? 'Ouvrir vers le vide' : fixed ? 'Isoler un choc' : expanding ? 'Lancer la détente' : 'Lancer la compression';
     $('start').disabled = touring || moving || (!fixed && Math.abs(target(s) - s.sim.width) < 1e-3);
     $('stop').disabled = !moving;
     for (const id of ['motionAction', 'target', 'duration', 'motionProfile']) $(id).disabled = touring || moving || (id === 'target' && active === 'free' && !!s.run?.free);
-    for (const id of ['timeScale','thermalMode','accommodation','allWalls','particleModel','initialTemperature','applyInitial']) $(id).disabled = touring;
+    for (const id of ['timeScale','thermalMode','accommodation','allWalls','particleRadius','applyRadius','initialTemperature','applyInitial']) $(id).disabled = touring;
     $('bathTemperature').disabled = touring || s.thermalMode === 'isolated';
     $('illustrate').disabled = touring || (active === 'heat' && (s.thermalMode === 'isolated' || s.accommodation === 0)) || (active === 'adiabatic' && !moving && Math.abs(target(s)-s.sim.width)<1e-3);
     $('endIllustration').hidden = !touring; $('tourStatus').hidden = !touring;
-    $('zoomPanel').hidden = !s.zoom || !s.other; $('microObservation').hidden = s.zoom || touring;
-    $('microHint').textContent = active === 'pressure' ? 'Le bouton suit un choc à venir : ralenti, rapprochement de la caméra, poussée sur le piston, puis retour à la vue d’ensemble.' : active === 'heat' ? 'Le parcours montre deux échanges successifs : de la paroi vers le gaz, puis du gaz vers la paroi. Le flux moyen peut avoir un autre signe que celui d’un choc.' : active === 'adiabatic' ? 'Le bouton d’illustration lance le trajet choisi si nécessaire. La paroi mobile et la particule échangent de l’énergie au moment du choc.' : 'L’espace vide se remplit sans travail du piston. Attendez le retour à un état homogène pour interpréter PV/(nRT).';
+    $('zoomPanel').hidden = !s.zoom || active !== 'comparison'; $('microObservation').hidden = s.zoom || touring || active === 'comparison';
+    $('microHint').textContent = active === 'comparison' ? 'Les chocs mutuels redistribuent les vitesses. Pour chaque rayon, attendez la stabilisation de la mesure ; un écart à 1 peut aussi fluctuer.' : active === 'pressure' ? 'Le bouton suit un choc à venir : ralenti, rapprochement de la caméra, poussée sur le piston, puis retour à la vue d’ensemble.' : active === 'heat' ? 'Le parcours montre deux échanges successifs : de la paroi vers le gaz, puis du gaz vers la paroi. Le flux moyen peut avoir un autre signe que celui d’un choc.' : active === 'adiabatic' ? 'Le bouton d’illustration lance le trajet choisi si nécessaire. La paroi mobile et la particule échangent de l’énergie au moment du choc.' : 'L’espace vide se remplit sans travail du piston. Attendez le retour à un état homogène pour interpréter PV/(nRT).';
     $('pause').textContent = s.playing ? 'Ⅱ Pause' : '▶ Reprendre'; $('pause').setAttribute('aria-label', s.playing ? 'Mettre en pause' : 'Reprendre la simulation');
     $('capture').disabled = !!s.seek;
     document.querySelectorAll('input[type="range"]').forEach(input => input.style.setProperty('--fill', ((+input.value - +input.min) / (+input.max - +input.min) * 100) + '%'));
@@ -139,7 +141,7 @@
     }
     s.playing = true; s.seek = null; accumulator = 0; updateControls(); render();
   }
-  function latestEvent(s) { return s.other ? s.other.observations.pair : s.sim.observations.walls[active === 'heat' ? 'left' : 'right']; }
+  function latestEvent(s) { return s.key === 'comparison' ? s.sim.observations.pair : s.sim.observations.walls[active === 'heat' ? 'left' : 'right']; }
   function capture() {
     const s = session(); s.zoom = true; $('zoomEnabled').checked = true;
     s.seek = { from: s.sim.time, deadline: s.sim.time + 10 }; accumulator = 0;
@@ -208,7 +210,7 @@
     $('tourSpeed').textContent=v.phase==='search' ? 'Préparation' : v.phase==='compare' ? 'Arrêt sur image · 2,5 s' : 'Lecture ×'+format(v.rate,3);
     let caption=v.phase==='search' ? 'Un choc à venir est repéré sans modifier les particules.' : v.phase==='approach' ? tour.kind==='work' ? 'Le piston se déplace devant un repère fixe du laboratoire. Suivez la particule entourée jusqu’au choc.' : 'Suivez la particule entourée. La caméra se rapproche de son point de contact.' : v.phase==='return' ? 'La caméra recule ; le temps retrouve progressivement sa vitesse normale.' : '';
     if(v.phase==='compare'&&v.event) caption='V sortante si fixe : '+U.text('velocity', G.stationaryReflection(v.event).speed)+' ; si mobile : '+U.text('velocity', Math.hypot(v.event.after.vx,v.event.after.vy))+'. Le piston mobile '+(v.event.work>0?'accélère':'ralentit')+' la particule. Reprise automatique dans un instant.';
-    if(!caption&&v.event) caption=tour.kind==='pressure' ? 'La particule rebondit et transmet une impulsion J = '+U.text('momentum', v.event.impulse)+' au piston. Cette poussée contribue à la pression.'
+    if(!caption&&v.event) caption=tour.kind==='pressure' ? 'La particule rebondit : J = m(vₓ avant − vₓ après) = '+U.text('momentum', v.event.impulse)+' au piston. Bleu et vert : quantités de mouvement ; orange : leur différence.'
       : tour.kind==='heat' ? (v.event.heat>0?'La paroi donne de l’énergie à la particule.':'La particule cède de l’énergie à la paroi.')+' δQ reçu par le gaz = '+U.text('energy', v.event.heat, 3)+'.'
       : (v.event.work>0?'Le piston communique de l’énergie à la particule.':'La particule communique de l’énergie au piston.')+' δW reçu par le gaz = '+U.text('energy', v.event.work, 3)+'.';
     if($('tourCaption').textContent!==caption)$('tourCaption').textContent=caption;
@@ -227,13 +229,13 @@
           series.push({ color, dashed: groupIndex > 0 || key === 'volume', points: rows.map(r => ({ x: r.time, y: (key === 'pressure' ? pressure(r) ?? NaN : r[key]) / base })) });
       }
       yLabel = 'Rapports à l’état initial'; xRange = [startTime, Math.max(startTime + 5, s.sim.time)];
-      legend = '<span style="--color:#238c79">P / P₀</span><span style="--color:#477dc6">V / V₀</span><span style="--color:#cb8640">T / T₀</span>' + (s.other ? '<small>P et T : plein ponctuel, pointillé disques</small>' : '');
+      legend = '<span style="--color:#238c79">P / P₀</span><span style="--color:#477dc6">V / V₀</span><span style="--color:#cb8640">T / T₀</span>' + (s.other ? '<small>P et T : plein de disques, pointillé disques</small>' : '');
       hint = 'P, V et T sont ramenés à leur valeur initiale pour partager le même axe. P₀ = nRT₀/V₀ est la référence idéale ; P est mesurée aux collisions.';
     } else if (s.chart === 'ratio') {
       series = groups.map(group => ({ color: group.color, points: group.rows.filter(r => r.time >= startTime).map(r => ({ x: r.time, y: ratio(r) ?? NaN })) }));
       xRange = [startTime, Math.max(startTime + 5, s.sim.time)]; yLabel = 'PV / (nRT)';
       series.unshift({ color: '#8c9eaa', dashed: true, points: xRange.map(x => ({ x, y: 1 })) });
-      legend = '<span style="--color:#287db4">' + (s.other ? 'Gaz ponctuel' : 'PV/(nRT) mesuré') + '</span>' + (s.other ? '<span style="--color:#bd843b">Disques durs</span>' : '') + '<span style="--color:#8c9eaa">Référence idéale : 1</span>';
+      legend = '<span style="--color:#287db4">' + (s.other ? 'Disques durs' : 'PV/(nRT) mesuré') + '</span>' + (s.other ? '<span style="--color:#bd843b">Disques durs</span>' : '') + '<span style="--color:#8c9eaa">Référence idéale : 1</span>';
       hint = 'À l’équilibre idéal, PV/(nRT) = 1. La pression est lissée sur 0,23 ms : transitoires, anisotropie et fluctuations peuvent écarter la mesure de cette référence.';
     } else if (s.chart === 'log') {
       const fit = GasAnalysis.logarithmicFit(primary, { runId: s.run?.id ?? 0, legId: 0, pressureKey: s.source === 'piston' ? 'pistonPressure' : 'pressure' });
@@ -250,7 +252,7 @@
       series = groups.map(group => ({ color: group.color, scatter: s.chart === 'pvt', arrows: s.chart !== 'pvt', points: group.rows.flatMap((row, i, rows) => i && row.freeExpansion && Math.abs(row.time - rows[i - 1].time) < 1e-9 && row.volume !== rows[i - 1].volume ? [{ x: NaN, y: NaN }, convert(row)] : [convert(row)]) }));
       xRange = G.dataRange(series.flatMap(line => line.points.map(p => p.x)), s.chart === 'pv' ? [s.initial.volume * .8, s.initial.volume * 1.2] : [s.initial.temperature * .8, s.initial.temperature * 1.2]);
       if (s.chart === 'pvt') series.unshift({ color: '#8c9eaa', dashed: true, points: xRange.map(x => ({ x, y: N * x })) });
-      legend = '<span style="--color:#287db4">' + (s.other ? 'Ponctuel' : 'Mesures') + '</span>' + (s.other ? '<span style="--color:#bd843b">Disques durs</span>' : '');
+      legend = '<span style="--color:#287db4">' + (s.other ? 'Disques durs' : 'Mesures') + '</span>' + (s.other ? '<span style="--color:#bd843b">Disques durs</span>' : '');
       hint = s.run?.free ? 'Une ouverture dans le vide est un saut de volume sans travail. Aucun segment ne relie ce saut dans le diagramme.' : s.chart === 'pv' ? 'Le travail reçu correspond à −∫P au piston dV. L’intégrale d’une pression lissée n’est qu’une estimation du travail réel aux chocs.' : s.chart === 'pvt' ? 'La droite PV = nRT est une référence idéale, indépendante de la pression mesurée.' : 'Les aires des diagrammes P–T et V–T ne représentent pas directement un travail.';
     }
     yRange = G.dataRange(series.flatMap(line => line.points.map(p => p.y)), s.chart === 'ratio' ? [.8,1.2] : [0,1.5], s.chart !== 'log');
@@ -288,9 +290,9 @@
     $('secondPressure').textContent = other ? 'Disques : ' + U.text('pressure', pressure(other)) : 'Fenêtre ' + U.text('time', m.measurementDuration);
     $('secondTemperature').textContent = other ? 'Disques : ' + U.text('temperature', other.temperature) : 'Modèle 2D : E = nRT';
     $('secondRatio').textContent = other ? 'Disques : ' + format(ratio(other)) : 'Référence idéale : 1';
-    $('modelBadge').textContent = other ? '1 000 + 1 000 particules' : s.model === 'ideal' ? 'Gaz ponctuel · N = 1 000' : 'Disques durs · N = 1 000';
+    $('modelBadge').textContent = other ? '1 000 + 1 000 particules' : s.model === 'ideal' ? 'Disques durs · N = 1 000' : 'Disques durs · N = 1 000';
     $('work').textContent = U.text('energy', m.pressureWork, 3); $('heat').textContent = U.text('energy', m.heat, 3); $('deltaEnergy').textContent = U.text('energy', m.energy - s.initial.energy, 3);
-    $('balance').textContent = (other ? 'Bilan du gaz ponctuel · ' : '') + (Math.abs(m.balancePressureError) < 1e-7 ? 'ΔE − W − Q ≈ 0' : 'Écart : ' + (m.balancePressureError * U.scales.energy).toExponential(2) + ' J');
+    $('balance').textContent = (other ? 'Bilan du gaz de disques · ' : '') + (Math.abs(m.balancePressureError) < 1e-7 ? 'ΔE − W − Q ≈ 0' : 'Écart : ' + (m.balancePressureError * U.scales.energy).toExponential(2) + ' J');
     $('outcome').textContent = 'Mesures : T/T₀ = ' + format(m.temperature / s.initial.temperature) + ' ; V/V₀ = ' + format(m.volume / s.initial.volume) + '. ' + (s.run ? 'Les valeurs exactes restent affichées au-dessus.' : 'Faites une prédiction avant de lancer.');
     const p = m.pressureByWall.right;
     const gauge = Math.min(1, (p ?? 0) / (4 * s.initial.pressureIdeal));
@@ -304,7 +306,7 @@
       $('collisionImpulse').textContent = U.text('momentum', event.impulse); $('collisionWallSpeed').textContent = U.text('velocity', event.wallVelocity);
       $('collisionWork').textContent = U.text('energy', event.work, 3); $('collisionBefore').textContent = U.text('energy', event.energyBefore); $('collisionAfter').textContent = U.text('energy', event.energyAfter); $('collisionHeat').textContent = U.text('energy', event.heat, 3);
       $('heatDirection').textContent = event.heat > 0 ? 'Paroi → gaz' : event.heat < 0 ? 'Gaz → paroi' : 'Aucun transfert';
-      $('pressureExplanation').textContent = 'Ce choc apporte une impulsion J = ' + U.text('momentum', event.impulse) + ' au piston. La jauge additionne les impulsions de tous les chocs sur la fenêtre de mesure.';
+      $('pressureExplanation').textContent = 'J = m(vₓ avant − vₓ après) = ' + U.text('momentum', event.impulse) + ' au piston : c’est la quantité de mouvement transmise. La jauge additionne les impulsions de tous les chocs sur la fenêtre de mesure.';
       $('heatExplanation').textContent = 'Paroi immobile : δW = 0 et δQ = Ec après − Ec avant = ' + U.text('energy', event.heat, 3) + '. Chaque choc peut donner ou reprendre de l’énergie ; c’est l’échange moyen qui réchauffe ou refroidit le gaz.';
     } else if (!event) {
       for (const id of ['collisionImpulse','collisionWallSpeed','collisionWork','collisionBefore','collisionAfter','collisionHeat']) $(id).textContent = '—';
@@ -327,7 +329,10 @@
       : event?.kind === 'wall' && event.before.vx <= 0 ? 'Le piston rattrape ici une particule qui s’éloigne : un piston immobile ne produirait pas ce choc.'
       : 'Le zoom reste fixe dans le laboratoire. Après le choc, comparez le rebond réel au rebond hypothétique sur un piston immobile.';
     $('heatFlux').textContent = 'Flux moyen à gauche : ' + U.text('flux', m.heatFluxByWall.left);
-    $('idealRatio').textContent = format(ratio(m)); $('diskRatio').textContent = other ? format(ratio(other)) : '—';
+    $('diskRatio').textContent = format(ratio(m));
+    $('recordRadius').disabled = active !== 'comparison' || m.time < 4;
+    $('radiusStatus').textContent = m.time < 4 ? 'Laissez les collisions redistribuer les vitesses avant de relever la mesure.' : 'Relevé sur la fenêtre de pression courante : répétez pour apprécier les fluctuations.';
+    $('radiusRecords').innerHTML = s.radiusRecords.map(r => '<li>r = ' + format(r.radius * U.scales.length * 1000) + ' mm · PV/(nRT) = ' + format(r.ratio) + ' · T = ' + U.text('temperature',r.temperature) + ' · t = ' + U.text('time',r.time) + ' · ' + (r.source === 'mean' ? 'toutes les parois' : 'piston') + '</li>').join('');
     $('pairCount').textContent = format(other?.pairCollisions ?? m.pairCollisions,0);
     $('packingFraction').textContent = 'Surface des disques : ' + format((other?.packingFraction ?? m.packingFraction) * 100,1) + ' %';
     $('directionTemperatures').textContent = 'Tₓ = ' + U.text('temperature', m.temperatureX) + ' ; Tᵧ = ' + U.text('temperature', m.temperatureY) + (other ? ' · Disques : Tₓ = ' + U.text('temperature', other.temperatureX) + ' ; Tᵧ = ' + U.text('temperature', other.temperatureY) : '');
@@ -341,7 +346,7 @@
       G.chamber($('idealChamber'), s.sim, { ...opts, focus: null, maxWidth });
       G.chamber($('diskChamber'), s.other, { ...opts, maxWidth });
     } else G.chamber($('chamber'), s.sim, opts);
-    if (s.zoom && s.other) G.collision($('collisionZoom'), s.focus, { kind: active, pulse: Math.max(0, 1 - (s.sim.time - (s.focus?.time ?? -1)) / .35) });
+    if (s.zoom && active === 'comparison') G.collision($('collisionZoom'), s.focus, { kind: active, pulse: Math.max(0, 1 - (s.sim.time - (s.focus?.time ?? -1)) / .35) });
   }
   function drawChart() {
     const data = chartData(); G.plot($('chart'), data);
@@ -351,7 +356,7 @@
     if ($('advanced').open) {
       const s = session(), current = snapshots(s.sim), reference = s.other ? snapshots(s.other) : s.initialParticles;
       G.histogram($('speedHistogram'), current.speeds.map(v => U.value('velocity',v)), reference.speeds.map(v => U.value('velocity',v)), 'v (m/s)'); G.histogram($('energyHistogram'), current.energies.map(v => U.value('energy',v)), reference.energies.map(v => U.value('energy',v)), 'E par marqueur (J)');
-      $('distributionLegend').textContent = s.other ? 'Barres : gaz ponctuel · pointillés : disques durs. Densités normalisées, mêmes classes.' : 'Barres : état actuel · pointillés : état initial. Densités normalisées, mêmes classes.';
+      $('distributionLegend').textContent = s.other ? 'Barres : gaz de disques · pointillés : disques durs. Densités normalisées, mêmes classes.' : 'Barres : état actuel · pointillés : état initial. Densités normalisées, mêmes classes.';
     }
   }
   function render() { readings(); draw(); drawChart(); }
@@ -407,7 +412,21 @@
   $('vectors').addEventListener('input', () => { session().vectors = $('vectors').checked; draw(); });
   $('zoomEnabled').addEventListener('input', () => { session().zoom = $('zoomEnabled').checked; updateControls(); draw(); });
   for (const id of ['thermalMode','bathTemperature','accommodation','allWalls']) $(id).addEventListener('input', applyThermal);
-  $('particleModel').addEventListener('input', () => { session().model = $('particleModel').value; reset(); });
+  $('particleRadius').addEventListener('input', () => {
+    $('radiusValue').value = format(+$('particleRadius').value / 1000 * U.scales.length * 1000) + ' mm';
+  });
+  $('applyRadius').addEventListener('click', () => {
+    session().radius = Math.max(.005, Math.min(.07, +$('particleRadius').value / 1000)); reset();
+    notify('Nouveau rayon appliqué : le gaz redémarre au même volume et à 300 K par défaut. Les relevés précédents sont conservés.');
+  });
+  $('recordRadius').addEventListener('click', () => {
+    const s = session(), m = s.sim.metrics;
+    if (active !== 'comparison' || m.time < 4 || ratio(m) == null) return;
+    s.radiusRecords.push({radius:s.radius, ratio:ratio(m), time:m.time, temperature:m.temperature, source:s.source});
+    if (s.radiusRecords.length > 30) s.radiusRecords.shift();
+    render(); notify('Relevé conservé. Changez le rayon puis appliquez-le pour comparer.');
+  });
+  $('clearRadiusRecords').addEventListener('click', () => { session().radiusRecords = []; render(); });
   $('initialTemperature').addEventListener('input', () => { $('initialTemperatureValue').value = U.text('temperature', +$('initialTemperature').value / 200); });
   $('applyInitial').addEventListener('click', () => { session().initialTemperature = +$('initialTemperature').value / 200; reset(); });
   $('pressureSource').addEventListener('input', () => { session().source = $('pressureSource').value; render(); });
@@ -417,9 +436,9 @@
   $('advanced').addEventListener('toggle',drawChart);
   $('export').addEventListener('click', () => {
     const s = session(); sample(s);
-    const headings = ['experience','modele','N_marqueurs','quantite_mol','temps_ms','volume_L','P_mesuree_bar','source_P','P_piston_bar','P_moyenne_bar','T_K','Tx_K','Ty_K','PV_sur_nRT','energie_J','travail_recu_J','chaleur_recue_J','delta_E_J','ecart_bilan_J','vitesse_piston_m_s','chocs_mutuels','fraction_surface','mode_thermique','temperature_thermostat_K','parois_thermiques','fraction_chocs_thermalises','chaleur_absorbee_J','chaleur_cedee_J','puissance_thermique_W','contacts_thermiques_multiples','trajet_id','en_mouvement','detente_libre'];
+    const headings = ['experience','modele','N_marqueurs','rayon_mm','quantite_mol','temps_ms','volume_L','P_mesuree_bar','source_P','P_piston_bar','P_moyenne_bar','T_K','Tx_K','Ty_K','PV_sur_nRT','energie_J','travail_recu_J','chaleur_recue_J','delta_E_J','ecart_bilan_J','vitesse_piston_m_s','chocs_mutuels','fraction_surface','mode_thermique','temperature_thermostat_K','parois_thermiques','fraction_chocs_thermalises','chaleur_absorbee_J','chaleur_cedee_J','puissance_thermique_W','contacts_thermiques_multiples','trajet_id','en_mouvement','detente_libre'];
     const number = v => v == null || !Number.isFinite(v) ? '' : v.toPrecision(10).replace('.',',');
-    const rows = s.history.flatMap(row => [row, ...(row.other ? [row.other] : [])].map(m => [active,m.particleModel,m.count,number(U.scales.amount),number(U.value('time', m.time)),number(U.value('volume', m.volume)),number(U.value('pressure', pressure(m))),s.source,number(U.value('pressure', m.pressureByWall.right)),number(U.value('pressure', m.pressure)),number(U.value('temperature', m.temperature)),number(U.value('temperature', m.temperatureX)),number(U.value('temperature', m.temperatureY)),number(ratio(m)),number(U.value('energy', m.energy)),number(U.value('energy', m.pressureWork)),number(U.value('energy', m.heat)),number(U.value('energy', m.energy - s.initial.energy)),number(U.value('energy', m.balancePressureError)),number(U.value('velocity', m.pistonVelocity)),m.pairCollisions,number(m.packingFraction),m.thermalMode,number(U.value('temperature', m.bathTemperature)),m.thermalWalls.join('|'),number(m.accommodation),number(U.value('energy', m.heatIn)),number(U.value('energy', m.heatOut)),number(U.value('power', m.heatPower)),m.thermalContactFallbacks,row.runId,+row.moving,+row.freeExpansion].join(';')));
+    const rows = s.history.flatMap(row => [row, ...(row.other ? [row.other] : [])].map(m => [active,m.particleModel,m.count,number(m.particleRadius * U.scales.length * 1000),number(U.scales.amount),number(U.value('time', m.time)),number(U.value('volume', m.volume)),number(U.value('pressure', pressure(m))),s.source,number(U.value('pressure', m.pressureByWall.right)),number(U.value('pressure', m.pressure)),number(U.value('temperature', m.temperature)),number(U.value('temperature', m.temperatureX)),number(U.value('temperature', m.temperatureY)),number(ratio(m)),number(U.value('energy', m.energy)),number(U.value('energy', m.pressureWork)),number(U.value('energy', m.heat)),number(U.value('energy', m.energy - s.initial.energy)),number(U.value('energy', m.balancePressureError)),number(U.value('velocity', m.pistonVelocity)),m.pairCollisions,number(m.packingFraction),m.thermalMode,number(U.value('temperature', m.bathTemperature)),m.thermalWalls.join('|'),number(m.accommodation),number(U.value('energy', m.heatIn)),number(U.value('energy', m.heatOut)),number(U.value('power', m.heatPower)),m.thermalContactFallbacks,row.runId,+row.moving,+row.freeExpansion].join(';')));
     const url = URL.createObjectURL(new Blob(['\uFEFF'+headings.join(';')+'\r\n'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'}));
     const a = document.createElement('a'); a.href=url; a.download='gaz-2d-'+active+'.csv'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
     notify('Mesures exportées pour cette expérience'+(s.other ? ', avec une ligne par gaz et par instant.' : '.'));

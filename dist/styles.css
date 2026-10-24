@@ -1707,3 +1707,9 @@ input[aria-invalid="true"] {
 
 /* Keep the expanded comparison value inside the panel with physical units. */
 #workLesson[data-compare="true"] .fixed-speed b { transform-origin:right center; }
+
+#radiusControls { margin: 8px 18px 14px; width: auto; max-width: none; }
+#radiusControls label { display: flex; justify-content: space-between; gap: 12px; }
+#radiusControls input { width: 100%; margin: 10px 0; }
+#radiusControls small { display: block; color: #647985; margin-top: 8px; font-size: 10px; }
+#radiusRecords { max-height: 105px; overflow: auto; padding-left: 18px; }

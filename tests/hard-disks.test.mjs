@@ -91,3 +91,14 @@ test('changer de modèle se fait lors d’un nouvel état, et les resets le cons
   sim.reset({particleModel:'ideal'});assert.equal(sim.radius,0);
   assert.throws(()=>sim.reset({particleModel:'unknown'}));
 });
+
+test('variable disk radii preserve non-overlap, energy and the chosen radius in forecasts',()=>{
+  for(const radius of [.005,.04,.07]) {
+    const sim=new GasSimulation({count:1000,width:11,particleModel:'hard-disks',particleRadius:radius,seed:314159});
+    validGeometry(sim);const energy=sim.metrics.energy;
+    run(sim,.1);validGeometry(sim);close(sim.metrics.energy,energy,1e-7);
+    close(sim.metrics.packingFraction,1000*Math.PI*radius**2/82.5);
+    assert.equal(sim.fork().radius,radius);assert.ok(sim.metrics.pairCollisions>0);
+  }
+  for(const particleRadius of [0,-.01,.071,NaN,Infinity]) assert.throws(()=>new GasSimulation({count:1000,particleModel:'hard-disks',particleRadius}),RangeError);
+});

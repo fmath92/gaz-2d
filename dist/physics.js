@@ -72,7 +72,9 @@
       if (!['ideal', 'hard-disks'].includes(model)) throw new RangeError('Modèle de particules inconnu.');
       if (model === 'hard-disks' && this.height < 1) throw new RangeError('Les disques durs nécessitent une hauteur d’au moins 1.');
       this.particleModel = model;
-      this.radius = model === 'hard-disks' ? 0.04 : 0;
+      const radius = options.particleRadius ?? 0.04;
+      if (model === 'hard-disks' && (!Number.isFinite(radius) || radius < 0.005 || radius > 0.07)) throw new RangeError('Le rayon doit être compris entre 0,005 et 0,07.');
+      this.radius = model === 'hard-disks' ? radius : 0;
       this.observeCollisions = options.observeCollisions ?? this.observeCollisions ?? false;
       this.observations = { sequence: 0, walls: {}, pair: null };
       this.setThermal(options.thermal ?? this.thermal ?? {});
