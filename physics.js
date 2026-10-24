@@ -39,7 +39,7 @@
     reset(options = {}) {
       const count = options.count ?? 180;
       const temperature = options.temperature ?? 1.5;
-      if (!Number.isInteger(count) || count < 1 || count > 2000) throw new RangeError('Le nombre de particules doit être compris entre 1 et 2000.');
+      if (!Number.isInteger(count) || count < 10 || count > 1000) throw new RangeError('Le nombre de particules doit être un entier compris entre 10 et 1000.');
       finite(temperature, 'La température');
       if (temperature <= 0) throw new RangeError('La température doit être positive.');
       this.width = checkWidth(options.width ?? 11);
@@ -60,6 +60,7 @@
       }
       this.time = 0;
       this.work = 0;
+      this.pressureWork = 0;
       this.initialEnergy = count * temperature;
       this.motion = null;
       this._pistonVelocity = 0;
@@ -95,8 +96,8 @@
       const phase = motion.type === 'oscillate' ? q : Math.min(1, q);
       return motion.startWidth + (motion.targetWidth - motion.startWidth) * (1 - Math.cos(Math.PI * phase)) / 2;
     }
-    _record(wall, impulse, time) {
-      this._events.push({ wall, impulse, time });
+    _record(wall, impulse, time, work = 0) {
+      this._events.push({ wall, impulse, time, work });
       this._collisions++;
     }
     _advanceParticle(p, dt, oldWidth, pistonVelocity) {
@@ -127,7 +128,11 @@
           const oldVelocity = p.vx;
           p.vx = 2 * pistonVelocity - p.vx;
           this.work += 0.5 * (p.vx * p.vx - oldVelocity * oldVelocity);
-          this._record('right', impulse, collisionTime);
+          // Wpression = -∫ Ppiston dV = -Σ J u pour une force impulsionnelle.
+          // Le calcul est indépendant de la différence d'énergie ci-dessus.
+          const pressureWork = -impulse * pistonVelocity;
+          this.pressureWork += pressureWork;
+          this._record('right', impulse, collisionTime, pressureWork);
         }
         if (Math.abs(hit - bottomTime) < EPS) {
           p.y = 0;
@@ -193,7 +198,12 @@
       const duration = Math.min(this.time, this.measurementWindow);
       const cutoff = this.time - duration;
       const impulses = { left: 0, right: 0, top: 0, bottom: 0 };
-      for (const event of this._events) if (event.time >= cutoff - EPS) impulses[event.wall] += event.impulse;
+      let windowWork = 0;
+      for (const event of this._events) {
+        if (event.time < cutoff - EPS) continue;
+        impulses[event.wall] += event.impulse;
+        windowWork += event.work;
+      }
       let widthIntegral = 0;
       for (const s of this._segments) {
         const start = Math.max(cutoff, s.start);
@@ -217,6 +227,10 @@
         pressure: perimeterIntegral > EPS ? sumImpulse / perimeterIntegral : null,
         pressureIdeal: energy / (this.width * this.height), pressureByWall,
         work: this.work, balanceError: energy - this.initialEnergy - this.work,
+        pressureWork: this.pressureWork,
+        pressurePower: duration > EPS ? windowWork / duration : null,
+        pressureWorkError: this.pressureWork - this.work,
+        balancePressureError: energy - this.initialEnergy - this.pressureWork,
         measurementDuration: duration, collisions: this._collisions,
         pistonVelocity: this._pistonVelocity
       };
