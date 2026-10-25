@@ -1,3 +1,8 @@
+## 0.20.7 — Le calcul de température dans son encadré
+
+- Suppression du popup de bilan « Des vitesses à la température » ; le tutoriel surligne directement le retour à la simulation.
+- Les explications sur les normes, les masses identiques, la somme des énergies et T = E/(nR) sont intégrées au panneau du calcul.
+
 ## 0.20.6 — Cinq rayons, cinq relevés
 
 - Le curseur de rayon applique immédiatement la nouvelle taille aux simulations, conserve les relevés et redémarre la fenêtre de mesure.

@@ -2,7 +2,7 @@
 
 **[Ouvrir le démonstrateur](https://fmath92.github.io/gaz-2d/)** · [Code source](https://github.com/fmath92/gaz-2d)
 
-Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.20.6 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
+Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.20.7 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
 
 ## La visite
 
@@ -25,7 +25,7 @@ Chaque onglet garde son état, ses réglages, sa pause et ses mesures jusqu’au
 
 Le parcours comporte 36 étapes, avec une zone mise en lumière et des transitions animées. Il utilise les véritables contrôles du simulateur : regarder les séquences de pression et de température, réaliser deux détentes de Joule–Gay–Lussac, répondre aux comparaisons de vitesse, déplacer le piston, lancer des cycles, choisir cinq rayons distincts, enregistrer un relevé par rayon, comparer PV/(nRT) au rayon, lire les distributions et découvrir les exports. Les actions et les résultats réellement obtenus sont signalés, sans verrouiller la progression : **Continuer reste disponible dans les panneaux explicatifs**, même pour avancer sans faire une manipulation. Une fois une étape réalisée, elle reste validée.
 
-Les simples consignes de navigation, de lancement et de retour deviennent des boutons surlignés sans popup ; l’action fait avancer automatiquement la visite. Le bouton d’en-tête « Quitter la visite » et Échap restent disponibles. Les animations de pression et de température affichent le commentaire du guide seulement au bilan.
+Les simples consignes de navigation, de lancement et de retour deviennent des boutons surlignés sans popup ; l’action fait avancer automatiquement la visite. Le bouton d’en-tête « Quitter la visite » et Échap restent disponibles. L’animation de pression affiche le commentaire du guide seulement au bilan. Pour la température, toutes les explications restent dans l’encadré de calcul à droite de la simulation ; aucun popup ne s’ajoute, même au bilan.
 
 Le voile gris disparaît pendant les manipulations et les animations à observer ; le cadre coloré continue d’indiquer la zone utile. Le voile revient lorsque l’étape est réalisée, après le relâchement de la souris, du doigt ou de la touche si l’on règle un curseur. Les chapitres sont accessibles directement, et **Quitter** ou Échap ferme le tutoriel. Les expériences et les réglages restent conservés. Les réinitialisations et les exports ne se font que lorsque l’utilisateur clique sur les commandes correspondantes. La navigation au clavier est disponible ; l’invitation retient le focus, et la préférence de réduction des animations supprime les transitions décoratives. Le tutoriel ne modifie pas les trajectoires physiques.
 

@@ -555,7 +555,7 @@ test('the tutorial follows a paused temperature animation through its real final
  lab.click('illustrateTemperature');lab.advance(5);assert.equal(lab.analysis.tutorial.ready,false);assert.equal(lab.analysis.tutorial.interacting,true);assert.equal(lab.analysis.tutorial.quiet,true);
  lab.click('pause');lab.advance(.15);assert.equal(lab.analysis.tutorial.target,'nextTemperatureStage');
  for(let i=0;i<6&&lab.analysis.lesson.phase!=='done';i++)lab.click('nextTemperatureStage');
- lab.advance(.15);assert.equal(lab.analysis.tutorial.ready,true);assert.equal(lab.analysis.tutorial.quiet,false);
+ lab.advance(.15);assert.equal(lab.analysis.tutorial.index,5);assert.equal(lab.analysis.tutorial.quiet,true);assert.match(lab.nodes.get('storyText').textContent,/modèle 2D/);assert.match(lab.nodes.get('storyFormula').textContent,/T = E/);
  // The real Return button also advances the visit without an extra Continue click.
  lab.click('illustrateTemperature');lab.advance(4.5);assert.equal(lab.analysis.lesson,null);assert.equal(lab.analysis.tutorial.index,6);assert.equal(lab.analysis.tutorial.quiet,true);
  lab.click('tutorialQuit');assert.equal(lab.analysis.tutorial.active,false);
