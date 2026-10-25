@@ -1,4 +1,4 @@
-/* Optional guided visit. Gates observe real UI actions and simulation state;
+/* Optional guided visit. Progress observes real UI actions and simulation state;
  * the guide never fabricates a measurement or changes particle trajectories. */
 (function(root){
   'use strict';
@@ -45,18 +45,20 @@
     {title:'À vous de mener l’enquête',target:'openTutorial',text:'Vous connaissez les commandes principales. Variez un paramètre à la fois, comparez vos prédictions aux mesures et revenez sur les expériences avec un autre rayon. La visite reste accessible ici.'}
   ];
   function create({getState}){
-    const $=id=>document.getElementById(id),counts={},guide={welcoming:true,active:false,index:0,baseline:{},target:null,completed:false};
+    const $=id=>document.getElementById(id),counts={},guide={welcoming:true,active:false,index:0,baseline:{},target:null,completed:false,interacting:false};
+    const pointers=new Set(),keys=new Set();
     const resolve=(value,state)=>typeof value==='function'?value(state):value;
+    const setText=(id,text)=>{if($(id).textContent!==text)$(id).textContent=text;};
     function record(id,type){const key=id+':'+type;$(id).addEventListener(type,()=>{counts[key]=(counts[key]??0)+1;if(guide.active)update();});}
     for(const key of new Set(steps.flatMap(s=>s.event?[s.event]:[]))){const[id,type]=key.split(':');record(id,type);}
     function modal(open){guide.welcoming=open;$('tutorialWelcome').hidden=!open;$('appHeader').inert=$('appMain').inert=open;}
-    function finish(){guide.active=false;guide.target=null;modal(false);$('tutorialCard').hidden=$('tutorialSpotlight').hidden=true;document.body?.classList.toggle('tutorial-running',false);$('openTutorial').focus();}
+    function finish(){guide.active=false;guide.target=null;guide.interacting=false;pointers.clear();keys.clear();modal(false);$('tutorialCard').hidden=$('tutorialSpotlight').hidden=true;document.body?.classList.toggle('tutorial-running',false);$('openTutorial').focus();}
     function enter(index){
       if(index>=steps.length){finish();return;}
       guide.index=index;guide.completed=false;guide.baseline={...counts};guide.target=null;guide.active=true;modal(false);
       $('tutorialCard').hidden=false;document.body?.classList.toggle('tutorial-running',true);
       $('tutorialChapter').value=String([0,4,6,9,15,20,24,32].filter(i=>i<=index).at(-1));
-      $('tutorialTitle').textContent=steps[index].title;$('tutorialTitle').focus({preventScroll:true});update();
+      setText('tutorialTitle',steps[index].title);$('tutorialTitle').focus({preventScroll:true});update();
     }
     function ready(state){if(guide.completed)return true;const step=steps[guide.index];return !!((!step.experiment||state.experiment===step.experiment)&&(!step.event||(counts[step.event]??0)>(guide.baseline[step.event]??0))&&(!step.done||step.done(state)));}
     function update(){
@@ -65,14 +67,21 @@
       let id=wrong?'tab-'+step.experiment:resolve(step.target,s);
       const closed=$(id).closest?.('details:not([open])');if(closed?.id==='advanced')id='advancedToggle';
       const el=$(id),ok=!wrong&&ready(s);if(ok)guide.completed=true;
+      // Keep the laboratory unobscured until the action/observation is finished.
+      // A slider gesture must finish before the veil returns, even if its first
+      // input event has already validated the step.
+      guide.interacting=!ok||pointers.size>0||keys.size>0;
+      $('tutorialSpotlight').classList.toggle('interaction',guide.interacting);
       $('tutorialCard').classList.toggle('scene-guide',!!step.scene);
-      $('tutorialTitle').textContent=step.title;
-      $('tutorialText').textContent=wrong?'Revenez à l’onglet indiqué pour poursuivre cette étape. Vos autres expériences conservent leur état.':resolve(step.text,s);
-      $('tutorialProgress').textContent='VISITE · '+(guide.index+1)+' / '+steps.length;
-      $('tutorialFill').style.width=((guide.index+1)/steps.length*100)+'%';
-      $('tutorialNext').disabled=!ok;$('tutorialNext').textContent=guide.index===steps.length-1?'Terminer la visite ✓':'Continuer →';
-      const message=ok?(step.done||step.event?'Étape réalisée ✓ · prenez le temps de lire.':'À observer · continuez quand vous le souhaitez.'):step.waiting?.(s)?'Observation en cours… Vous pouvez patienter ou passer cette étape.':'À vous de jouer dans la zone encadrée. Vous pouvez aussi passer cette étape.';
-      if($('tutorialStatus').textContent!==message)$('tutorialStatus').textContent=message;
+      setText('tutorialTitle',step.title);
+      setText('tutorialText',wrong?'Revenez à l’onglet indiqué pour poursuivre cette étape. Vos autres expériences conservent leur état.':resolve(step.text,s));
+      setText('tutorialProgress','VISITE · '+(guide.index+1)+' / '+steps.length);
+      const progress=((guide.index+1)/steps.length*100)+'%';
+      if($('tutorialFill').style.width!==progress)$('tutorialFill').style.width=progress;
+      // Navigation is always available. Completion is feedback, not a lock.
+      setText('tutorialNext',guide.index===steps.length-1?'Terminer la visite ✓':'Continuer →');
+      const message=ok?(step.done||step.event?'Étape réalisée ✓ · prenez le temps de lire.':'À observer · continuez quand vous le souhaitez.'):step.waiting?.(s)?'Observation en cours… « Continuer » reste disponible à votre rythme.':'À vous de jouer dans la zone encadrée. « Continuer » reste disponible à votre rythme.';
+      setText('tutorialStatus',message);
       if(guide.target!==id){
         guide.target=id;
         // Keep both the cavity and its diagram visible during a desktop scene,
@@ -101,17 +110,25 @@
     }
     $('tutorialStart').addEventListener('click',()=>enter(0));$('tutorialDismiss').addEventListener('click',finish);
     $('openTutorial').addEventListener('click',()=>{if(guide.active)finish();modal(true);$('tutorialStart').focus();});
-    $('tutorialQuit').addEventListener('click',finish);$('tutorialSkip').addEventListener('click',()=>enter(guide.index+1));
-    $('tutorialNext').addEventListener('click',()=>{if(guide.active&&ready(getState()))enter(guide.index+1);});
+    $('tutorialQuit').addEventListener('click',finish);
+    $('tutorialNext').addEventListener('click',()=>{if(guide.active)enter(guide.index+1);});
     $('tutorialChapter').addEventListener('change',()=>enter(Number($('tutorialChapter').value)));
+    const inLab=target=>!!target?.closest?.('#appHeader, #appMain');
+    document.addEventListener('pointerdown',event=>{if(guide.active&&inLab(event.target)){pointers.add(event.pointerId);update();}},true);
+    const releasePointer=event=>{if(pointers.delete(event.pointerId))update();};
+    document.addEventListener('pointerup',releasePointer,true);document.addEventListener('pointercancel',releasePointer,true);
+    const adjustmentKeys=new Set(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown',' ','Enter']);
     document.addEventListener('keydown',event=>{
+      if(guide.active&&inLab(event.target)&&adjustmentKeys.has(event.key)){keys.add(event.key);update();}
       if(event.key==='Escape'&&(guide.welcoming||guide.active)){event.preventDefault();finish();}
       if(event.key==='Tab'&&guide.welcoming){event.preventDefault();(document.activeElement===$('tutorialStart')?$('tutorialDismiss'):$('tutorialStart')).focus();}
-    });
+    },true);
+    document.addEventListener('keyup',event=>{if(keys.delete(event.key))update();},true);
+    root.addEventListener?.('blur',()=>{pointers.clear();keys.clear();update();});
     root.addEventListener?.('resize',()=>{if(guide.active)position($(guide.target));});
     root.addEventListener?.('scroll',()=>{if(guide.active)position($(guide.target));},{passive:true});
     modal(true);$('tutorialStart').focus();
-    return {update,get welcoming(){return guide.welcoming;},get snapshot(){return {active:guide.active,welcoming:guide.welcoming,index:guide.index,total:steps.length,title:steps[guide.index].title,target:guide.target,ready:guide.active&&ready(getState())};}};
+    return {update,get welcoming(){return guide.welcoming;},get snapshot(){return {active:guide.active,welcoming:guide.welcoming,index:guide.index,total:steps.length,title:steps[guide.index].title,target:guide.target,ready:guide.active&&ready(getState()),interacting:guide.active&&guide.interacting};}};
   }
   root.GasTutorial={create,steps};
 })(typeof globalThis!=='undefined'?globalThis:window);

@@ -15,6 +15,7 @@ const app = readFileSync(new URL('../dist/app.js', import.meta.url), 'utf8');
 // animation loop and physics engine run unchanged, including all button handlers.
 function laboratory({welcome=false}={}) {
   const nodes = new Map();
+  const documentListeners=new Map(),textWrites=new Map();
   let pendingFrame, timestamp = 1000;
   const downloads = [], blobs = new Map(), histogramCalls = [];
   const context2d = new Proxy({}, { get: (o, key) => o[key] ?? (() => {}), set: (o, key, value) => (o[key] = value, true) });
@@ -30,6 +31,7 @@ function laboratory({welcome=false}={}) {
       classList: { toggle(name, force) { const on = force ?? !classes.has(name); if (on) classes.add(name); else classes.delete(name); return on; }, contains: name => classes.has(name) },
       setAttribute(name, value) { this.attributes[name] = String(value); },
       getAttribute(name) { return this.attributes[name] ?? null; },
+      closest(selector) { return selector==='#appHeader, #appMain'&&!/^tutorial/.test(attrs.id??'')?this:null; },
       addEventListener(name, listener) { if (!listeners.has(name)) listeners.set(name, []); listeners.get(name).push(listener); },
       dispatch(name, event = {}) { for (const listener of listeners.get(name) || []) listener({ target: this, type: name, ...event }); },
       click() { if (!this.disabled) { this.dispatch('click'); if (tag === 'a') downloads.push({ href: this.href, download: this.download, blob: blobs.get(this.href) }); } },
@@ -37,6 +39,8 @@ function laboratory({welcome=false}={}) {
       getContext: () => context2d,
       querySelector(selector) { if (selector === '[value="free"]') return freeOption; throw new Error('Unexpected selector ' + selector); }
     };
+    let textContent='';
+    Object.defineProperty(node,'textContent',{get:()=>textContent,set(value){textContent=value;textWrites.set(attrs.id,(textWrites.get(attrs.id)??0)+1);}});
     Object.defineProperty(node, 'value', {
       get() { return storedValue; },
       set(value) {
@@ -73,7 +77,7 @@ function laboratory({welcome=false}={}) {
       throw new Error('Unexpected selector ' + selector);
     },
     createElement: tag => element(tag),
-    addEventListener() {}
+    addEventListener(type,listener) { if(!documentListeners.has(type))documentListeners.set(type,[]);documentListeners.get(type).push(listener); }
   };
   const window = { devicePixelRatio: 1, addEventListener() {} };
   const scope = vm.createContext({ document, window, console, Blob, performance: { now: () => 0 },
@@ -100,7 +104,8 @@ function laboratory({welcome=false}={}) {
   function frame() { const callback = pendingFrame; pendingFrame = null; callback(timestamp); timestamp += 1000 / 60; }
   frame();
   return {
-    nodes, charts, freeOption, downloads, histogramCalls,
+    nodes, charts, freeOption, downloads, histogramCalls,textWrites,
+    documentEvent(type,event) { for(const listener of documentListeners.get(type)??[])listener({preventDefault(){},...event}); },
     get metrics() { return window.gaz2D.metrics; },
     get comparisonMetrics() { return window.gaz2D.comparisonMetrics; },
     get paused() { return window.gaz2D.paused; },
@@ -487,9 +492,9 @@ test('welcome is optional, freezes the film, and can be reopened without resetti
  lab.click('tutorialDismiss');assert.equal(lab.analysis.tutorial.active,false);
 });
 
-test('interactive guide gates actual actions, supports chapter jumps, skips and exit',()=>{
+test('interactive guide recognises actual actions and supports chapter jumps and exit',()=>{
  const lab=laboratory({welcome:true});lab.click('tutorialStart');assert.equal(lab.analysis.tutorial.index,0);lab.click('tutorialNext');
- assert.equal(lab.analysis.tutorial.target,'timeScale');assert.equal(lab.nodes.get('tutorialNext').disabled,true);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,1);
+ assert.equal(lab.analysis.tutorial.target,'timeScale');assert.equal(lab.nodes.get('tutorialNext').disabled,false);assert.equal(lab.analysis.tutorial.ready,false);
  lab.input('timeScale',.25);assert.equal(lab.analysis.tutorial.ready,true);lab.click('tutorialNext');lab.click('pause');lab.advance(.15);assert.equal(lab.analysis.tutorial.ready,true);
  lab.click('tutorialNext');lab.click('pause');lab.advance(.15);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,4);
  lab.nodes.get('tutorialChapter').value='9';lab.nodes.get('tutorialChapter').dispatch('change');assert.equal(lab.analysis.tutorial.target,'tab-free');
@@ -500,9 +505,48 @@ test('interactive guide gates actual actions, supports chapter jumps, skips and 
  lab.click('tutorialNext');lab.click('start');lab.advance(.2);assert.equal(lab.analysis.tutorial.ready,false);lab.input('timeScale',4);lab.advance(2.1);assert.equal(lab.analysis.tutorial.ready,true);
  lab.click('tutorialNext');lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,15);
  // Skipping all remaining stages never invents measurements or changes the experiment.
- const width=lab.metrics.width;while(lab.analysis.tutorial.active)lab.click('tutorialSkip');assert.equal(lab.metrics.width,width);
+ const width=lab.metrics.width;while(lab.analysis.tutorial.active)lab.click('tutorialNext');assert.equal(lab.metrics.width,width);
  assert.equal(lab.nodes.get('tutorialSpotlight').hidden,true);assert.equal(lab.nodes.get('tutorialCard').hidden,true);
  lab.click('openTutorial');lab.click('tutorialStart');lab.click('tutorialQuit');assert.equal(lab.analysis.tutorial.active,false);
+});
+
+test('Continue always advances once, even before an action or on another experiment',()=>{
+ const lab=laboratory({welcome:true});lab.click('tutorialStart');
+ for(let index=0;index<38;index++){
+  assert.equal(lab.analysis.tutorial.index,index);assert.equal(lab.nodes.get('tutorialNext').disabled,false);
+  lab.advance(.12);lab.click('tutorialNext');
+ }
+ assert.equal(lab.analysis.tutorial.active,false);assert.equal(lab.analysis.experiment,'pressure');
+ assert.equal(lab.analysis.lesson,null);assert.equal(lab.analysis.run,null);
+});
+
+test('the guide clears the veil for actions and waits for slider release before dimming',()=>{
+ const lab=laboratory({welcome:true}),spot=lab.nodes.get('tutorialSpotlight');lab.click('tutorialStart');
+ assert.equal(spot.classList.contains('interaction'),false);lab.click('tutorialNext');
+ assert.equal(spot.classList.contains('interaction'),true);
+ lab.input('timeScale',.25);assert.equal(lab.analysis.tutorial.ready,true);assert.equal(spot.classList.contains('interaction'),false);
+ lab.nodes.get('tutorialChapter').value='24';lab.nodes.get('tutorialChapter').dispatch('change');
+ lab.click('tab-comparison');lab.advance(.15);lab.click('tutorialNext');
+ const target=lab.nodes.get('particleRadius');
+ lab.documentEvent('pointerdown',{target,pointerId:1});lab.input('particleRadius',.6);
+ assert.equal(lab.analysis.tutorial.ready,true);assert.equal(spot.classList.contains('interaction'),true);
+ lab.advance(.3);assert.equal(spot.classList.contains('interaction'),true);
+ lab.documentEvent('pointerup',{target,pointerId:1});assert.equal(spot.classList.contains('interaction'),false);
+ lab.documentEvent('keydown',{target,key:'ArrowRight'});lab.input('particleRadius',.7);lab.advance(.3);
+ assert.equal(spot.classList.contains('interaction'),true);
+ lab.documentEvent('keyup',{target,key:'ArrowRight'});assert.equal(spot.classList.contains('interaction'),false);
+ lab.documentEvent('pointerdown',{target,pointerId:2});assert.equal(spot.classList.contains('interaction'),true);
+ lab.documentEvent('pointercancel',{target,pointerId:2});assert.equal(spot.classList.contains('interaction'),false);
+ lab.click('tutorialQuit');assert.equal(spot.hidden,true);
+});
+
+test('the enabled Continue button keeps its text node stable during simulation refreshes',()=>{
+ const lab=laboratory({welcome:true});lab.click('tutorialStart');
+ const writes=lab.textWrites.get('tutorialNext');
+ lab.advance(.5);assert.equal(lab.textWrites.get('tutorialNext'),writes);
+ lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,1);
+ lab.input('timeScale',.25);lab.advance(.5);assert.equal(lab.textWrites.get('tutorialNext'),writes);
+ lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,2);
 });
 
 test('Joule–Gay–Lussac has reference ticks and offers a fresh ratio replay after observation',()=>{

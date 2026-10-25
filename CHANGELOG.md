@@ -1,3 +1,10 @@
+## 0.20.1 — Une visite sans blocage
+
+- « Continuer » reste disponible à chaque étape, sans attendre obligatoirement une manipulation ou la fin d’une animation ; il remplace aussi « Passer cette étape ».
+- Le voile gris disparaît pendant l’action et l’observation, puis revient après validation de l’étape et relâchement du curseur.
+- Les textes du tutoriel sont mis à jour seulement lorsqu’ils changent, pour conserver des commandes stables pendant les rafraîchissements.
+- Vérifications de la navigation sur les 38 étapes, des gestes à la souris et au clavier et de la stabilité du bouton.
+
 ## 0.20.0 — Une visite guidée du laboratoire
 
 - Invitation facultative à l’arrivée ; parcours interactif de 38 étapes sur les vraies commandes, avec mise en lumière, progression, chapitres, étapes passables et sortie à tout moment.

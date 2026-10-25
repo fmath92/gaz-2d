@@ -1803,7 +1803,8 @@ input[aria-invalid="true"] {
 .welcome-card small { display:block; margin-top:20px; color:#657c85; line-height:1.5; }
 .welcome-route { background:#edf7f3; color:#22675c; padding:15px; margin:22px 0; border-radius:12px; font-size:13px; line-height:1.8; }
 .welcome-card .text-button { display:block; margin-top:14px; }
-.tutorial-spotlight { position:fixed; z-index:80; pointer-events:none; border:3px solid #21b19c; border-radius:12px; box-shadow:0 0 0 9999px #12364866,0 0 0 7px #78dccb66; transition:left .3s,top .3s,width .3s,height .3s; }
+.tutorial-spotlight { position:fixed; z-index:80; pointer-events:none; border:3px solid #21b19c; border-radius:12px; box-shadow:0 0 0 9999px #12364866,0 0 0 7px #78dccb66; transition:left .3s,top .3s,width .3s,height .3s,box-shadow .25s; }
+.tutorial-spotlight.interaction { box-shadow:0 0 0 9999px transparent,0 0 0 7px #78dccb66; }
 .tutorial-spotlight::after { content:'↓'; position:absolute; top:-35px; left:12px; background:#137b70; color:white; width:30px; height:30px; text-align:center; line-height:30px; border-radius:50%; font-size:21px; animation:tutorial-beacon 1.4s ease-in-out infinite; }
 .tutorial-card { position:fixed; z-index:90; padding:18px; border:1px solid #bfdbd5; border-radius:16px; background:#fff; box-shadow:0 8px 40px #16394f30; max-height:calc(100vh - 24px); overflow:auto; box-sizing:border-box; }
 .tutorial-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
@@ -1814,7 +1815,7 @@ input[aria-invalid="true"] {
 .tutorial-card h2 { font-size:19px; margin:13px 0 10px; line-height:1.3; }
 #tutorialText { font-size:13px; line-height:1.55; color:#3b5968; margin:0 0 12px; }
 #tutorialStatus { font-size:11px; line-height:1.5; color:#247469; background:#eef8f4; padding:9px; border-radius:8px; }
-.tutorial-actions { display:flex; justify-content:space-between; align-items:center; gap:8px; margin:12px 0; }
+.tutorial-actions { display:flex; justify-content:flex-end; align-items:center; gap:8px; margin:12px 0; }
 .tutorial-actions button { font-size:12px; padding:9px 10px; }
 .tutorial-chapter-label { display:block; font-size:10px; color:#718690; margin-bottom:4px; }
 #tutorialChapter { width:100%; font-size:12px; padding:6px; border:1px solid #d2e3df; border-radius:7px; }
