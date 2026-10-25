@@ -354,7 +354,7 @@
     }else{
       for(const stroke of m.strokes){
         const points=stroke.points;if(points.length<2)continue;
-        const tone=stroke.direction<0?'#c77e2f':'#337fba',shade=m.mode==='free'?(stroke.complete?1:.5):m.shade;
+        const tone=stroke.direction<0?'#c77e2f':'#337fba',shade=m.mode==='free'?1:m.shade;
         if(shade>0){
           c.beginPath();c.moveTo(X(points[0].v),bottom);
           for(const p of points)c.lineTo(X(p.v),bottom+(Y(p.p)-bottom)*shade);
