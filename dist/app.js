@@ -265,7 +265,7 @@
     }
     let feedback='Choisissez un signe pour expliquer le choc.';
     if(a&&!a.correct)feedback='Essayez encore. Indice : comparez les deux valeurs en m/s. La norme mesure la rapidité, quel que soit le sens de la flèche.';
-    if(a?.correct)feedback='Oui. '+(a.relation==='='?'Les vitesses sont égales : la particule a poussé sur le piston et contribue à la pression, mais son énergie cinétique n’a pas changé.':a.relation==='>'?'La vitesse sortante est plus grande : la particule a poussé sur le piston et contribue à la pression, mais le piston lui a fourni de l’énergie.':'La vitesse sortante est plus petite : la particule contribue à la pression en poussant sur le piston. C’est parce que le piston reculait pendant le choc qu’elle lui a cédé de l’énergie.');
+    if(a?.correct)feedback='Oui. '+(a.relation==='='?'Les vitesses sont égales : la particule a poussé sur le piston et contribue à la pression, mais son énergie cinétique n’a pas changé.':a.relation==='>'?'La vitesse sortante est plus grande : la particule a poussé sur le piston et contribue à la pression, mais le piston, qui avançait face à elle lors de la collision, lui a fourni de l’énergie.':'La vitesse sortante est plus petite : la particule contribue à la pression en poussant sur le piston. C’est parce que le piston reculait pendant le choc qu’elle lui a cédé de l’énergie.');
     $('speedWorkSign').hidden=!a?.correct;
     $('speedWorkSign').textContent=a?.correct?(a.relation==='='?'Le travail reçu par le gaz est nul : W = 0.':a.relation==='>'?'Le travail reçu par le gaz est positif : W > 0.':'Le travail reçu par le gaz est négatif : W < 0.') : '';
     if($('speedFeedback').textContent!==feedback)$('speedFeedback').textContent=feedback;
