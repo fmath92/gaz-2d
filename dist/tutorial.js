@@ -24,13 +24,11 @@
     {quiet:true,auto:true,title:'Enchaîner des cycles',target:'tab-cycles',done:s=>s.experiment==='cycles',text:'Ouvrez Cycles P–V pour suivre plusieurs compressions et détentes sur un même diagramme.'},
     {experiment:'cycles',scene:true,quiet:s=>!s.cycle,waiting:s=>s.cycle?.running&&s.playing,title:'Dessiner l’aller et le retour',target:s=>s.cycle&&!s.playing?'pause':s.cycle?'chart':'start',done:s=>!!s.cycle&&s.cycle.leg>=1,text:'Lancez les cycles. Orange : compression ; bleu : détente. Les trajets peuvent différer : comparez leur aire et l’énergie du gaz. Attendez au moins le premier changement de sens, ou passez cette étape.'},
     {quiet:true,auto:true,title:'Mettre la loi des gaz à l’épreuve',target:'tab-comparison',done:s=>s.experiment==='comparison',text:'Ouvrez Rayon & loi des gaz. Le volume propre des disques permet d’explorer les limites du gaz dilué.'},
-    {experiment:'comparison',title:'Changer la taille des disques',target:'particleRadius',event:'particleRadius:input',text:'Déplacez le curseur de rayon. Le rayon est commun aux six expériences : il faudra appliquer ce choix pour reconstruire le gaz sans recouvrement.'},
-    {experiment:'comparison',quiet:true,auto:true,title:'Appliquer le nouveau rayon',target:'applyRadius',event:'applyRadius:click',text:'Appliquez le rayon. Les simulations redémarrent, mais les relevés déjà conservés gardent leur rayon d’origine.'},
-    {experiment:'comparison',title:'Conserver une mesure',target:s=>s.recordY!=='ratio'?'plotRadius':!s.playing?'pause':'recordRadius',event:'recordRadius:click',text:'Choisissez « L’effet du rayon », laissez le gaz évoluer puis relevez ce rayon. Le bouton attend une fenêtre complète ; deux relevés successifs ne partagent pas la même fenêtre de mesure.'},
-    {experiment:'comparison',title:'Introduire un volume exclu',target:'plotExcludedVolume',done:s=>s.recordY==='correctedPV',text:'Passez à P(V − b) en fonction de T. À rayon fixé, on cherche une correction de volume b = αV occupé qui rapproche les mesures de la droite de pente nR.'},
-    {experiment:'comparison',waiting:s=>!!s.batch,title:'Mesurer plusieurs températures',target:s=>s.batch?'temperatureProtocol':'startTemperatureSeries',event:'startTemperatureSeries:click',done:s=>!s.batch&&s.seriesFinished,text:s=>s.batch?'La série prépare cinq températures, attend une stabilisation puis mesure chaque état. La lecture passe à ×4. Laissez-la terminer, ou passez cette étape pour découvrir la suite.':'Lancez les cinq températures. Les points sont mesurés à rayon fixé, avant toute correction par α. En cas d’arrêt faute de stabilisation, vous pouvez relancer ou passer cette étape.'},
-    {experiment:'comparison',title:'Ajuster la correction',target:s=>s.recordY==='correctedPV'?'alpha':'plotExcludedVolume',event:'alpha:input',text:'Faites varier α. Les points corrigés bougent, mais le gaz ne change pas. Comparez la pente mesurée à nR et l’ordonnée à l’origine à zéro. Le bouton d’ajustement automatique propose aussi une valeur.'},
-    {experiment:'comparison',title:'Lire une régression avec prudence',target:'recordChart',text:'La droite de référence, la régression, R² et les incertitudes sur la pente et l’ordonnée aident à comparer les relevés. Il faut au moins trois températures distinctes. Un grand R² ne prouve pas à lui seul une équation d’état.'},
+    ...Array.from({length:5},(_,i)=>[
+      {experiment:'comparison',scene:true,auto:true,event:'particleRadius:input',title:'Choisir le rayon '+(i+1)+' / 5',target:s=>s.recordY!=='ratio'?'plotRadius':'particleRadius',done:s=>Math.abs(s.radius-s.stepRadius)>1e-9&&!s.study.some(r=>Math.abs(r-s.radius)<1e-9),text:'Déplacez le curseur vers un nouveau rayon. Les disques changent immédiatement ; le gaz redémarre à la même température. Nous allons conserver cinq relevés, un pour chacun de cinq rayons différents.'},
+      {experiment:'comparison',quiet:true,auto:true,collectRadius:true,event:'recordRadius:click',title:'Relever le rayon '+(i+1)+' / 5',target:s=>s.recordY!=='ratio'?'plotRadius':!s.playing?'pause':'recordRadius',done:s=>s.radiusRecords.length>s.recordBaseline&&Math.abs(s.radiusRecords.at(-1).radius-s.radius)<1e-9&&!s.study.some(r=>Math.abs(r-s.radius)<1e-9),text:'Laissez le gaz évoluer, puis cliquez sur « Relever ce rayon » lorsque le bouton devient disponible.'}
+    ]).flat(),
+    {experiment:'comparison',scene:true,title:'Comparer les cinq rayons',target:s=>s.recordY!=='ratio'?'plotRadius':'recordChart',text:'Observez PV/(nRT) en fonction du rayon : les petits disques se rapprochent-ils de 1 ? Que devient le rapport quand les disques occupent davantage de place ? Comparez les cinq relevés, en gardant à l’esprit les fluctuations de pression.'},
     {quiet:true,auto:true,title:'Revenir avec des disques plus grands',target:s=>s.experiment==='comparison'?'revisitAdiabatic':'tab-adiabatic',done:s=>s.experiment==='adiabatic',text:'Retournez aux adiabatiques avec le rayon choisi. Les résultats observés pour un gaz dilué restent-ils valables ? Les boutons en bas de l’expérience proposent ce retour au laboratoire.'},
     {experiment:'adiabatic',quiet:true,auto:true,title:'Ouvrir les outils complémentaires',target:s=>!idle(s)?'illustrate':'advancedToggle',done:s=>idle(s)&&document.getElementById('advanced').open,text:'Si une illustration est encore ouverte, revenez à la simulation. Ouvrez ensuite « Approfondir » : autres diagrammes, distributions, réglages et export.'},
     {experiment:'adiabatic',title:'Changer de diagramme',target:()=>document.getElementById('advanced').open?'extraChart':'advancedToggle',event:'extraChart:input',text:'Choisissez P–T, V–T, P–V ou une autre représentation. Seule l’aire sur P–V se relie directement au travail de pression ; les autres graphes répondent à d’autres questions.'},
@@ -41,6 +39,8 @@
   function create({getState}){
     const $=id=>document.getElementById(id),counts={},guide={welcoming:true,active:false,index:0,baseline:{},target:null,completed:false,interacting:false};
     const pointers=new Set(),keys=new Set();
+    guide.study=[];
+    const state=()=>({...getState(),study:guide.study,stepRadius:guide.stepRadius,recordBaseline:guide.recordBaseline});
     const resolve=(value,state)=>typeof value==='function'?value(state):value;
     const setText=(id,text)=>{if($(id).textContent!==text)$(id).textContent=text;};
     function record(id,type){const key=id+':'+type;$(id).addEventListener(type,()=>{counts[key]=(counts[key]??0)+1;if(guide.active)update();});}
@@ -49,20 +49,22 @@
     function finish(){guide.active=false;guide.target=null;guide.interacting=false;pointers.clear();keys.clear();modal(false);$('tutorialCard').hidden=$('tutorialSpotlight').hidden=true;document.body?.classList.toggle('tutorial-running',false);setText('openTutorial','Visite guidée');$('openTutorial').focus();}
     function enter(index){
       if(index>=steps.length){finish();return;}
+      if(index===19)guide.study=[];
+      guide.stepRadius=getState().radius;guide.recordBaseline=getState().radiusRecords?.length??0;
       guide.index=index;guide.completed=false;guide.baseline={...counts};guide.target=null;guide.active=true;modal(false);setText('openTutorial','Quitter la visite');
       $('tutorialCard').hidden=false;document.body?.classList.toggle('tutorial-running',true);
-      $('tutorialChapter').value=String([0,1,3,6,11,16,18,26].filter(i=>i<=index).at(-1));
+      $('tutorialChapter').value=String([0,1,3,6,11,16,18,30].filter(i=>i<=index).at(-1));
       setText('tutorialTitle',steps[index].title);update();if(!$('tutorialCard').hidden)$('tutorialTitle').focus({preventScroll:true});
     }
     function ready(state){if(guide.completed)return true;const step=steps[guide.index];return !!((!step.experiment||state.experiment===step.experiment)&&(!step.event||(counts[step.event]??0)>(guide.baseline[step.event]??0))&&(!step.done||step.done(state)));}
     function update(){
       if(!guide.active)return;
-      const step=steps[guide.index],s=getState(),wrong=step.experiment&&step.experiment!==s.experiment;
+      const step=steps[guide.index],s=state(),wrong=step.experiment&&step.experiment!==s.experiment;
       let id=wrong?'tab-'+step.experiment:resolve(step.target,s);
       const closed=$(id).closest?.('details:not([open])');if(closed?.id==='advanced')id='advancedToggle';
-      const el=$(id),ok=!wrong&&ready(s);if(ok)guide.completed=true;
+      const el=$(id),ok=!wrong&&ready(s);if(ok&&pointers.size===0&&keys.size===0)guide.completed=true;
       if(!wrong&&typeof step.quiet==='function'&&s.returning){enter(guide.index+1);return;}
-      if(step.auto&&ok){enter(guide.index+1);return;}
+      if(step.auto&&ok&&pointers.size===0&&keys.size===0){if(step.collectRadius)guide.study.push(s.radius);enter(guide.index+1);return;}
       const quiet=wrong||!!resolve(step.quiet,s);
       $('tutorialCard').hidden=quiet;
       const animation=!!(s.tour||s.returning||(s.lesson&&s.lesson.phase!=='done')||s.cycle?.running||s.batch);
@@ -133,7 +135,7 @@
     root.addEventListener?.('resize',()=>{if(guide.active)position($(guide.target));});
     root.addEventListener?.('scroll',()=>{if(guide.active)position($(guide.target));},{passive:true});
     modal(true);$('tutorialStart').focus();
-    return {update,get welcoming(){return guide.welcoming;},get snapshot(){return {active:guide.active,welcoming:guide.welcoming,index:guide.index,total:steps.length,title:steps[guide.index].title,target:guide.target,ready:guide.active&&ready(getState()),interacting:guide.active&&guide.interacting,quiet:guide.active&&$('tutorialCard').hidden};}};
+    return {update,get welcoming(){return guide.welcoming;},get snapshot(){return {active:guide.active,welcoming:guide.welcoming,index:guide.index,total:steps.length,title:steps[guide.index].title,target:guide.target,ready:guide.active&&ready(state()),interacting:guide.active&&guide.interacting,quiet:guide.active&&$('tutorialCard').hidden};}};
   }
   root.GasTutorial={create,steps};
 })(typeof globalThis!=='undefined'?globalThis:window);

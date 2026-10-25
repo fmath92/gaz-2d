@@ -2,7 +2,7 @@
 
 **[Ouvrir le démonstrateur](https://fmath92.github.io/gaz-2d/)** · [Code source](https://github.com/fmath92/gaz-2d)
 
-Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.20.5 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
+Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.20.6 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
 
 ## La visite
 
@@ -15,7 +15,7 @@ Un laboratoire de thermodynamique pour relier les collisions microscopiques à l
 | 05 | Cycles P–V | Allers-retours isolés du piston, branches compression/détente et échauffement éventuel. |
 | 06 | Rayon & loi des gaz | Une simulation de disques durs à rayon réglable ; relevés de PV/(nRT) à n, V et T initiale identiques. |
 
-Toutes les expériences utilisent **1 000 disques durs** avec collisions élastiques mutuelles. Le rayon commun vaut initialement 0,50 mm équivalent (≈ 0,0218 unité interne). Son réglage dans le dernier onglet s’applique aux six expériences et les réinitialise ; les relevés conservés gardent leur rayon d’origine. Le dernier onglet propose de 0,005 à 0,07 unité (≈ 0,11 à 1,61 mm). Le rayon dessiné est le rayon de collision. Le modèle ponctuel reste disponible dans la bibliothèque et ses tests, mais n’est plus proposé dans l’interface.
+Toutes les expériences utilisent **1 000 disques durs** avec collisions élastiques mutuelles. Le rayon commun vaut initialement 0,50 mm équivalent (≈ 0,0218 unité interne). Son curseur agit immédiatement, sans bouton de validation. Chaque changement dans le dernier onglet s’applique aux six expériences et les réinitialise ; les relevés conservés gardent leur rayon d’origine. Le dernier onglet propose de 0,005 à 0,07 unité (≈ 0,11 à 1,61 mm). Le rayon dessiné est le rayon de collision. Le modèle ponctuel reste disponible dans la bibliothèque et ses tests, mais n’est plus proposé dans l’interface.
 
 Chaque onglet garde son état, ses réglages, sa pause et ses mesures jusqu’au rechargement de la page. Seule l’expérience affichée évolue. « Recommencer » efface les données de l’expérience courante. L’onglet Cycles P–V propose 1, 3 ou 5 allers-retours progressifs, entre le volume de départ et 70 % de ce volume.
 
@@ -23,7 +23,7 @@ Chaque onglet garde son état, ses réglages, sa pause et ses mesures jusqu’au
 
 À chaque chargement, une invitation propose **Commencer la visite guidée** ou **Explorer librement**. Le film est suspendu tant que cette invitation est ouverte, sans modifier le réglage de lecture. Le bouton **Visite guidée**, dans l’en-tête, permet de la relancer.
 
-Le parcours comporte 32 étapes, avec une zone mise en lumière et des transitions animées. Il utilise les véritables contrôles du simulateur : regarder les séquences de pression et de température, réaliser deux détentes de Joule–Gay–Lussac, répondre aux comparaisons de vitesse, déplacer le piston, lancer des cycles, changer le rayon, enregistrer des mesures, réaliser la série de températures, régler α, lire les distributions et découvrir les exports. Les actions et les résultats réellement obtenus sont signalés, sans verrouiller la progression : **Continuer reste disponible dans les panneaux explicatifs**, même pour avancer sans faire une manipulation. Une fois une étape réalisée, elle reste validée.
+Le parcours comporte 36 étapes, avec une zone mise en lumière et des transitions animées. Il utilise les véritables contrôles du simulateur : regarder les séquences de pression et de température, réaliser deux détentes de Joule–Gay–Lussac, répondre aux comparaisons de vitesse, déplacer le piston, lancer des cycles, choisir cinq rayons distincts, enregistrer un relevé par rayon, comparer PV/(nRT) au rayon, lire les distributions et découvrir les exports. Les actions et les résultats réellement obtenus sont signalés, sans verrouiller la progression : **Continuer reste disponible dans les panneaux explicatifs**, même pour avancer sans faire une manipulation. Une fois une étape réalisée, elle reste validée.
 
 Les simples consignes de navigation, de lancement et de retour deviennent des boutons surlignés sans popup ; l’action fait avancer automatiquement la visite. Le bouton d’en-tête « Quitter la visite » et Échap restent disponibles. Les animations de pression et de température affichent le commentaire du guide seulement au bilan.
 

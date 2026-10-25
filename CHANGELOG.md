@@ -1,3 +1,9 @@
+## 0.20.6 — Cinq rayons, cinq relevés
+
+- Le curseur de rayon applique immédiatement la nouvelle taille aux simulations, conserve les relevés et redémarre la fenêtre de mesure.
+- Le tutoriel propose cinq rayons différents avec un relevé manuel par rayon, puis la lecture du graphique PV/(nRT).
+- Le volume exclu et la série de températures restent disponibles hors tutoriel.
+
 ## 0.20.5 — Un accès direct aux cycles
 
 - Le commentaire du rebond sur un piston fixe précise explicitement son immobilité.

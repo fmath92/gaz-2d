@@ -232,8 +232,8 @@ test('radius experiment uses one interacting gas, records measurements and share
   assert.equal(lab.comparisonMetrics,null);assert.equal(lab.metrics.particleModel,'hard-disks');
   lab.input('timeScale',4);lab.advance(1.3);assert.ok(lab.metrics.pairCollisions>0);
   lab.click('recordRadius');assert.match(lab.nodes.get('radiusRecords').innerHTML,/PV/);
-  const old=lab.metrics;lab.input('particleRadius',70);assert.equal(lab.metrics.particleRadius,DEFAULT_RADIUS);
-  lab.click('applyRadius');assert.equal(lab.metrics.particleRadius,.07);assert.equal(lab.metrics.time,0);
+  const old=lab.metrics;lab.input('particleRadius',70);assert.equal(lab.nodes.get('applyRadius').hidden,true);
+  assert.equal(lab.metrics.particleRadius,.07);assert.equal(lab.metrics.time,0);
   assert.equal(lab.metrics.volume,old.volume);assert.ok(Math.abs(lab.metrics.temperature-1.5)<1e-9);
   assert.match(lab.nodes.get('radiusRecords').innerHTML,/PV/);assert.equal(lab.nodes.get('recordRadius').disabled,true);
   lab.click('capture');lab.advance(.2);assert.ok(lab.paused);assert.equal(lab.analysis.collision.kind,'pair');
@@ -523,12 +523,8 @@ test('the guide clears the veil for actions and waits for slider release before 
  lab.documentEvent('pointerdown',{target,pointerId:1});lab.input('particleRadius',.6);
  assert.equal(lab.analysis.tutorial.ready,true);assert.equal(spot.classList.contains('interaction'),true);
  lab.advance(.3);assert.equal(spot.classList.contains('interaction'),true);
- lab.documentEvent('pointerup',{target,pointerId:1});assert.equal(spot.classList.contains('interaction'),false);
- lab.documentEvent('keydown',{target,key:'ArrowRight'});lab.input('particleRadius',.7);lab.advance(.3);
- assert.equal(spot.classList.contains('interaction'),true);
- lab.documentEvent('keyup',{target,key:'ArrowRight'});assert.equal(spot.classList.contains('interaction'),false);
- lab.documentEvent('pointerdown',{target,pointerId:2});assert.equal(spot.classList.contains('interaction'),true);
- lab.documentEvent('pointercancel',{target,pointerId:2});assert.equal(spot.classList.contains('interaction'),false);
+ lab.documentEvent('pointerup',{target,pointerId:1});assert.equal(lab.analysis.tutorial.quiet,true);
+ assert.equal(lab.analysis.tutorial.target,'recordRadius');assert.equal(spot.classList.contains('interaction'),true);
  lab.click('tutorialQuit');assert.equal(spot.hidden,true);
 });
 
@@ -568,7 +564,7 @@ test('the tutorial follows a paused temperature animation through its real final
 
 test('tutorial keeps the page top for visible targets and only reveals lower controls',()=>{
  const lab=laboratory({welcome:true});lab.click('tutorialStart');
- assert.equal(lab.analysis.tutorial.total,32);assert.equal(lab.scrollCalls.length,0);
+ assert.equal(lab.analysis.tutorial.total,36);assert.equal(lab.scrollCalls.length,0);
  lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.title,'D’où vient la pression ?');assert.equal(lab.scrollCalls.length,0);
  lab.nodes.get('tutorialChapter').value='6';lab.nodes.get('tutorialChapter').dispatch('change');
  lab.click('tab-free');lab.advance(.15);
@@ -603,4 +599,21 @@ test('the cycles guide goes straight to launch and shows a clear bottom panel af
  assert.equal(lab.analysis.tutorial.quiet,false);assert.equal(lab.nodes.get('tutorialCard').classList.contains('scene-guide'),true);
  assert.equal(lab.analysis.tutorial.interacting,true);
  assert.equal(lab.nodes.get('cycleCount').value,count);assert.equal(lab.nodes.get('duration').value,duration);
+});
+
+
+test('radius guide collects five distinct new manual readings before comparing their plot',()=>{
+ const lab=laboratory({welcome:true});lab.click('tutorialStart');
+ lab.nodes.get('tutorialChapter').value='18';lab.nodes.get('tutorialChapter').dispatch('change');lab.click('tab-comparison');lab.advance(.15);
+ for(let i=0;i<5;i++){
+  assert.equal(lab.analysis.tutorial.title,'Choisir le rayon '+(i+1)+' / 5');
+  if(i>0){lab.input('particleRadius',10);assert.equal(lab.analysis.tutorial.title,'Choisir le rayon '+(i+1)+' / 5');assert.equal(lab.analysis.tutorial.ready,false);}
+  lab.input('particleRadius',10+i*12);assert.equal(lab.metrics.particleRadius,(10+i*12)/1000);
+  assert.equal(lab.analysis.tutorial.title,'Relever le rayon '+(i+1)+' / 5');
+  assert.equal(lab.nodes.get('recordRadius').disabled,true);lab.click('recordRadius');assert.equal(lab.analysis.radiusRecords.length,i);
+  lab.input('timeScale',4);lab.advance(1.1);lab.click('recordRadius');assert.equal(lab.analysis.radiusRecords.length,i+1);
+ }
+ assert.equal(lab.analysis.tutorial.title,'Comparer les cinq rayons');assert.equal(lab.analysis.recordPlot.points.length,5);
+ assert.equal(lab.nodes.get('recordY').value,'ratio');
+ lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.title,'Revenir avec des disques plus grands');
 });

@@ -802,15 +802,17 @@
   $('vectors').addEventListener('input', () => { session().vectors = $('vectors').checked; draw(); });
   $('zoomEnabled').addEventListener('input', () => { session().zoom = $('zoomEnabled').checked; updateControls(); draw(); });
   for (const id of ['thermalMode','bathTemperature','accommodation','allWalls']) $(id).addEventListener('input', applyThermal);
-  $('particleRadius').addEventListener('input', () => {
-    $('radiusValue').value = format(+$('particleRadius').value / 1000 * U.scales.length * 1000) + ' mm';
-  });
-  $('applyRadius').addEventListener('click', () => {
+  function applyRadius() {
     sharedRadius = Math.max(.005, Math.min(.07, +$('particleRadius').value / 1000));
     for (const [key, previous] of sessions) sessions.set(key, createSession(key, previous));
     accumulator = 0; previousFrame = 0; populateControls(); render();
-    notify('Rayon commun appliqué à toutes les expériences : les simulations redémarrent. Les relevés précédents sont conservés avec leur rayon d’origine.');
+    notify('Rayon modifié : les simulations redémarrent sans recouvrement. Attendez la nouvelle fenêtre de mesure ; vos relevés précédents sont conservés.');
+  }
+  $('particleRadius').addEventListener('input', () => {
+    const radius=Math.max(.005,Math.min(.07,+$('particleRadius').value/1000));
+    if(Math.abs(radius-sharedRadius)>1e-12)applyRadius();
   });
+  $('applyRadius').addEventListener('click',applyRadius);
   function recordRadius() {
     const s = session(), m = s.sim.metrics;
     if (active !== 'comparison' || m.time < nextRecordTime(s) || ratio(m) == null || s.radiusRecords.length >= MAX_RECORDS) return;
@@ -871,7 +873,7 @@
   });
   window.addEventListener('resize',render); document.addEventListener('visibilitychange',()=>{previousFrame=0;accumulator=0;});
   selectExperiment('pressure');
-  guide=GasTutorial.create({getState:()=>{const s=session();return {experiment:active,playing:s.playing,time:s.sim.time,run:s.run,chart:s.chart,lesson:s.lesson,tour:s.tour,returning:s.returning,cycle:s.cycle,batch:s.batch,recordY:s.recordY,seriesFinished:s.batchMessage.startsWith('Série terminée')};}});
+  guide=GasTutorial.create({getState:()=>{const s=session();return {experiment:active,playing:s.playing,time:s.sim.time,run:s.run,chart:s.chart,lesson:s.lesson,tour:s.tour,returning:s.returning,cycle:s.cycle,batch:s.batch,recordY:s.recordY,radius:s.radius,radiusRecords:s.radiusRecords,seriesFinished:s.batchMessage.startsWith('Série terminée')};}});
   requestAnimationFrame(frame);
   Object.defineProperty(window,'gaz2D',{value:{
     get metrics(){return {...session().sim.metrics};}, get comparisonMetrics(){return session().other ? {...session().other.metrics} : null;},
