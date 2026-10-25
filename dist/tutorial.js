@@ -22,9 +22,7 @@
     {experiment:'adiabatic',scene:true,title:'Essayer un parcours libre',target:s=>s.lesson?.window?.canDrag?'workPistonHandle':'illustrate',done:s=>s.lesson?.phase==='free'&&s.lesson.window.strokes.some(b=>b.direction>0)&&s.lesson.window.strokes.some(b=>b.direction<0),text:'Déplacez le piston dans les deux sens. Les branches du diagramme gardent l’ordre du parcours. Le travail reçu est positif en compression, négatif en détente ; il est nul au repos.'},
     {experiment:'adiabatic',quiet:true,auto:true,title:'Revenir aux commandes',target:'illustrate',done:idle,text:'Quittez l’illustration avec « Retour à la simulation ». Vous retrouvez les réglages de trajet et de durée pour vos propres essais.'},
     {quiet:true,auto:true,title:'Enchaîner des cycles',target:'tab-cycles',done:s=>s.experiment==='cycles',text:'Ouvrez Cycles P–V pour suivre plusieurs compressions et détentes sur un même diagramme.'},
-    {experiment:'cycles',title:'Choisir un aller-retour',target:'cycleCount',done:()=>document.getElementById('cycleCount').value==='1',text:'Pour ce premier essai, choisissez 1 aller-retour. Vous pourrez ensuite en comparer 3 ou 5.'},
-    {experiment:'cycles',title:'Régler la rapidité du piston',target:'duration',event:'duration:input',text:'Déplacez le curseur de durée du trajet. Une durée courte signifie un piston rapide. Le temps simulé est indiqué en millisecondes, avec une lecture fortement ralentie.'},
-    {experiment:'cycles',waiting:s=>s.cycle?.running&&s.playing,title:'Dessiner l’aller et le retour',target:s=>s.cycle&&!s.playing?'pause':s.cycle?'chart':'start',done:s=>!!s.cycle&&s.cycle.leg>=1,text:'Lancez les cycles. Orange : compression ; bleu : détente. Les trajets peuvent différer : comparez leur aire et l’énergie du gaz. Attendez au moins le premier changement de sens, ou passez cette étape.'},
+    {experiment:'cycles',scene:true,quiet:s=>!s.cycle,waiting:s=>s.cycle?.running&&s.playing,title:'Dessiner l’aller et le retour',target:s=>s.cycle&&!s.playing?'pause':s.cycle?'chart':'start',done:s=>!!s.cycle&&s.cycle.leg>=1,text:'Lancez les cycles. Orange : compression ; bleu : détente. Les trajets peuvent différer : comparez leur aire et l’énergie du gaz. Attendez au moins le premier changement de sens, ou passez cette étape.'},
     {quiet:true,auto:true,title:'Mettre la loi des gaz à l’épreuve',target:'tab-comparison',done:s=>s.experiment==='comparison',text:'Ouvrez Rayon & loi des gaz. Le volume propre des disques permet d’explorer les limites du gaz dilué.'},
     {experiment:'comparison',title:'Changer la taille des disques',target:'particleRadius',event:'particleRadius:input',text:'Déplacez le curseur de rayon. Le rayon est commun aux six expériences : il faudra appliquer ce choix pour reconstruire le gaz sans recouvrement.'},
     {experiment:'comparison',quiet:true,auto:true,title:'Appliquer le nouveau rayon',target:'applyRadius',event:'applyRadius:click',text:'Appliquez le rayon. Les simulations redémarrent, mais les relevés déjà conservés gardent leur rayon d’origine.'},
@@ -53,7 +51,7 @@
       if(index>=steps.length){finish();return;}
       guide.index=index;guide.completed=false;guide.baseline={...counts};guide.target=null;guide.active=true;modal(false);setText('openTutorial','Quitter la visite');
       $('tutorialCard').hidden=false;document.body?.classList.toggle('tutorial-running',true);
-      $('tutorialChapter').value=String([0,1,3,6,11,16,20,28].filter(i=>i<=index).at(-1));
+      $('tutorialChapter').value=String([0,1,3,6,11,16,18,26].filter(i=>i<=index).at(-1));
       setText('tutorialTitle',steps[index].title);update();if(!$('tutorialCard').hidden)$('tutorialTitle').focus({preventScroll:true});
     }
     function ready(state){if(guide.completed)return true;const step=steps[guide.index];return !!((!step.experiment||state.experiment===step.experiment)&&(!step.event||(counts[step.event]??0)>(guide.baseline[step.event]??0))&&(!step.done||step.done(state)));}

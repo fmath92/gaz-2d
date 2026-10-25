@@ -1,3 +1,9 @@
+## 0.20.5 — Un accès direct aux cycles
+
+- Le commentaire du rebond sur un piston fixe précise explicitement son immobilité.
+- Le tutoriel passe directement au bouton de lancement des cycles, sans imposer un nombre de trajets ni une vitesse.
+- L’explication des cycles s’affiche en bandeau inférieur après le lancement.
+
 ## 0.20.4 — Montrer les commandes sans multiplier les popups
 
 - Navigation, lancement et retour guidés par surlignage ; progression automatique après l’action, sans confirmation supplémentaire.

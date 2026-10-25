@@ -2,7 +2,7 @@
 
 **[Ouvrir le démonstrateur](https://fmath92.github.io/gaz-2d/)** · [Code source](https://github.com/fmath92/gaz-2d)
 
-Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.20.4 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
+Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.20.5 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
 
 ## La visite
 
@@ -23,7 +23,7 @@ Chaque onglet garde son état, ses réglages, sa pause et ses mesures jusqu’au
 
 À chaque chargement, une invitation propose **Commencer la visite guidée** ou **Explorer librement**. Le film est suspendu tant que cette invitation est ouverte, sans modifier le réglage de lecture. Le bouton **Visite guidée**, dans l’en-tête, permet de la relancer.
 
-Le parcours comporte 34 étapes, avec une zone mise en lumière et des transitions animées. Il utilise les véritables contrôles du simulateur : regarder les séquences de pression et de température, réaliser deux détentes de Joule–Gay–Lussac, répondre aux comparaisons de vitesse, déplacer le piston, lancer des cycles, changer le rayon, enregistrer des mesures, réaliser la série de températures, régler α, lire les distributions et découvrir les exports. Les actions et les résultats réellement obtenus sont signalés, sans verrouiller la progression : **Continuer reste disponible dans les panneaux explicatifs**, même pour avancer sans faire une manipulation. Une fois une étape réalisée, elle reste validée.
+Le parcours comporte 32 étapes, avec une zone mise en lumière et des transitions animées. Il utilise les véritables contrôles du simulateur : regarder les séquences de pression et de température, réaliser deux détentes de Joule–Gay–Lussac, répondre aux comparaisons de vitesse, déplacer le piston, lancer des cycles, changer le rayon, enregistrer des mesures, réaliser la série de températures, régler α, lire les distributions et découvrir les exports. Les actions et les résultats réellement obtenus sont signalés, sans verrouiller la progression : **Continuer reste disponible dans les panneaux explicatifs**, même pour avancer sans faire une manipulation. Une fois une étape réalisée, elle reste validée.
 
 Les simples consignes de navigation, de lancement et de retour deviennent des boutons surlignés sans popup ; l’action fait avancer automatiquement la visite. Le bouton d’en-tête « Quitter la visite » et Échap restent disponibles. Les animations de pression et de température affichent le commentaire du guide seulement au bilan.
 

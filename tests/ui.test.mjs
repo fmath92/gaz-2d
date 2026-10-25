@@ -517,7 +517,7 @@ test('the guide clears the veil for actions and waits for slider release before 
  const lab=laboratory({welcome:true}),spot=lab.nodes.get('tutorialSpotlight');lab.click('tutorialStart');
  assert.equal(spot.classList.contains('interaction'),false);lab.click('tutorialNext');
  assert.equal(spot.classList.contains('interaction'),true);
- lab.nodes.get('tutorialChapter').value='20';lab.nodes.get('tutorialChapter').dispatch('change');
+ lab.nodes.get('tutorialChapter').value='18';lab.nodes.get('tutorialChapter').dispatch('change');
  lab.click('tab-comparison');lab.advance(.15);
  const target=lab.nodes.get('particleRadius');
  lab.documentEvent('pointerdown',{target,pointerId:1});lab.input('particleRadius',.6);
@@ -568,7 +568,7 @@ test('the tutorial follows a paused temperature animation through its real final
 
 test('tutorial keeps the page top for visible targets and only reveals lower controls',()=>{
  const lab=laboratory({welcome:true});lab.click('tutorialStart');
- assert.equal(lab.analysis.tutorial.total,34);assert.equal(lab.scrollCalls.length,0);
+ assert.equal(lab.analysis.tutorial.total,32);assert.equal(lab.scrollCalls.length,0);
  lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.title,'D’où vient la pression ?');assert.equal(lab.scrollCalls.length,0);
  lab.nodes.get('tutorialChapter').value='6';lab.nodes.get('tutorialChapter').dispatch('change');
  lab.click('tab-free');lab.advance(.15);
@@ -589,4 +589,18 @@ test('an ongoing animation stays clear even on an explanatory step already marke
  lab.nodes.get('tutorialChapter').value='0';lab.nodes.get('tutorialChapter').dispatch('change');lab.advance(.2);
  assert.equal(lab.analysis.tutorial.ready,true);assert.equal(lab.nodes.get('tutorialSpotlight').classList.contains('interaction'),true);
  lab.click('tutorialQuit');
+});
+
+
+test('the cycles guide goes straight to launch and shows a clear bottom panel after launch',()=>{
+ const lab=laboratory({welcome:true});lab.click('tutorialStart');
+ lab.nodes.get('tutorialChapter').value='16';lab.nodes.get('tutorialChapter').dispatch('change');
+ lab.click('tab-cycles');lab.advance(.15);
+ assert.equal(lab.analysis.tutorial.title,'Dessiner l’aller et le retour');
+ assert.equal(lab.analysis.tutorial.target,'start');assert.equal(lab.analysis.tutorial.quiet,true);
+ const count=lab.nodes.get('cycleCount').value,duration=lab.nodes.get('duration').value;
+ lab.click('start');lab.advance(.2);
+ assert.equal(lab.analysis.tutorial.quiet,false);assert.equal(lab.nodes.get('tutorialCard').classList.contains('scene-guide'),true);
+ assert.equal(lab.analysis.tutorial.interacting,true);
+ assert.equal(lab.nodes.get('cycleCount').value,count);assert.equal(lab.nodes.get('duration').value,duration);
 });
