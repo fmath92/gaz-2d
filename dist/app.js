@@ -279,7 +279,7 @@
     $('workPistonHandle').hidden=!draggable;
     $('restartWorkPath').hidden=!show||l.phase!=='free';
     if(!show)return;
-    $('workDragHint').textContent=l.phase==='hold'?(l.case==='fixed'?'Même pression, aucun déplacement : aucune aire.':'Le trajet est terminé. L’aire donne le travail reçu par le gaz.'):
+    $('workDragHint').textContent=l.phase==='hold'?(l.case==='fixed'?'Des poussées, aucun déplacement : aucune aire.':'Le trajet est terminé. L’aire donne le travail reçu par le gaz.'):
       m.phase==='shade'?'L’aire sous la courbe se colore…':m.mode==='fixed'?'Piston immobile : les chocs continuent, mais ΔV = 0.':
       m.mode==='free'?'Glissez le piston dans les deux sens. Chaque trajet contribue au travail.':
       'Glissez le piston orange de A vers B '+(m.mode==='compression'?'←':'→')+' · ou utilisez les flèches du clavier.';
