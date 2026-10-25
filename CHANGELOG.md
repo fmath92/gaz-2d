@@ -1,3 +1,10 @@
+## 0.17.0 — Comparer activement les vitesses
+
+- Bandeau interactif sur le zoom : vitesse entrante <, = ou > vitesse sortante, pour les trois cas.
+- Explication après le choix : contribution à la pression, énergie gagnée ou cédée et signe du travail reçu.
+- Correction explicite d’une réponse erronée ; Continuer devient disponible après une réponse.
+- Retrait du rebond hypothétique sur piston fixe dans le parcours guidé ; pauses manuelles conservées.
+
 ## 0.16.1 — Lire chaque résultat à son rythme
 
 - Les résultats de repos et de compression attendent un clic sur « Cas suivant » ; aucun passage automatique.

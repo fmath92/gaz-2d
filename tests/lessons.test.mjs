@@ -137,7 +137,7 @@ test('the work journey chains rest, compression and expansion on the same gas, t
  const particles=sim.particles,l=new WorkJourney(sim,{planningBudget:Infinity}),seen=[],comparisons=[];
  for(let i=0;i<7000&&l.phase!=='done'&&l.phase!=='unavailable';i++){
   if(seen.at(-1)!==l.case)seen.push(l.case);
-  if(l.tour?.phase==='compare'){comparisons.push(l.case);const time=sim.time,particles=JSON.stringify(sim.particles);l.tick(60,sim,h=>{sim.step(h);return h;});assert.equal(sim.time,time);assert.equal(JSON.stringify(sim.particles),particles);assert.equal(l.tour.phase,'compare');l.continueComparison();}
+  if(l.tour?.phase==='compare'){comparisons.push(l.case);const time=sim.time,particles=JSON.stringify(sim.particles);l.tick(60,sim,h=>{sim.step(h);return h;});assert.equal(sim.time,time);assert.equal(JSON.stringify(sim.particles),particles);assert.equal(l.tour.phase,'compare');l.continueComparison();assert.equal(l.tour.phase,'compare');l.answerComparison('invalid');assert.equal(l.answer,null);const expected=l.case==='fixed'?'=':l.case==='compression'?'<':'>';l.answerComparison(expected==='='?'<':'=');assert.equal(l.answer.correct,false);assert.equal(l.answer.relation,expected);assert.equal(JSON.stringify(sim.particles),particles);l.answerComparison(expected);assert.equal(l.answer.correct,true);l.continueComparison();}
   if(l.phase==='hold'){const time=sim.time,index=l.index;l.tick(60,sim,h=>{sim.step(h);return h;});assert.equal(sim.time,time);assert.equal(l.index,index);assert.equal(l.phase,'hold');l.nextCase();l.nextCase();assert.equal(l.phase,'between');}
   l.tick(1/60,sim,h=>{sim.step(h);return h;});
  }

@@ -222,7 +222,7 @@
     const fixed=stationaryReflection(e);
     const impulse = impulseVector(e);
     const f=Math.min(68,h*.22)/Math.max(fixed.speed,Math.hypot(e.after.vx,e.after.vy),tour.kind==='pressure'?Math.hypot(impulse.vx,impulse.vy):0,.1);
-    if (tour.kind==='work') {
+    if (tour.kind==='work'&&!tour.compareIncoming) {
       ctx.setLineDash([5,4]);arrow(ctx,cx,cy,fixed.vx*f,-fixed.vy*f,'#9274ad',2);ctx.setLineDash([]);
       const dt=Math.max(0,sim.time-e.time), gx=X(e.x+fixed.vx*dt), gy=Y(e.y+fixed.vy*dt);
       ctx.setLineDash([3,3]);line(ctx,cx,cy,gx,gy,'#9274ad99',1.5);
@@ -232,8 +232,8 @@
     arrow(ctx,cx,cy,e.after.vx*f,-e.after.vy*f,'#258d79',2.5);
     ctx.strokeStyle='#e3a34e';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,12+Math.min(1,tour.impactAge/.6)*16,0,2*Math.PI);ctx.stroke();
     // A common scale and laboratory velocities reveal the work asymmetry.
-    ctx.font='10px system-ui';ctx.textAlign='left';ctx.fillStyle=tour.kind==='work'?'#9274ad':'#397fbe';ctx.fillText((tour.kind==='work'?'v sortante si fixe · ':'p avant · ')+U.text(tour.kind==='work'?'velocity':'momentum', fixed.speed),14,h-35);
-    ctx.fillStyle='#258d79';ctx.fillText((tour.kind==='work'?'v sortante si mobile · ':'p après · ')+U.text(tour.kind==='work'?'velocity':'momentum', Math.hypot(e.after.vx,e.after.vy)),14,h-19);
+    ctx.font='10px system-ui';ctx.textAlign='left';ctx.fillStyle=tour.kind==='work'&&!tour.compareIncoming?'#9274ad':'#397fbe';ctx.fillText((tour.compareIncoming?'v entrante · ':tour.kind==='work'?'v sortante si fixe · ':'p avant · ')+U.text(tour.kind==='work'||tour.compareIncoming?'velocity':'momentum', fixed.speed),14,h-35);
+    ctx.fillStyle='#258d79';ctx.fillText((tour.compareIncoming?'v sortante · ':tour.kind==='work'?'v sortante si mobile · ':'p après · ')+U.text(tour.kind==='work'||tour.compareIncoming?'velocity':'momentum', Math.hypot(e.after.vx,e.after.vy)),14,h-19);
     const inward=e.wall==='left'?1:-1;
     if (tour.kind==='pressure') {
       arrow(ctx,cx,cy,impulse.vx*f,-impulse.vy*f,'#ce8b37',3);ctx.fillStyle='#aa702e';ctx.textAlign='right';ctx.fillText('J = p avant − p après = '+U.text('momentum', e.impulse),w-14,Math.min(h-55,cy+35));
@@ -245,7 +245,7 @@
       ctx.fillText((tour.kind==='heat'?'δQ':'δW reçu')+' = '+(energy>0?'+':'')+U.text('energy', energy, 3),w-14,h-19);
 
     }
-    if (tour.kind==='work' && tour.phase==='compare') {
+    if (tour.kind==='work' && tour.phase==='compare'&&!tour.compareIncoming) {
       ctx.fillStyle='rgba(255,255,255,.97)';ctx.fillRect(10,h-93,w-20,85);
       ctx.strokeStyle='#d3e2e7';ctx.lineWidth=1;ctx.strokeRect(10,h-93,w-20,85);
       ctx.textAlign='center';ctx.font='600 11px system-ui';ctx.fillStyle='#314f5e';

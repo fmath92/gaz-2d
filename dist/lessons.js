@@ -78,10 +78,16 @@
       else this.beginCase();
     }
     get case(){return workCases[this.index];}
-    continueComparison(){if(this.phase==='collision'&&this.tour.phase==='compare'){this.tour.continueComparison();this.paused=false;}}
+    answerComparison(choice){
+      if(this.phase!=='collision'||this.tour.phase!=='compare'||!['<','=','>'].includes(choice))return;
+      const e=this.tour.event,incoming=Math.hypot(e.before.vx,e.before.vy),outgoing=Math.hypot(e.after.vx,e.after.vy);
+      const relation=Math.abs(incoming-outgoing)<=1e-10*Math.max(1,incoming,outgoing)?'=':incoming<outgoing?'<':'>';
+      this.answer={choice,relation,correct:choice===relation,incoming,outgoing};
+    }
+    continueComparison(){if(this.answer&&this.phase==='collision'&&this.tour.phase==='compare'){this.tour.continueComparison();this.paused=false;}}
     nextCase(){if(this.phase!=='hold')return;this.phase='between';this.elapsed=0;this.paused=false;}
     beginCase(){
-      this.sim.stopMotion();this.elapsed=0;this.window=null;this.collision=null;
+      this.sim.stopMotion();this.elapsed=0;this.window=null;this.collision=null;this.answer=null;
       if(this.case!=='fixed'){
         const direction=this.case==='compression'?-1:1;
         const travel=Math.min(2,direction<0?this.sim.width-3:18-this.sim.width);
@@ -115,7 +121,7 @@
       this.elapsed+=seconds;
       if(this.phase==='between'&&this.elapsed>=1.4){this.index++;this.beginCase();}
     }
-    get summary(){return {kind:this.kind,phase:this.phase,case:this.case,index:this.index,zoom:this.zoom,rate:this.rate,progress:this.progress,collision:this.tour?.event??this.collision,collisionPhase:this.tour?.phase??null,window:this.window?.summary??null,results:this.results.map(r=>({...r})),message:this.message??''};}
+    get summary(){return {kind:this.kind,phase:this.phase,case:this.case,index:this.index,zoom:this.zoom,rate:this.rate,progress:this.progress,collision:this.tour?.event??this.collision,collisionPhase:this.tour?.phase??null,answer:this.answer?{...this.answer}:null,window:this.window?.summary??null,results:this.results.map(r=>({...r})),message:this.message??''};}
   }
   class TemperatureSnapshot {
     constructor(sim){
@@ -203,7 +209,7 @@
   }
   function workChamber(canvas,sim,story,options={}){
     const G=root.LabGraphics,zoom=options.zoom??story.zoom;
-    if(story.tour){G.chamber(canvas,sim,{...options,tour:{...story.tour.view,zoom}});return;}
+    if(story.tour){G.chamber(canvas,sim,{...options,tour:{...story.tour.view,zoom,compareIncoming:true}});return;}
     const m=story.window;
     if(!m){G.chamber(canvas,sim,options);return;}
     // The camera is anchored in the laboratory, never attached to the moving piston.
@@ -219,7 +225,7 @@
       text(c,'Vitesse sortante',22,133,'#258d79');
       text(c,U.text('velocity',Math.hypot(e.after.vx,e.after.vy)),22,163,'#258d79',24);
       text(c,'δW reçu = Ec après − Ec avant = '+U.text('energy',e.work,4),22,207,color,13);
-      text(c,'Cliquez sur Continuer après avoir comparé.',22,246,'#687f8a',11);
+      text(c,'Choisissez <, = ou > sur le bandeau du zoom.',22,246,'#687f8a',11);
       return;
     }
     if(!m){

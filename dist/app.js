@@ -150,6 +150,8 @@
     const comparingWork=s.lesson?.kind==='work'&&s.lesson.tour?.phase==='compare';
     $('pause').disabled=!!s.returning||s.lesson?.phase==='hold'||comparingWork;
     $('nextWorkCase').hidden=s.lesson?.kind!=='work'||(s.lesson.phase!=='hold'&&!comparingWork)||!!s.returning;
+    $('nextWorkCase').disabled=comparingWork&&!s.lesson.answer;
+    updateSpeedQuestion();
     $('nextWorkCase').textContent=comparingWork?'Continuer après la comparaison →':'Cas suivant : '+(s.lesson?.index===0?'compression':'détente')+' →';
     if(s.lesson?.phase==='hold'||comparingWork)$('pause').textContent='Résultat figé';
     if(['pressure','adiabatic'].includes(active)){
@@ -248,6 +250,20 @@
       $('storyText').textContent=phase==='restore'?'Les dessins retrouvent leur position dans l’instant figé.':phase==='zoomOut'?'La caméra recule jusqu’à la vue d’ensemble.':'Le gaz retrouve progressivement la vitesse de lecture choisie.';
     }else if(l.phase==='done')$('storyText').textContent+=' Utilisez « Retour à la simulation » pour dézoomer puis relancer le temps.';
   }
+  function updateSpeedQuestion(){
+    const s=session(),l=s.lesson,e=l?.tour?.event,show=l?.kind==='work'&&l.tour?.phase==='compare'&&!s.returning;
+    $('workSpeedQuestion').hidden=!show;if(!show)return;
+    $('quizIncoming').textContent=U.text('velocity',Math.hypot(e.before.vx,e.before.vy));
+    $('quizOutgoing').textContent=U.text('velocity',Math.hypot(e.after.vx,e.after.vy));
+    const a=l.answer;
+    for(const [id,choice] of [['speedLess','<'],['speedEqual','='],['speedGreater','>']])$(id).setAttribute('aria-pressed',String(a?.choice===choice));
+    const explanation=!a?'Choisissez un signe pour expliquer le choc.':a.relation==='='?'Les vitesses sont égales : la particule a poussé sur le piston et contribue à la pression, mais son énergie cinétique n’a pas changé. Le travail reçu est nul.':a.relation==='<'?'La vitesse sortante est plus grande : la particule a poussé sur le piston et contribue à la pression. Le piston lui a fourni de l’énergie : le travail reçu par le gaz est positif.':'La vitesse sortante est plus petite : la particule a poussé sur le piston et contribue à la pression. Elle a cédé de l’énergie au piston : le travail reçu par le gaz est négatif.';
+    const feedback=(a?(a.correct?'Oui. ':'Pas tout à fait : v entrante '+a.relation+' v sortante. '):'')+explanation;
+    if($('speedFeedback').textContent!==feedback)$('speedFeedback').textContent=feedback;
+  }
+  for(const [id,choice] of [['speedLess','<'],['speedEqual','='],['speedGreater','>']])$(id).addEventListener('click',()=>{
+    const s=session();if(s.lesson?.kind!=='work'||s.returning)return;s.lesson.answerComparison(choice);updateControls();render();
+  });
   function updateWorkStory(l){
     const names=['Repos','Compression','Détente'],signs=['ΔV = 0 ; W = 0','ΔV < 0 ; W > 0','ΔV > 0 ; W < 0'];
     const m=l.window,e=l.tour?.event??l.collision;
@@ -261,7 +277,7 @@
     $('storyDetails').textContent=m?'Fenêtre : '+U.text('time',m.elapsed,3)+' · P moyenne = '+U.text('pressure',m.pressure,3)+' · ΔV = '+U.text('volume',m.deltaVolume,3)+' · '+m.events.length+' chocs · ΔE = '+U.text('energy',m.deltaEnergy,3)+'. Pᵢ est la pression mesurée sur chaque intervalle, sur tout le piston. À vitesse constante, W = −P moyenne × ΔV.':'u est la vitesse du piston vers la droite ; J est l’impulsion qu’il reçoit. W > 0 signifie que le gaz reçoit de l’énergie. Les parois sont isolées : Q = 0.';
     if(l.tour?.phase==='compare'){
       $('storyTitle').textContent=(l.index+1)+'/3 · Comparer avant de continuer';
-      $('storyText').textContent='Le temps est figé. Comparez les vitesses entrante et sortante, puis cliquez sur « Continuer après la comparaison ».';
+      $('storyText').textContent='Le temps est figé. Choisissez <, = ou > entre la vitesse entrante et la vitesse sortante sur le bandeau du zoom. Lisez l’explication avant de continuer.';
     }
     if(l.phase==='done'){
       $('storyText').textContent='La pression peut être positive sans travail si le piston reste immobile. En mouvement : dV < 0 donne δW > 0 ; dV > 0 donne δW < 0.';

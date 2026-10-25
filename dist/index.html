@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#f4f7f8">
   <meta name="description" content="Visite guidée d’un laboratoire de thermodynamique : des collisions aux mesures de pression, de travail et de chaleur.">
   <title>Gaz 2D — Visite guidée du laboratoire</title>
-  <link rel="stylesheet" href="styles.css?v=0.16.1-final">
-  <script defer src="physics.js?v=0.16.1-final"></script>
-  <script defer src="analysis.js?v=0.16.1-final"></script>
-  <script defer src="units.js?v=0.16.1-final"></script>
-  <script defer src="graphics.js?v=0.16.1-final"></script>
-  <script defer src="tour.js?v=0.16.1-final"></script>
-  <script defer src="lessons.js?v=0.16.1-final"></script>
-  <script defer src="app.js?v=0.16.1-final"></script>
+  <link rel="stylesheet" href="styles.css?v=0.17.0">
+  <script defer src="physics.js?v=0.17.0"></script>
+  <script defer src="analysis.js?v=0.17.0"></script>
+  <script defer src="units.js?v=0.17.0"></script>
+  <script defer src="graphics.js?v=0.17.0"></script>
+  <script defer src="tour.js?v=0.17.0"></script>
+  <script defer src="lessons.js?v=0.17.0"></script>
+  <script defer src="app.js?v=0.17.0"></script>
 </head>
 <body>
   <header class="masthead">
@@ -46,7 +46,21 @@
       <div class="bench-grid">
         <article class="panel microscope">
           <div class="panel-heading"><h2 id="microTitle">Le gaz et son piston</h2><span id="modelBadge" class="small-tag">Disques durs</span></div>
-          <div id="singleChamber"><canvas id="chamber" aria-label="État microscopique du gaz et position du piston">Simulation des particules.</canvas></div>
+          <div id="singleChamber"><canvas id="chamber" aria-label="État microscopique du gaz et position du piston">Simulation des particules.</canvas>
+            <section id="workSpeedQuestion" class="work-speed-question" hidden aria-label="Comparer la vitesse entrante et la vitesse sortante">
+              <strong>Comparez les normes des vitesses</strong>
+              <div class="speed-choice-row">
+                <div>Vitesse entrante<strong id="quizIncoming"></strong></div>
+                <div class="speed-choice-buttons" role="group" aria-label="La vitesse entrante est-elle inférieure, égale ou supérieure à la vitesse sortante ?">
+                  <button id="speedLess" type="button" aria-label="Vitesse entrante inférieure à la vitesse sortante" aria-pressed="false">&lt;</button>
+                  <button id="speedEqual" type="button" aria-label="Vitesses entrante et sortante égales" aria-pressed="false">=</button>
+                  <button id="speedGreater" type="button" aria-label="Vitesse entrante supérieure à la vitesse sortante" aria-pressed="false">&gt;</button>
+                </div>
+                <div>Vitesse sortante<strong id="quizOutgoing"></strong></div>
+              </div>
+              <p id="speedFeedback" role="status" aria-live="polite">Choisissez un signe pour expliquer le choc.</p>
+            </section>
+          </div>
           <div id="comparisonChambers" class="comparison-chambers" hidden><div><span class="model-name ideal">Disques durs</span><canvas id="idealChamber" aria-label="Gaz de disques durs"></canvas></div><div><span class="model-name disks">Disques durs</span><canvas id="diskChamber" aria-label="Gaz avec collisions élastiques entre disques"></canvas></div></div>
           <div class="micro-toolbar"><span><i class="speed-ramp"></i> Couleur = vitesse</span><label><input id="vectors" type="checkbox"> Vitesses</label><label id="staticZoomControl"><input id="zoomEnabled" type="checkbox" checked> Zoom</label><button id="capture" class="text-button" hidden>Isoler un choc mutuel</button></div>
           <div class="illustration-controls" id="illustrationControls"><button id="illustrate" class="button primary">▶ Comprendre la pression</button><button id="nextWorkCase" class="button secondary" hidden>Cas suivant →</button><button id="endIllustration" class="text-button" hidden>Quitter le zoom</button></div>
@@ -173,7 +187,7 @@
         <div class="panel distributions"><div><h2>Norme des vitesses</h2><canvas id="speedHistogram" aria-label="Distribution de la norme des vitesses"></canvas></div><div><h2>Énergie cinétique par marqueur</h2><canvas id="energyHistogram" aria-label="Distribution de l’énergie cinétique des particules"></canvas></div><p id="distributionLegend">État actuel et état initial, densités normalisées.</p></div>
       </details>
     </section>
-    <footer><span>Gaz 2D · version 0.16.1</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
+    <footer><span>Gaz 2D · version 0.17.0</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
   </main>
 </body>
 </html>
