@@ -1,3 +1,10 @@
+## 0.20.10 — Mesurer l’exposant adiabatique
+
+- Le tutoriel guide la préparation et le lancement du trajet lent, attend sa fin et laisse le résultat visible avant de passer aux cycles, sans popup supplémentaire.
+- Après les trois cas du travail, invitation à tester PV^γ sur une compression ou une détente lente.
+- Accès direct au tracé logarithmique et préparation d’un trajet lent ; régression, équation et γ avec erreur standard sous le graphique.
+- Conservation du filtrage par trajet et des fenêtres de pression non recouvrantes, avec référence idéale 2D γ = 2.
+
 ## 0.20.9 — Une visite guidée discrète
 
 - Les explications déjà présentes dans les expériences ne sont plus répétées dans les popups.

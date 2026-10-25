@@ -504,14 +504,17 @@
       hint = 'À l’équilibre idéal, PV/(nRT) = 1. La pression est lissée sur 0,23 ms : transitoires, anisotropie et fluctuations peuvent écarter la mesure de cette référence.';
     } else if (s.chart === 'log') {
       const fit = GasAnalysis.logarithmicFit(primary, { runId: s.run?.id ?? 0, legId: 0, pressureKey: s.source === 'piston' ? 'pistonPressure' : 'pressure' });
+      s.logFitReady=!!fit.fit;
       series = [{ color: '#238c79', scatter: true, points: fit.points }];
       xRange = G.dataRange(fit.points.map(p => p.x), [Math.log(s.initial.volume) - .1, Math.log(s.initial.volume) + .1]);
       const anchor = fit.fitPoints[0] || { x: Math.log(s.initial.volume), y: Math.log(s.initial.pressureIdeal) };
       series.push({ color: '#bd843b', dashed: true, points: xRange.map(x => ({ x, y: anchor.y - s.gamma * (x - anchor.x) })) });
       if (fit.fit) series.push({ color: '#287db4', points: xRange.map(x => ({ x, y: fit.fit.slope * x + fit.fit.intercept })) });
-      xLabel = 'ln(V)'; yLabel = 'ln(P)'; legend = '<span style="--color:#238c79">Mesures</span><span style="--color:#bd843b">Référence γ</span>';
+      xLabel = 'ln(V)'; yLabel = 'ln(P)'; legend = '<span style="--color:#238c79">Mesures</span><span style="--color:#bd843b">Référence γ</span><span style="--color:#287db4">Régression linéaire</span>';
       hint = fit.reason || 'γ apparent = ' + format(-fit.fit.slope, 3) + ' · R² = ' + format(fit.fit.rSquared, 3) + '. Une pente ne valide pas à elle seule une loi adiabatique.';
-      $('fitStatus').textContent = hint; $('fitValues').textContent = 'Dernier trajet uniquement, fenêtres de pression complètes et non recouvrantes. Référence idéale 2D isotrope : γ = 2.';
+      $('fitStatus').textContent = hint;
+      const f=fit.fit, intercept=f?f.intercept+Math.log(U.value('pressure',1))-f.slope*Math.log(U.value('volume',1)):null;
+      $('fitValues').textContent = (f?'ln(P / 1 bar) = '+format(f.slope,3)+' × ln(V / 1 L) '+(intercept<0?'−':'+')+' '+format(Math.abs(intercept),3)+'. γ = −pente = '+format(-f.slope,3)+' ± '+format(f.slopeSE,3)+' (erreur standard de la régression, '+f.count+' points). ':'')+'Dernier trajet uniquement, fenêtres de pression complètes et non recouvrantes. La dispersion statistique ne couvre pas les écarts liés à la vitesse du piston ou à la densité. Référence idéale 2D isotrope : γ = 2.';
     } else {
       const convert = r => ({ x: ['pt', 'vt', 'pvt'].includes(s.chart) ? r.temperature : r.volume, y: s.chart === 'vt' ? r.volume : s.chart === 'pvt' ? (pressure(r) ?? NaN) * r.volume : pressure(r) ?? NaN });
       series = groups.map(group => ({ color: group.color, scatter: s.chart === 'pvt', arrows: s.chart !== 'pvt', points: group.rows.flatMap((row, i, rows) => i && row.freeExpansion && Math.abs(row.time - rows[i - 1].time) < 1e-9 && row.volume !== rows[i - 1].volume ? [{ x: NaN, y: NaN }, convert(row)] : [convert(row)]) }));
@@ -626,7 +629,9 @@
     $('thermalFallbacks').textContent = 'Réflexions élastiques de contact thermique multiple : ' + format(m.thermalContactFallbacks,0) + '.';
     $('temperatureSeriesStatus').textContent=s.batch ? 'Température '+(s.batch.index+1)+'/5 · '+s.batch.temperatures[s.batch.index]+' K · '+(s.playing?'':'en pause · ')+(s.batch.measureAt ? 'mesure sur une fenêtre complète…':'stabilisation…') : s.batchMessage || 'Les relevés précédents restent conservés.';
     $('cycleStatus').textContent=s.cycle ? (s.cycle.running?'En cours · ':'Terminé / arrêté · ')+Math.floor(s.cycle.leg/2)+' / '+s.cycle.count+' allers-retours'+(s.cycle.running?' · '+(s.cycle.leg%2?'détente':'compression'):'') : 'Choisissez la durée d’un trajet, puis lancez les cycles.';
-    $('logAnalysis').hidden = s.chart !== 'log';
+    $('logAnalysis').hidden = s.chart !== 'log'||!!s.lesson||!!s.tour||!!s.returning;
+    $('prepareLogStudy').disabled=!!s.sim.motion;
+    $('adiabaticInvestigation').hidden=active!=='adiabatic'||!!s.lesson||!!s.tour||!!s.returning||s.lastLesson?.kind!=='work'||s.lastLesson.results.length<3;
   }
   function draw() {
     const s = session(), opts = { initialTemperature: s.initialTemperature, vectors: s.vectors, focus: s.zoom ? s.focus : null, target: s.action === 'fixed' ? null : target(s), tour: s.tour?.view ?? null };
@@ -734,6 +739,12 @@
     $('recordTable').innerHTML = s.radiusRecords.slice(s.recordPage*RECORD_PAGE_SIZE,(s.recordPage+1)*RECORD_PAGE_SIZE).map((r,i)=>'<tr><td>'+(s.recordPage*RECORD_PAGE_SIZE+i+1)+'</td><td>'+format(recordFields.radius.value(r))+'</td><td>'+format(r.ratio,3)+'</td><td>'+format(recordFields.correctedRatio.value(r),3)+'</td><td>'+format(recordFields.meanFreePath.value(r))+'</td><td>'+format(recordFields.packing.value(r))+'</td><td>'+format(recordFields.pressure.value(r),3)+'</td><td>'+format(recordFields.temperature.value(r))+'</td><td>'+format(recordFields.meanCollisionTime.value(r))+'</td><td>'+r.completedFlights+'</td><td>'+U.text('time',r.windowStart,3)+' → '+U.text('time',r.time,3)+'</td><td>'+(r.source==='mean'?'Toutes les parois':'Piston')+'</td></tr>').join('');
   }
   function render() { readings(); draw(); drawChart(); drawRecordPlot(); }
+  $('prepareLogStudy').addEventListener('click',()=>{
+    const s=session();if(active!=='adiabatic'||s.lesson||s.tour||s.returning||s.sim.motion)return;
+    s.duration=100;s.profile='linear';$('duration').value=100;$('motionProfile').value=s.profile;
+    changeChart('log');updateControls();
+    notify('Trajet lent préparé. Choisissez détente ou compression, puis lancez le piston : γ sera estimé au fil des mesures.');
+  });
   function changeChart(key) { const s = session(); s.chart = key; $('extraChart').value = key; render(); }
   function frame(timestamp) {
     const s = session(); if (!previousFrame) previousFrame = timestamp;
@@ -874,7 +885,7 @@
   });
   window.addEventListener('resize',render); document.addEventListener('visibilitychange',()=>{previousFrame=0;accumulator=0;});
   selectExperiment('pressure');
-  guide=GasTutorial.create({getState:()=>{const s=session();return {experiment:active,playing:s.playing,time:s.sim.time,run:s.run,chart:s.chart,lesson:s.lesson,tour:s.tour,returning:s.returning,cycle:s.cycle,batch:s.batch,recordY:s.recordY,radius:s.radius,radiusRecords:s.radiusRecords,seriesFinished:s.batchMessage.startsWith('Série terminée')};}});
+  guide=GasTutorial.create({getState:()=>{const s=session();return {experiment:active,playing:s.playing,time:s.sim.time,run:s.run,chart:s.chart,moving:!!s.sim.motion,logFitReady:!!s.logFitReady,lesson:s.lesson,tour:s.tour,returning:s.returning,cycle:s.cycle,batch:s.batch,recordY:s.recordY,radius:s.radius,radiusRecords:s.radiusRecords,seriesFinished:s.batchMessage.startsWith('Série terminée')};}});
   requestAnimationFrame(frame);
   Object.defineProperty(window,'gaz2D',{value:{
     get metrics(){return {...session().sim.metrics};}, get comparisonMetrics(){return session().other ? {...session().other.metrics} : null;},

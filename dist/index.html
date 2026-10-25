@@ -6,15 +6,15 @@
   <meta name="theme-color" content="#f4f7f8">
   <meta name="description" content="Visite guidée d’un laboratoire de thermodynamique : des collisions aux mesures de pression, de travail et de chaleur.">
   <title>Gaz 2D — Visite guidée du laboratoire</title>
-  <link rel="stylesheet" href="styles.css?v=0.20.9">
-  <script defer src="physics.js?v=0.20.9"></script>
-  <script defer src="analysis.js?v=0.20.9"></script>
-  <script defer src="units.js?v=0.20.9"></script>
-  <script defer src="graphics.js?v=0.20.9"></script>
-  <script defer src="tour.js?v=0.20.9"></script>
-  <script defer src="lessons.js?v=0.20.9"></script>
-  <script defer src="tutorial.js?v=0.20.9"></script>
-  <script defer src="app.js?v=0.20.9"></script>
+  <link rel="stylesheet" href="styles.css?v=0.20.10">
+  <script defer src="physics.js?v=0.20.10"></script>
+  <script defer src="analysis.js?v=0.20.10"></script>
+  <script defer src="units.js?v=0.20.10"></script>
+  <script defer src="graphics.js?v=0.20.10"></script>
+  <script defer src="tour.js?v=0.20.10"></script>
+  <script defer src="lessons.js?v=0.20.10"></script>
+  <script defer src="tutorial.js?v=0.20.10"></script>
+  <script defer src="app.js?v=0.20.10"></script>
 </head>
 <body>
   <header id="appHeader" class="masthead">
@@ -102,6 +102,8 @@
           <div id="graphLegend" class="graph-legend"></div>
           <canvas id="chart" aria-label="Évolution temporelle de la pression, du volume et de la température"></canvas>
           <p id="chartHint" class="chart-hint"></p><div id="freeRetry" class="lesson free-retry" hidden><strong>Et si vous changiez de point de vue ?</strong><p>Refaites la même détente en suivant PV/(nRT). Après le transitoire, se rapproche-t-il de 1 ? Comparez au cas idéal, puis essayez des disques plus grands.</p><button id="retryFreeRatio" class="button secondary">Recommencer avec PV/(nRT) →</button></div>
+          <div id="adiabaticInvestigation" class="lesson" hidden><strong>Et sur tout le trajet : PV<sup>γ</sup> reste-t-il constant ?</strong><p>Après les trois cas, essayez une compression ou une détente lente. Si PV<sup>γ</sup> est constant, ln(P) = −γ ln(V) + constante : l’opposé de la pente donne γ.</p><button id="prepareLogStudy" class="button secondary">Tracer ln(P) en fonction de ln(V) · trajet lent</button><p class="field-help">Choisissez ensuite détente ou compression, puis lancez le piston. Comparez au gaz dilué 2D : γ = 2. Des disques plus gros ou un trajet rapide peuvent s’en écarter.</p></div>
+          <div id="logAnalysis" hidden><label for="gamma">γ de référence</label><input id="gamma" type="number" min="0.1" max="5" value="2" step="0.1"><p id="fitStatus"></p><p id="fitValues"></p></div>
           <div id="pressureLesson" class="lesson">
             <div class="lesson-title"><strong>Des impulsions à la pression</strong><span id="pressureWindow">Fenêtre 0,23 ms</span></div>
             <div class="pressure-gauge" title="Échelle de la jauge : de 0 à quatre fois la pression idéale initiale"><div id="pressureGaugeFill"></div></div>
@@ -189,14 +191,13 @@
             <p><strong>Tester la loi idéale.</strong> Les disques ont des collisions élastiques entre eux. Le dernier onglet change uniquement leur rayon, avec réinitialisation aux mêmes n, V et T initiale. Les relevés manuels sont conservés lors de ce changement. PV/(nRT) est calculé à partir de la pression mesurée, jamais imposé à 1. Le volume utilisé est celui de la cavité entière, pas un volume libre corrigé.</p>
             <p><strong>Adiabatique ne signifie pas toujours quasi statique.</strong> La référence γ = 2 suppose un gaz idéal 2D isotrope. Les chocs entre disques redistribuent les vitesses ; leur taille finie et un déplacement rapide peuvent néanmoins écarter le gaz de cette référence.</p>
             <p id="directionTemperatures"></p><p id="thermalFallbacks" class="field-help"></p>
-            <div id="logAnalysis" hidden><label for="gamma">γ de référence</label><input id="gamma" type="number" min="0.1" max="5" value="2" step="0.1"><p id="fitStatus"></p><p id="fitValues"></p></div>
             <p class="field-help">Les contacts thermiques multiples à un même instant numérique sont régularisés : une seule réémission thermique par particule, puis des réflexions élastiques. Les événements sont comptés dans l’export. <a href="https://algs4.cs.princeton.edu/61event/index.php" target="_blank" rel="noopener">Simulation de disques durs · Princeton ↗</a></p>
           </div>
         </div>
         <div class="panel distributions"><div><h2>Norme des vitesses</h2><canvas id="speedHistogram" aria-label="Distribution de la norme des vitesses"></canvas></div><div><h2>Énergie cinétique par marqueur</h2><canvas id="energyHistogram" aria-label="Distribution de l’énergie cinétique des particules"></canvas></div><p id="distributionLegend">État actuel et état initial, densités normalisées.</p></div>
       </details>
     </section>
-    <footer><span>Gaz 2D · version 0.20.9</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
+    <footer><span>Gaz 2D · version 0.20.10</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
   </main>
   <div id="tutorialWelcome" class="tutorial-welcome" hidden>
     <section role="dialog" aria-modal="true" aria-labelledby="welcomeTitle" aria-describedby="welcomeDescription" class="welcome-card">
@@ -216,7 +217,7 @@
     <p id="tutorialStatus" role="status" aria-live="polite"></p>
     <div class="tutorial-actions"><button id="tutorialNext" class="button primary">Continuer →</button></div>
     <label class="tutorial-chapter-label" for="tutorialChapter">Aller à une expérience</label>
-    <select id="tutorialChapter" aria-label="Aller à une expérience"><option value="0">Prendre en main</option><option value="1">Pression</option><option value="3">Température</option><option value="6">Joule–Gay–Lussac</option><option value="11">Travail</option><option value="16">Cycles</option><option value="18">Rayon & loi des gaz</option><option value="30">Pour aller plus loin</option></select>
+    <select id="tutorialChapter" aria-label="Aller à une expérience"><option value="0">Prendre en main</option><option value="1">Pression</option><option value="3">Température</option><option value="6">Joule–Gay–Lussac</option><option value="11">Travail</option><option value="18">Cycles</option><option value="20">Rayon & loi des gaz</option><option value="32">Pour aller plus loin</option></select>
   </aside>
 </body>
 </html>

@@ -202,6 +202,15 @@ test('work illustration requires a correct retry, then manual piston travel, wit
  lab.click('illustrate');lab.advance(3.2);assert.equal(lab.analysis.lesson,null);assert.equal(lab.paused,false);
  assert.equal(lab.nodes.get('workMotionRibbon').hidden,true);assert.equal(handle.hidden,true);
  const work=lab.metrics.work;lab.advance(.3);assert.equal(lab.metrics.work,work);
+ assert.equal(lab.nodes.get('adiabaticInvestigation').hidden,false);
+ lab.click('tutorialStart');lab.nodes.get('tutorialChapter').value='16';lab.nodes.get('tutorialChapter').dispatch('change');
+ assert.equal(lab.analysis.tutorial.target,'prepareLogStudy');assert.equal(lab.analysis.tutorial.quiet,true);
+ lab.click('prepareLogStudy');assert.equal(lab.analysis.chartType,'log');assert.equal(lab.nodes.get('duration').value,'100');assert.equal(lab.nodes.get('logAnalysis').hidden,false);
+ assert.equal(lab.analysis.tutorial.target,'start');lab.input('timeScale',4);lab.click('start');lab.advance(7);
+ assert.equal(lab.analysis.tutorial.index,17);assert.equal(lab.analysis.tutorial.quiet,true);assert.equal(lab.analysis.tutorial.target,'logAnalysis');
+ assert.match(lab.nodes.get('fitStatus').textContent,/γ apparent/);
+ lab.advance(24);assert.equal(lab.analysis.tutorial.target,'tab-cycles');assert.equal(lab.analysis.tutorial.quiet,true);
+ assert.equal(lab.nodes.get('logAnalysis').hidden,false);lab.click('tab-cycles');lab.advance(.15);assert.equal(lab.analysis.tutorial.target,'start');
 });
 
 test('Joule–Gay–Lussac doubles V without changing E or T, with simulation and plot visible together',()=>{
@@ -521,7 +530,7 @@ test('the guide clears the veil for actions and waits for slider release before 
  const lab=laboratory({welcome:true}),spot=lab.nodes.get('tutorialSpotlight');lab.click('tutorialStart');
  assert.equal(spot.classList.contains('interaction'),false);lab.click('tutorialNext');
  assert.equal(spot.classList.contains('interaction'),true);
- lab.nodes.get('tutorialChapter').value='18';lab.nodes.get('tutorialChapter').dispatch('change');
+ lab.nodes.get('tutorialChapter').value='20';lab.nodes.get('tutorialChapter').dispatch('change');
  lab.click('tab-comparison');lab.advance(.15);
  const target=lab.nodes.get('particleRadius');
  lab.documentEvent('pointerdown',{target,pointerId:1});lab.input('particleRadius',.6);
@@ -568,7 +577,7 @@ test('the tutorial follows a paused temperature animation through its real final
 
 test('tutorial keeps the page top for visible targets and only reveals lower controls',()=>{
  const lab=laboratory({welcome:true});lab.click('tutorialStart');
- assert.equal(lab.analysis.tutorial.total,36);assert.equal(lab.scrollCalls.length,0);
+ assert.equal(lab.analysis.tutorial.total,38);assert.equal(lab.scrollCalls.length,0);
  lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.title,'D’où vient la pression ?');assert.equal(lab.scrollCalls.length,0);
  lab.nodes.get('tutorialChapter').value='6';lab.nodes.get('tutorialChapter').dispatch('change');
  lab.click('tab-free');lab.advance(.15);
@@ -594,7 +603,7 @@ test('an ongoing animation stays clear even on an explanatory step already marke
 
 test('the cycles guide stays quiet before and during the cycle',()=>{
  const lab=laboratory({welcome:true});lab.click('tutorialStart');
- lab.nodes.get('tutorialChapter').value='16';lab.nodes.get('tutorialChapter').dispatch('change');
+ lab.nodes.get('tutorialChapter').value='18';lab.nodes.get('tutorialChapter').dispatch('change');
  lab.click('tab-cycles');lab.advance(.15);
  assert.equal(lab.analysis.tutorial.title,'Dessiner l’aller et le retour');
  assert.equal(lab.analysis.tutorial.target,'start');assert.equal(lab.analysis.tutorial.quiet,true);
@@ -608,7 +617,7 @@ test('the cycles guide stays quiet before and during the cycle',()=>{
 
 test('radius guide collects five distinct new manual readings before comparing their plot',()=>{
  const lab=laboratory({welcome:true});lab.click('tutorialStart');
- lab.nodes.get('tutorialChapter').value='18';lab.nodes.get('tutorialChapter').dispatch('change');lab.click('tab-comparison');lab.advance(.15);
+ lab.nodes.get('tutorialChapter').value='20';lab.nodes.get('tutorialChapter').dispatch('change');lab.click('tab-comparison');lab.advance(.15);
  for(let i=0;i<5;i++){
   assert.equal(lab.analysis.tutorial.title,'Choisir le rayon '+(i+1)+' / 5');assert.equal(lab.analysis.tutorial.quiet,i>0);
   if(i>0){lab.input('particleRadius',10);assert.equal(lab.analysis.tutorial.title,'Choisir le rayon '+(i+1)+' / 5');assert.equal(lab.analysis.tutorial.ready,false);}
@@ -621,3 +630,16 @@ test('radius guide collects five distinct new manual readings before comparing t
  assert.equal(lab.nodes.get('recordY').value,'ratio');
  lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.title,'Revenir avec des disques plus grands');
 });
+
+ test('logarithmic chart exposes the measured regression and gamma beside the graph',()=>{
+ const lab=laboratory();lab.click('tab-adiabatic');
+ assert.equal(lab.nodes.get('adiabaticInvestigation').hidden,true);
+ lab.input('extraChart','log');assert.equal(lab.nodes.get('logAnalysis').hidden,false);
+ assert.doesNotMatch(lab.nodes.get('fitValues').textContent,/γ = −pente/);
+ lab.input('duration',100);lab.input('timeScale',4);lab.click('start');lab.advance(7);
+ assert.match(lab.nodes.get('fitStatus').textContent,/γ apparent.*R²/);
+ assert.match(lab.nodes.get('fitValues').textContent,/ln\(P \/ 1 bar\).*γ = −pente.*erreur standard/);
+ assert.doesNotMatch(lab.nodes.get('fitValues').textContent,/NaN|Infinity/);
+ assert.ok(html.indexOf('id="logAnalysis"')<html.indexOf('id="advanced"'));
+ lab.input('extraChart','pv');assert.equal(lab.nodes.get('logAnalysis').hidden,true);
+ });
