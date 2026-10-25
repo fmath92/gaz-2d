@@ -102,3 +102,14 @@ test('variable disk radii preserve non-overlap, energy and the chosen radius in 
   }
   for(const particleRadius of [0,-.01,.071,NaN,Infinity]) assert.throws(()=>new GasSimulation({count:1000,particleModel:'hard-disks',particleRadius}),RangeError);
 });
+
+test('mean free path counts complete mutual flights including wall bounces, not initial partial paths',()=>{
+  const sim=isolatedPair(),[a,b]=sim.particles;
+  Object.assign(a,{x:3,y:3,vx:1,vy:0});Object.assign(b,{x:3.2,y:3,vx:-1,vy:0});
+  sim.step(.1);assert.equal(sim.metrics.completedFlights,0);assert.equal(sim.metrics.meanFreePath,null);
+  const copy=sim.fork();run(copy,10.81);
+  assert.equal(sim.metrics.completedFlights,0);close(sim.particles[0].lastPairTime,.06);
+  assert.equal(copy.metrics.completedFlights,2);
+  close(copy.metrics.meanFreePath,10.84,1e-7);close(copy.metrics.meanCollisionTime,10.84,1e-7);
+  copy.reset({count:10,particleModel:'hard-disks'});assert.equal(copy.metrics.completedFlights,0);assert.equal(copy.metrics.meanFreePath,null);
+});

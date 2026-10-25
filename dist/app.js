@@ -21,7 +21,7 @@
   const snapshots = sim => ({ speeds: sim.particles.map(p => Math.hypot(p.vx, p.vy)), energies: sim.particles.map(p => (p.vx ** 2 + p.vy ** 2) / 2) });
   function createSession(key, previous) {
     const config = experiments[key];
-    const s = { key, model: 'hard-disks', radius: key === 'comparison' ? (previous?.radius ?? .04) : .04, radiusRecords: previous?.radiusRecords ?? [], initialTemperature: previous?.initialTemperature || 1.5,
+    const s = { key, model: 'hard-disks', radius: key === 'comparison' ? (previous?.radius ?? .04) : .04, radiusRecords: previous?.radiusRecords ?? [], recordX: previous?.recordX ?? 'radius', recordY: previous?.recordY ?? 'ratio', initialTemperature: previous?.initialTemperature || 1.5,
       action: previous?.action ?? config.action, duration: 72, ratio: key === 'free' ? 200 : (previous?.action ?? config.action) === 'compression' ? 70 : 140,
       source: config.source, chart: config.chart, zoom: config.zoom, speed: config.speed, playing: true, vectors: false,
       bath: previous?.bath ?? 3, accommodation: previous?.accommodation ?? 1, allWalls: previous?.allWalls ?? false,
@@ -75,6 +75,8 @@
     $('motionFixedOption').hidden = $('motionFixedOption').disabled = active === 'adiabatic';
     $('heatControls').hidden = active !== 'heat'; $('thermalAdvanced').hidden = active !== 'heat';
     $('radiusControls').hidden = active !== 'comparison';
+    $('recordAnalysis').hidden = active !== 'comparison';
+    $('recordX').value = s.recordX; $('recordY').value = s.recordY;
     $('particleRadius').value = Math.round(s.radius * 1000);
     $('radiusValue').value = format(s.radius * U.scales.length * 1000) + ' mm';
     $('microTitle').textContent = s.other ? 'Deux états microscopiques' : active === 'heat' ? 'Le gaz et la paroi gauche' : 'Le gaz et son piston';
@@ -359,7 +361,37 @@
       $('distributionLegend').textContent = s.other ? 'Barres : gaz de disques · pointillés : disques durs. Densités normalisées, mêmes classes.' : 'Barres : état actuel · pointillés : état initial. Densités normalisées, mêmes classes.';
     }
   }
-  function render() { readings(); draw(); drawChart(); }
+  const recordFields = {
+    radius: {label:'Rayon (mm)', value:r => r.radius * U.scales.length * 1000},
+    ratio: {label:'PV/(nRT)', value:r => r.ratio},
+    meanFreePath: {label:'Libre parcours moyen (mm)', value:r => r.meanFreePath == null ? null : r.meanFreePath * U.scales.length * 1000},
+    packing: {label:'Surface occupée (%)', value:r => r.packing * 100},
+    pressure: {label:'Pression (bar)', value:r => U.value('pressure',r.pressure)},
+    temperature: {label:'Température (K)', value:r => U.value('temperature',r.temperature)},
+    meanCollisionTime: {label:'Temps moyen entre chocs (µs)', value:r => r.meanCollisionTime == null ? null : r.meanCollisionTime * U.scales.time * 1e6},
+    completedFlights: {label:'Trajets complets comptés', value:r => r.completedFlights}
+  };
+  function recordPlotData() {
+    const s = session(), xf = recordFields[s.recordX], yf = recordFields[s.recordY];
+    const points = s.radiusRecords.map((r,i) => ({x:xf.value(r), y:yf.value(r), index:i+1})).filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
+    const xRange = G.dataRange(points.map(p=>p.x),[0,1]), yRange = G.dataRange(points.map(p=>p.y).concat(s.recordY === 'ratio' ? [1] : []),[0,1]);
+    const series = [{color:'#287db4',scatter:true,radius:4,points}];
+    if (s.recordY === 'ratio') series.unshift({color:'#8c9eaa',dashed:true,points:xRange.map(x=>({x,y:1}))});
+    if (s.recordX === 'ratio') {
+      xRange[0] = Math.min(xRange[0],.95); xRange[1] = Math.max(xRange[1],1.05);
+      series.unshift({color:'#8c9eaa',dashed:true,points:yRange.map(y=>({x:1,y}))});
+    }
+    return {series,xRange,yRange,xLabel:xf.label,yLabel:yf.label,points};
+  }
+  function drawRecordPlot() {
+    if (active !== 'comparison') return;
+    const s = session(), data = recordPlotData(); G.plot($('recordChart'),data);
+    $('recordChart').setAttribute('aria-label',data.yLabel+' en fonction de '+data.xLabel);
+    $('recordPlotHint').textContent = s.radiusRecords.length ? data.points.length+' point(s) sur '+s.radiusRecords.length+' relevé(s). Chaque point est un relevé conservé ; les points ne sont pas reliés.'+(data.points.length<s.radiusRecords.length?' Les mesures indisponibles sont omises.':'') : 'Relevez au moins une mesure avec « Relever ce rayon », puis changez le rayon pour comparer.';
+    $('exportRecords').disabled = !s.radiusRecords.length;
+    $('recordTable').innerHTML = s.radiusRecords.map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+format(recordFields.radius.value(r))+'</td><td>'+format(r.ratio,3)+'</td><td>'+format(recordFields.meanFreePath.value(r))+'</td><td>'+format(recordFields.packing.value(r))+'</td><td>'+format(recordFields.pressure.value(r),3)+'</td><td>'+format(recordFields.temperature.value(r))+'</td><td>'+format(recordFields.meanCollisionTime.value(r))+'</td><td>'+r.completedFlights+'</td><td>'+U.text('time',r.time)+'</td><td>'+(r.source==='mean'?'Toutes les parois':'Piston')+'</td></tr>').join('');
+  }
+  function render() { readings(); draw(); drawChart(); drawRecordPlot(); }
   function changeChart(key) { const s = session(); s.chart = key; $('extraChart').value = key; render(); }
   function frame(timestamp) {
     const s = session(); if (!previousFrame) previousFrame = timestamp;
@@ -422,9 +454,17 @@
   $('recordRadius').addEventListener('click', () => {
     const s = session(), m = s.sim.metrics;
     if (active !== 'comparison' || m.time < 4 || ratio(m) == null) return;
-    s.radiusRecords.push({radius:s.radius, ratio:ratio(m), time:m.time, temperature:m.temperature, source:s.source});
+    s.radiusRecords.push({radius:s.radius, ratio:ratio(m), time:m.time, temperature:m.temperature, source:s.source, pressure:pressure(m), volume:m.volume, packing:m.packingFraction, meanFreePath:m.meanFreePath, meanCollisionTime:m.meanCollisionTime, completedFlights:m.completedFlights});
     if (s.radiusRecords.length > 30) s.radiusRecords.shift();
     render(); notify('Relevé conservé. Changez le rayon puis appliquez-le pour comparer.');
+  });
+  for (const id of ['recordX','recordY']) $(id).addEventListener('input', () => { session()[id] = $(id).value; drawRecordPlot(); });
+  $('exportRecords').addEventListener('click', () => {
+    const number = v => v == null || !Number.isFinite(v) ? '' : v.toPrecision(10).replace('.',',');
+    const rows = session().radiusRecords.map((r,i)=>[i+1,...Object.values(recordFields).map(f=>number(f.value(r))),number(U.value('time',r.time)),r.source].join(';'));
+    const header = 'releve;rayon_mm;PV_sur_nRT;libre_parcours_moyen_mm;surface_occupee_pct;pression_bar;temperature_K;temps_moyen_entre_chocs_us;trajets_complets;temps_ms;capteur';
+    const url=URL.createObjectURL(new Blob(['\uFEFF'+header+'\r\n'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'}));
+    const a=document.createElement('a');a.href=url;a.download='gaz-2d-releves.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   });
   $('clearRadiusRecords').addEventListener('click', () => { session().radiusRecords = []; render(); });
   $('initialTemperature').addEventListener('input', () => { $('initialTemperatureValue').value = U.text('temperature', +$('initialTemperature').value / 200); });
@@ -447,6 +487,6 @@
   selectExperiment('pressure'); requestAnimationFrame(frame);
   Object.defineProperty(window,'gaz2D',{value:{
     get metrics(){return {...session().sim.metrics};}, get comparisonMetrics(){return session().other ? {...session().other.metrics} : null;},
-    get paused(){return !session().playing;}, get analysis(){const s=session();return {experiment:active,chartType:s.chart,pressureSource:s.source,count:N,history:s.history.map(r=>({...r})),collision:s.focus,plot:chartData(),run:s.run,seek:!!s.seek,tour:s.tour?.view ?? null,lastTour:s.lastTour};}
+    get paused(){return !session().playing;}, get analysis(){const s=session();return {experiment:active,chartType:s.chart,pressureSource:s.source,count:N,history:s.history.map(r=>({...r})),collision:s.focus,plot:chartData(),recordPlot:recordPlotData(),radiusRecords:s.radiusRecords.map(r=>({...r})),run:s.run,seek:!!s.seek,tour:s.tour?.view ?? null,lastTour:s.lastTour};}
   },writable:false});
 })();

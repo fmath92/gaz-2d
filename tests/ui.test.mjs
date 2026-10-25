@@ -249,3 +249,25 @@ test('visible units and plot coordinates share fixed scales across presets and r
   assert.equal(lab.nodes.get('temperature').textContent,'600,00 K');
   assert.equal(lab.nodes.get('volume').textContent,'1,00 L');
 });
+
+test('record axes use immutable saved measurements and export all radii independently of live history',async()=>{
+  const lab=laboratory();lab.click('tab-comparison');
+  assert.equal(lab.analysis.recordPlot.points.length,0);assert.equal(lab.nodes.get('exportRecords').disabled,true);
+  lab.input('timeScale',4);lab.advance(1.3);lab.click('recordRadius');
+  const saved=lab.analysis.radiusRecords[0];assert.ok(saved.meanFreePath>0);assert.ok(saved.completedFlights>0);
+  lab.input('particleRadius',70);lab.click('applyRadius');
+  assert.equal(lab.analysis.radiusRecords[0].meanFreePath,saved.meanFreePath);
+  lab.input('recordX','packing');lab.input('recordY','meanFreePath');
+  const point=lab.analysis.recordPlot.points[0];
+  assert.ok(Math.abs(point.x-saved.packing*100)<1e-9);
+  assert.ok(point.y>saved.meanFreePath);assert.equal(lab.analysis.recordPlot.xLabel,'Surface occupée (%)');
+  lab.input('timeScale',4);lab.advance(1.3);lab.click('recordRadius');
+  assert.equal(lab.analysis.recordPlot.points.length,2);
+  lab.click('exportRecords');const csv=await lab.downloads.at(-1).blob.text();
+  assert.match(csv,/libre_parcours_moyen_mm/);assert.equal(csv.trim().split(/\r?\n/).length,3);
+  for(const key of ['radius','ratio','packing','meanFreePath','temperature','pressure','meanCollisionTime','completedFlights']) {
+    lab.input('recordX',key);lab.input('recordY',key);assert.equal(lab.analysis.recordPlot.points.length,2);
+    assert.equal(lab.analysis.recordPlot.points[0].x,lab.analysis.recordPlot.points[0].y);
+  }
+  lab.click('clearRadiusRecords');assert.equal(lab.analysis.recordPlot.points.length,0);assert.equal(lab.nodes.get('exportRecords').disabled,true);
+});

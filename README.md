@@ -2,7 +2,7 @@
 
 **[Ouvrir le démonstrateur](https://fmath92.github.io/gaz-2d/)** · [Code source](https://github.com/fmath92/gaz-2d)
 
-Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.8.0 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
+Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.9.0 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
 
 ## La visite
 
@@ -138,3 +138,12 @@ node --test tests/*.test.mjs
 Les tests vérifient les conservations, le confinement, les collisions, les thermostats sélectifs, les observations avant/après, la fidélité des prévisions, les parcours de caméra, la reprise automatique, les interruptions, les diagrammes et les commandes. Les scénarios d’interface exécutent le vrai moteur et le code applicatif avec un DOM et un Canvas simulés ; l’apparence est également contrôlée dans un navigateur. Le module d’analyse des cycles de la version précédente est conservé dans les sources, mais n’est plus chargé par l’interface.
 
 GitHub Pages publie automatiquement la branche `main`, depuis la racine du dépôt. `index.html` redirige vers `dist/` et `.nojekyll` demande un service statique sans transformation. Le dépôt est public : pousser les changements sur `main` met à jour le démonstrateur.
+
+
+## Graphique des relevés (0.9.0)
+
+Dans « Rayon & loi des gaz », le panneau **Comparer les relevés** trace une grandeur sauvegardée en fonction d’une autre. Les deux axes proposent PV/(nRT), rayon (mm), libre parcours moyen (mm), surface occupée (%), pression (bar), température (K), temps moyen entre collisions mutuelles (µs) et nombre de trajets complets. Les points ne sont pas reliés ; une ligne de référence à 1 accompagne un axe PV/(nRT). Le tableau et l’export dédié `gaz-2d-releves.csv` conservent les conditions de chaque mesure, même après changement de rayon. L’export habituel reste celui de l’historique courant.
+
+Le moteur intègre la distance réellement parcourue par chaque disque. Une collision mutuelle clôt le trajet de chacun des deux participants. Les rebonds aux parois n’interrompent pas ce comptage ; les trajets initiaux partiels et les trajets en cours ne sont pas inclus. La moyenne utilise tous les trajets complets depuis la réinitialisation et ne déduit rien de la loi des gaz parfaits. Le temps moyen est calculé sur les mêmes trajets. Les statistiques de la prévision des zooms sont indépendantes de celles du gaz affiché.
+
+Ces moyennes cumulées diffèrent de la fenêtre glissante de pression. Une observation courte sous-échantillonne les longs trajets ; le nombre de trajets et l’instant du relevé permettent de juger la durée d’observation, sans garantir l’équilibre. En 2D, l’occupation est Nπr²/(LH), égale à la fraction du volume équivalent pour des disques extrudés sur la profondeur conventionnelle. Aucun volume de sphères 3D n’est utilisé.

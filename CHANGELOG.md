@@ -1,3 +1,10 @@
+## 0.9.0 — Graphiques des relevés
+
+- Axes X/Y libres pour comparer ratio, rayon, libre parcours moyen, occupation, pression, température, temps entre collisions et nombre de trajets.
+- Mesure cinématique des trajets complets entre collisions mutuelles, indépendante de l’équation d’état ; définition et biais de durée explicités.
+- Tableau des conditions et export CSV dédié à tous les relevés conservés.
+- Tests des distances analytiques avec rebonds aux parois, de l’indépendance des prévisions et des axes/exports.
+
 ## 0.8.0 — Impulsions et disques durs
 
 - Impulsion affichée en kg·m/s et expliquée par J = m(v avant − v après) ; flèche orange à la même échelle que les flèches de quantité de mouvement.

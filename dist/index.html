@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#f4f7f8">
   <meta name="description" content="Visite guidée d’un laboratoire de thermodynamique : des collisions aux mesures de pression, de travail et de chaleur.">
   <title>Gaz 2D — Visite guidée du laboratoire</title>
-  <link rel="stylesheet" href="styles.css?v=0.8.0">
-  <script defer src="physics.js?v=0.8.0"></script>
-  <script defer src="analysis.js?v=0.8.0"></script>
-  <script defer src="units.js?v=0.8.0"></script>
-  <script defer src="graphics.js?v=0.8.0"></script>
-  <script defer src="tour.js?v=0.8.0"></script>
-  <script defer src="app.js?v=0.8.0"></script>
+  <link rel="stylesheet" href="styles.css?v=0.9.0">
+  <script defer src="physics.js?v=0.9.0"></script>
+  <script defer src="analysis.js?v=0.9.0"></script>
+  <script defer src="units.js?v=0.9.0"></script>
+  <script defer src="graphics.js?v=0.9.0"></script>
+  <script defer src="tour.js?v=0.9.0"></script>
+  <script defer src="app.js?v=0.9.0"></script>
 </head>
 <body>
   <header class="masthead">
@@ -100,6 +100,15 @@
       </div>
       <p class="field-help">Modèle cinétique 2D · volume équivalent à profondeur constante · unités physiques à échelles fixes · lecture ralentie.</p>
       <div class="bottom-row"><p id="notice" role="status" aria-live="polite">Chaque onglet conserve son expérience. Seul le gaz affiché évolue.</p><button id="nextExperience" class="text-button">Étape suivante →</button></div>
+      <section id="recordAnalysis" class="panel record-analysis" hidden aria-labelledby="recordAnalysisTitle">
+        <div class="panel-heading"><h2 id="recordAnalysisTitle">Comparer les relevés</h2><button id="exportRecords" class="button secondary">Exporter les relevés CSV</button></div>
+        <div class="record-axes"><label>Abscisse X<select id="recordX"><option value="radius" selected>Rayon des particules (mm)</option><option value="ratio">Ratio PV/(nRT)</option><option value="meanFreePath">Libre parcours moyen (mm)</option><option value="packing">Surface occupée (%)</option><option value="pressure">Pression (bar)</option><option value="temperature">Température (K)</option><option value="meanCollisionTime">Temps moyen entre chocs (µs)</option><option value="completedFlights">Nombre de trajets complets</option></select></label><label>Ordonnée Y<select id="recordY"><option value="radius">Rayon des particules (mm)</option><option value="ratio" selected>Ratio PV/(nRT)</option><option value="meanFreePath">Libre parcours moyen (mm)</option><option value="packing">Surface occupée (%)</option><option value="pressure">Pression (bar)</option><option value="temperature">Température (K)</option><option value="meanCollisionTime">Temps moyen entre chocs (µs)</option><option value="completedFlights">Nombre de trajets complets</option></select></label></div>
+        <canvas id="recordChart" aria-label="Graphique des relevés conservés"></canvas>
+        <p id="recordPlotHint" class="field-help"></p>
+        <p class="field-help">Le libre parcours moyen est la longueur moyenne des trajets complets entre deux collisions entre particules, depuis le redémarrage. Les rebonds aux parois prolongent le trajet ; ils ne le terminent pas. Le premier trajet incomplet et ceux encore en cours sont exclus : une mesure courte peut sous-estimer les longs trajets. Ce calcul est indépendant de PV/(nRT).</p>
+        <p class="field-help">En 2D, la surface occupée vaut Nπr²/(L×H). Avec notre profondeur constante, c’est aussi la fraction du volume équivalent occupée par les disques extrudés. Pression : fenêtre glissante ; parcours et temps entre chocs : moyennes cumulées. Comparez des durées et des capteurs semblables.</p>
+        <details><summary>Tableau des relevés et conditions de mesure</summary><div class="record-table"><table><thead><tr><th>N°</th><th>r (mm)</th><th>PV/(nRT)</th><th>λ (mm)</th><th>Occupation (%)</th><th>P (bar)</th><th>T (K)</th><th>τ (µs)</th><th>Trajets</th><th>Instant</th><th>Capteur</th></tr></thead><tbody id="recordTable"></tbody></table></div></details>
+      </section>
       <details id="advanced" class="advanced">
         <summary>Approfondir : autres diagrammes, distributions, réglages et explications</summary>
         <div class="advanced-grid">
@@ -129,7 +138,7 @@
         <div class="panel distributions"><div><h2>Norme des vitesses</h2><canvas id="speedHistogram" aria-label="Distribution de la norme des vitesses"></canvas></div><div><h2>Énergie cinétique par marqueur</h2><canvas id="energyHistogram" aria-label="Distribution de l’énergie cinétique des particules"></canvas></div><p id="distributionLegend">État actuel et état initial, densités normalisées.</p></div>
       </details>
     </section>
-    <footer><span>Gaz 2D · version 0.8.0</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
+    <footer><span>Gaz 2D · version 0.9.0</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
   </main>
 </body>
 </html>

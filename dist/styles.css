@@ -1713,3 +1713,13 @@ input[aria-invalid="true"] {
 #radiusControls input { width: 100%; margin: 10px 0; }
 #radiusControls small { display: block; color: #647985; margin-top: 8px; font-size: 10px; }
 #radiusRecords { max-height: 105px; overflow: auto; padding-left: 18px; }
+
+.record-analysis { margin: 16px 0; padding: 18px; }
+.record-axes { display: flex; gap: 16px; margin: 12px 0; }
+.record-axes label { flex: 1; font-size: 12px; color: #557082; }
+.record-axes select { display: block; width: 100%; margin-top: 6px; }
+#recordChart { width: 100%; height: 300px; display: block; }
+.record-table { overflow-x: auto; }
+.record-table table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.record-table th, .record-table td { padding: 9px; text-align: right; white-space: nowrap; border-bottom: 1px solid #e5edef; }
+@media(max-width:600px) { .record-axes { flex-direction:column; } .record-analysis .panel-heading { flex-wrap:wrap; gap:10px; } }

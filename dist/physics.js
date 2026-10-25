@@ -132,6 +132,8 @@
       this._segments = [];
       this._collisions = 0;
       this._pairCollisions = 0;
+      this._flightDistanceSum = 0; this._flightTimeSum = 0; this._flightCount = 0;
+      for (const p of this.particles) { p.flightDistance = 0; p.lastPairTime = null; }
       this._lastThermalContact = new Float64Array(count).fill(-Infinity);
       this._thermalContactFallbacks = 0;
       return this;
@@ -299,7 +301,7 @@
       const ps = this.particles, n = ps.length, radius = this.radius, diameter = 2 * radius;
       const localTime = new Float64Array(n), revisions = new Uint32Array(n);
       const queue = new EventQueue();
-      const move = (i, t) => { const p = ps[i], h = t - localTime[i]; p.x += h * p.vx; p.y += h * p.vy; localTime[i] = t; };
+      const move = (i, t) => { const p = ps[i], h = t - localTime[i]; p.flightDistance += Math.max(0,h) * Math.hypot(p.vx,p.vy); p.x += h * p.vx; p.y += h * p.vy; localTime[i] = t; };
       const scheduleWall = (i, t) => {
         const p = ps[i];
         const hits = [
@@ -372,6 +374,16 @@
           a.vx += normalVelocity * nx; a.vy += normalVelocity * ny;
           b.vx -= normalVelocity * nx; b.vy -= normalVelocity * ny;
           this._pairCollisions++;
+          // Only complete flights between two mutual collisions enter the mean.
+          // Wall reflections continue the travelled path, without ending it.
+          for (const p of [a,b]) {
+            if (p.lastPairTime !== null) {
+              this._flightDistanceSum += p.flightDistance;
+              this._flightTimeSum += this.time + t - p.lastPairTime;
+              this._flightCount++;
+            }
+            p.flightDistance = 0; p.lastPairTime = this.time + t;
+          }
           if (this.observeCollisions) this.observations.pair = { kind: 'pair', sequence: ++this.observations.sequence,
             time: this.time + t, ids: [a.id, b.id], radius, before,
             after: [{ x: a.x, y: a.y, vx: a.vx, vy: a.vy }, { x: b.x, y: b.y, vx: b.vx, vy: b.vy }],
@@ -486,6 +498,9 @@
         accommodation: this.thermal.accommodation, pistonThermal: this.thermal.pistonThermal,
         measurementDuration: duration, collisions: this._collisions,
         particleModel: this.particleModel, particleRadius: this.radius, pairCollisions: this._pairCollisions,
+        meanFreePath: this._flightCount ? this._flightDistanceSum / this._flightCount : null,
+        meanCollisionTime: this._flightCount ? this._flightTimeSum / this._flightCount : null,
+        completedFlights: this._flightCount,
         thermalContactFallbacks: this._thermalContactFallbacks,
         packingFraction: this.count * Math.PI * this.radius ** 2 / (this.width * this.height),
         pistonVelocity: this._pistonVelocity
