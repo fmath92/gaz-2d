@@ -6,12 +6,12 @@
   const format = (v, digits = 2) => v == null || !Number.isFinite(v) ? '—' : (Math.abs(v) < 0.5 * Math.pow(10,-digits) ? 0 : v).toLocaleString('fr-FR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
   const experiments = {
     pressure: { index: '01', label: 'LES CHOCS FONT LA PRESSION', title: 'Des chocs microscopiques à la pression.', description: 'Suivez une particule jusqu’au piston et observez la poussée au moment du choc.', width: 11, action: 'fixed', source: 'piston', chart: 'time', zoom: false, speed: 1 },
-    heat: { index: '02', label: 'LA CHALEUR PASSE PAR LES PAROIS', title: 'Un choc peut réchauffer ou refroidir le gaz.', description: 'Le piston reste fixe. Seule la paroi gauche échange de la chaleur avec un thermostat réglable.', width: 11, action: 'fixed', source: 'mean', chart: 'time', zoom: false, speed: 1 },
-    free: { index: '03', label: 'DÉTENTE DE JOULE–GAY–LUSSAC', title: 'Plus de place. La même température ?', description: 'Ouvrez vers le vide, puis regardez le gaz occuper le nouvel espace. Les parois sont isolées.', width: 9, action: 'expansion', source: 'mean', chart: 'time', zoom: false, speed: 1 },
-    adiabatic: { index: '04', label: 'LE TRAVAIL DU PISTON', title: 'Détendre ou comprimer : l’énergie change de côté.', description: 'Choisissez le sens du mouvement, puis suivez un choc sur le piston mobile. Les parois sont isolées.', width: 11, action: 'expansion', source: 'mean', chart: 'time', zoom: false, speed: 1 },
-    comparison: { index: '05', label: 'LE RAYON DES PARTICULES', title: 'La taille des particules change-t-elle PV = nRT ?', description: 'Faites varier le rayon des disques, à quantité de gaz, volume et température initiale identiques. Comparez PV/(nRT) à 1.', width: 11, action: 'fixed', source: 'mean', chart: 'ratio', zoom: false, speed: 1 }
+    free: { index: '02', label: 'DÉTENTE DE JOULE–GAY–LUSSAC', title: 'Plus de place. La même température ?', description: 'Ouvrez vers le vide, puis regardez le gaz occuper le nouvel espace. Les parois sont isolées.', width: 9, action: 'expansion', source: 'mean', chart: 'time', zoom: false, speed: 1 },
+    adiabatic: { index: '03', label: 'LE TRAVAIL DU PISTON', title: 'Détendre ou comprimer : l’énergie change de côté.', description: 'Choisissez le sens du mouvement, puis suivez un choc sur le piston mobile. Les parois sont isolées.', width: 11, action: 'expansion', source: 'mean', chart: 'time', zoom: false, speed: 1 },
+    comparison: { index: '04', label: 'LE RAYON DES PARTICULES', title: 'La taille des particules change-t-elle PV = nRT ?', description: 'Faites varier le rayon des disques, à quantité de gaz, volume et température initiale identiques. Comparez PV/(nRT) à 1.', width: 11, action: 'fixed', source: 'mean', chart: 'ratio', zoom: false, speed: 1 }
   };
   const sessions = new Map();
+  let sharedRadius = .04;
   let active = 'pressure', previousFrame = 0, accumulator = 0, lastUI = 0;
   const session = () => sessions.get(active);
   const states = s => s.other ? [s.sim, s.other] : [s.sim];
@@ -22,7 +22,7 @@
   const snapshots = sim => ({ speeds: sim.particles.map(p => Math.hypot(p.vx, p.vy)), energies: sim.particles.map(p => (p.vx ** 2 + p.vy ** 2) / 2) });
   function createSession(key, previous) {
     const config = experiments[key];
-    const s = { key, model: 'hard-disks', radius: key === 'comparison' ? (previous?.radius ?? .04) : .04, radiusRecords: previous?.radiusRecords ?? [], recordX: previous?.recordX ?? 'radius', recordY: previous?.recordY ?? 'ratio', lastRecordTime: null, alpha: previous?.alpha ?? 1, fitEnabled: previous?.fitEnabled ?? true, autoRecords: previous?.autoRecords ?? false, recordPage: previous?.recordPage ?? 0, initialTemperature: previous?.initialTemperature || 1.5,
+    const s = { key, model: 'hard-disks', radius: sharedRadius, radiusRecords: previous?.radiusRecords ?? [], recordX: previous?.recordX ?? 'radius', recordY: previous?.recordY ?? 'ratio', lastRecordTime: null, alpha: previous?.alpha ?? 1, fitEnabled: previous?.fitEnabled ?? true, autoRecords: previous?.autoRecords ?? false, recordPage: previous?.recordPage ?? 0, initialTemperature: previous?.initialTemperature || 1.5,
       action: previous?.action ?? config.action, duration: 72, ratio: key === 'free' ? 200 : (previous?.action ?? config.action) === 'compression' ? 70 : 140,
       source: config.source, chart: config.chart, zoom: config.zoom, speed: config.speed, playing: true, vectors: false,
       bath: previous?.bath ?? 3, accommodation: previous?.accommodation ?? 1, allWalls: previous?.allWalls ?? false,
@@ -58,7 +58,7 @@
     $('workbench').setAttribute('data-experience', key);
     $('advanced').open = false;
     populateControls(); render();
-    notify('Chaque onglet conserve son expérience. Seul le gaz affiché évolue.');
+    notify('Rayon commun : '+format(sharedRadius*U.scales.length*1000)+' mm. Seul le gaz affiché évolue.');
   }
   function reset() {
     sessions.set(active, createSession(active, session()));
@@ -377,6 +377,9 @@
     radius: {label:'Rayon (mm)', value:r => r.radius * U.scales.length * 1000},
     ratio: {label:'PV/(nRT)', value:r => r.ratio},
     correctedRatio: {label:'P(V − αV occupé)/(nRT)', value:r => r.ratio*(1-session().alpha*r.packing)},
+    correctedPVT: {label:'P(V − αV occupé)/T (J/K)', value:r => r.ratio*(1-session().alpha*r.packing)*U.scales.nR},
+    inverseMeanFreePath: {label:'Inverse du libre parcours moyen (mm⁻¹)', value:r => r.meanFreePath > 0 ? 1/(r.meanFreePath*U.scales.length*1000) : null},
+    inverseMeanCollisionTime: {label:'Inverse du temps moyen entre chocs (µs⁻¹)', value:r => r.meanCollisionTime > 0 ? 1/(r.meanCollisionTime*U.scales.time*1e6) : null},
     meanFreePath: {label:'Libre parcours moyen (mm)', value:r => r.meanFreePath == null ? null : r.meanFreePath * U.scales.length * 1000},
     packing: {label:'Surface occupée (%)', value:r => r.packing * 100},
     pressure: {label:'Pression (bar)', value:r => U.value('pressure',r.pressure)},
@@ -387,12 +390,14 @@
   function recordPlotData() {
     const s = session(), xf = recordFields[s.recordX], yf = recordFields[s.recordY];
     const points = s.radiusRecords.map((r,i) => ({x:xf.value(r), y:yf.value(r), index:i+1})).filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
-    const xRange = G.dataRange(points.map(p=>p.x),[0,1]), yRange = G.dataRange(points.map(p=>p.y).concat(['ratio','correctedRatio'].includes(s.recordY) ? [1] : []),[0,1]);
+    const reference = key => key === 'correctedPVT' ? U.scales.nR : ['ratio','correctedRatio'].includes(key) ? 1 : null;
+    const xr = reference(s.recordX), yr = reference(s.recordY);
+    const xRange = G.dataRange(points.map(p=>p.x),[0,1]), yRange = G.dataRange(points.map(p=>p.y).concat(yr == null ? [] : [yr]),[0,1]);
     const series = [{color:'#287db4',scatter:true,radius:4,points}];
-    if (['ratio','correctedRatio'].includes(s.recordY)) series.unshift({color:'#8c9eaa',dashed:true,points:xRange.map(x=>({x,y:1}))});
-    if (['ratio','correctedRatio'].includes(s.recordX)) {
-      xRange[0] = Math.min(xRange[0],.95); xRange[1] = Math.max(xRange[1],1.05);
-      series.unshift({color:'#8c9eaa',dashed:true,points:yRange.map(y=>({x:1,y}))});
+    if (yr != null) series.unshift({color:'#8c9eaa',dashed:true,points:xRange.map(x=>({x,y:yr}))});
+    if (xr != null) {
+      xRange[0] = Math.min(xRange[0],xr*.95); xRange[1] = Math.max(xRange[1],xr*1.05);
+      series.unshift({color:'#8c9eaa',dashed:true,points:yRange.map(y=>({x:xr,y}))});
     }
     const fit = s.fitEnabled ? GasAnalysis.linearRegression(points) : null;
     if (fit) {
@@ -417,6 +422,7 @@
     const fit = data.fit;
     $('fitEquation').textContent = !s.fitEnabled ? 'Régression désactivée.' : !fit ? (data.points.length<3 ? 'Il faut au moins 3 relevés valides pour estimer les incertitudes.' : 'Les abscisses doivent varier pour déterminer une pente.') : 'y = ('+significant(fit.slope)+') x '+(fit.intercept<0?'− ':'+ ')+significant(Math.abs(fit.intercept))+' · R² = '+significant(fit.rSquared);
     $('fitUncertainty').textContent = fit ? 'a = '+significant(fit.slope)+' ± '+significant(fit.slopeSE)+' ; b = '+significant(fit.intercept)+' ± '+significant(fit.interceptSE)+' (incertitudes-types, 1 σ) · n = '+fit.count+' · degrés de liberté = '+fit.degreesOfFreedom+'. Unités : a en unité Y / unité X ; b en unité Y.' : '';
+    $('fitInterpretation').textContent = ['correctedRatio','correctedPVT'].includes(s.recordY) ? 'On cherche ici une grandeur constante : une pente compatible avec zéro et une valeur proche de '+(s.recordY==='correctedPVT'?'nR = '+format(U.scales.nR,4)+' J/K':'1')+'. Un faible R² peut donc être attendu : il ne mesure pas la qualité de cette correction. Multiplier par nR ne change pas R².' : '';
     const pages = Math.max(1,Math.ceil(s.radiusRecords.length/RECORD_PAGE_SIZE));
     s.recordPage = Math.max(0,Math.min(s.recordPage,pages-1));
     $('recordPageStatus').textContent = 'Page '+(s.recordPage+1)+' / '+pages+' · 100 lignes par page ; graphique, régression et export : tous les relevés.';
@@ -481,8 +487,10 @@
     $('radiusValue').value = format(+$('particleRadius').value / 1000 * U.scales.length * 1000) + ' mm';
   });
   $('applyRadius').addEventListener('click', () => {
-    session().radius = Math.max(.005, Math.min(.07, +$('particleRadius').value / 1000)); reset();
-    notify('Nouveau rayon appliqué : le gaz redémarre au même volume et à 300 K par défaut. Les relevés précédents sont conservés.');
+    sharedRadius = Math.max(.005, Math.min(.07, +$('particleRadius').value / 1000));
+    for (const [key, previous] of sessions) sessions.set(key, createSession(key, previous));
+    accumulator = 0; previousFrame = 0; populateControls(); render();
+    notify('Rayon commun appliqué à toutes les expériences : les simulations redémarrent. Les relevés précédents sont conservés avec leur rayon d’origine.');
   });
   function recordRadius() {
     const s = session(), m = s.sim.metrics;
@@ -512,7 +520,7 @@
   $('exportRecords').addEventListener('click', () => {
     const number = v => v == null || !Number.isFinite(v) ? '' : v.toPrecision(10).replace('.',',');
     const rows = session().radiusRecords.map((r,i)=>[i+1,...Object.values(recordFields).map(f=>number(f.value(r))),number(U.value('time',r.windowStart)),number(U.value('time',r.time)),r.source,number(session().alpha)].join(';'));
-    const header = 'releve;rayon_mm;PV_sur_nRT;P_V_moins_alpha_Voccupe_sur_nRT;libre_parcours_moyen_mm;surface_occupee_pct;pression_bar;temperature_K;temps_moyen_entre_chocs_us;trajets_complets_fenetre;debut_fenetre_ms;fin_fenetre_ms;capteur;alpha_analyse';
+    const header = 'releve;rayon_mm;PV_sur_nRT;P_V_moins_alpha_Voccupe_sur_nRT;P_V_moins_alpha_Voccupe_sur_T_J_K;inverse_libre_parcours_mm_moins_1;inverse_temps_chocs_us_moins_1;libre_parcours_moyen_mm;surface_occupee_pct;pression_bar;temperature_K;temps_moyen_entre_chocs_us;trajets_complets_fenetre;debut_fenetre_ms;fin_fenetre_ms;capteur;alpha_analyse';
     const url=URL.createObjectURL(new Blob(['\uFEFF'+header+'\r\n'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'}));
     const a=document.createElement('a');a.href=url;a.download='gaz-2d-releves.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   });

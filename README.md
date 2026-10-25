@@ -2,19 +2,18 @@
 
 **[Ouvrir le démonstrateur](https://fmath92.github.io/gaz-2d/)** · [Code source](https://github.com/fmath92/gaz-2d)
 
-Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.10.0 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
+Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.10.1 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
 
 ## La visite
 
 | Étape | Expérience | À observer |
 | --- | --- | --- |
 | 01 | Pression | Un choc à venir, sa poussée sur le piston immobile et sa contribution à la pression. |
-| 02 | Échanges thermiques | Parcours automatique de deux chocs : chaleur reçue par le gaz, puis chaleur cédée à la paroi. |
-| 03 | Joule–Gay–Lussac | Ouverture vers le vide (doublement du volume par défaut), énergie et température conservées en mode isolé. |
-| 04 | Détente et compression adiabatiques | Choix du sens du mouvement ; zoom sur un choc au piston mobile et sur le travail reçu ou fourni. |
-| 05 | Rayon & loi des gaz | Une simulation de disques durs à rayon réglable ; relevés de PV/(nRT) à n, V et T initiale identiques. |
+| 02 | Joule–Gay–Lussac | Ouverture vers le vide (doublement du volume par défaut), énergie et température conservées en mode isolé. |
+| 03 | Détente et compression adiabatiques | Choix du sens du mouvement ; zoom sur un choc au piston mobile et sur le travail reçu ou fourni. |
+| 04 | Rayon & loi des gaz | Une simulation de disques durs à rayon réglable ; relevés de PV/(nRT) à n, V et T initiale identiques. |
 
-Toutes les expériences utilisent **1 000 disques durs** avec collisions élastiques mutuelles. Le rayon reste 0,04 unité interne (≈ 0,92 mm équivalents) dans les quatre premières expériences. Le dernier onglet propose de 0,005 à 0,07 unité (≈ 0,11 à 1,61 mm). Le rayon dessiné est le rayon de collision. Le modèle ponctuel reste disponible dans la bibliothèque et ses tests, mais n’est plus proposé dans l’interface.
+Toutes les expériences utilisent **1 000 disques durs** avec collisions élastiques mutuelles. Le rayon commun vaut initialement 0,04 unité interne (≈ 0,92 mm équivalents). Son réglage dans le dernier onglet s’applique aux quatre expériences et les réinitialise ; les relevés conservés gardent leur rayon d’origine. Le dernier onglet propose de 0,005 à 0,07 unité (≈ 0,11 à 1,61 mm). Le rayon dessiné est le rayon de collision. Le modèle ponctuel reste disponible dans la bibliothèque et ses tests, mais n’est plus proposé dans l’interface.
 
 Chaque onglet garde son état, ses réglages, sa pause et ses mesures jusqu’au rechargement de la page. Seule l’expérience affichée évolue. « Recommencer » efface les données de l’expérience courante. L’expérience de cycles périodiques a été retirée de l’interface ; les déplacements proposés sont des trajets simples, à vitesse constante ou progressifs.
 
@@ -90,7 +89,7 @@ La jauge utilise cette pression mesurée, avec une échelle visuelle de 0 à qua
 
 Le travail cumulé est calculé aux impacts et non à partir d’une pression déduite de l’équation d’état. Son lien avec un diagramme est W reçu = −∫Ppiston dV. Une intégrale utilisant la pression glissante reste une estimation, et les aires de P–T ou de V–T ne sont pas des travaux.
 
-Dans l’expérience 02, **seule la paroi gauche** est reliée au thermostat par défaut ; les autres parois sont isolées et le piston reste fixe. Une option avancée étend le contact thermique à toutes les parois. L’isolation, la température de paroi et la fraction de chocs thermalisés peuvent changer pendant la simulation, sans modifier immédiatement les vitesses ni effacer le cumul de chaleur.
+L’onglet d’échanges thermiques a été retiré de la visite. Le moteur thermique reste disponible dans la bibliothèque et couvert par ses tests ; les quatre expériences proposées utilisent des parois isolées.
 
 Lors d’un choc thermique, le moteur tire la vitesse sortante dans le référentiel de la paroi : normale intérieure suivant la loi de flux `|cn| = √(−2 Tb ln U)` et tangente gaussienne de variance Tb. La chaleur reçue est la variation d’énergie dans ce référentiel. À paroi fixe :
 
@@ -105,7 +104,7 @@ La flèche thermique traverse le point de contact dans le sens de l’énergie �
 
 Le modèle utilisé dans l’interface contient des disques durs en interaction élastique. Les chocs isolés sur les parois sont élastiques ; au piston de vitesse u, vx après = 2u − vx avant. Un piston peut rendre les températures directionnelles différentes : Tx = moyenne(vx²), Ty = moyenne(vy²). Les collisions mutuelles permettent leur rééquilibrage ; une compression rapide peut néanmoins créer une anisotropie transitoire.
 
-Les disques durs ont un rayon 0,04 par défaut, réglable dans la cinquième expérience. Ils sont placés sans recouvrement et leur centre reste à cette distance des parois. Un choc entre deux disques conserve exactement, aux arrondis numériques près, l’énergie cinétique et la quantité de mouvement de la paire. L’énergie échangée entre particules n’est ni W ni Q, car elle reste interne au gaz.
+Les disques durs ont un rayon 0,04 par défaut, réglable dans la quatrième expérience. Ils sont placés sans recouvrement et leur centre reste à cette distance des parois. Un choc entre deux disques conserve exactement, aux arrondis numériques près, l’énergie cinétique et la quantité de mouvement de la paire. L’énergie échangée entre particules n’est ni W ni Q, car elle reste interne au gaz.
 
 Le moteur prédit les dates de contact, les traite dans une file de priorité et invalide les prédictions après les changements de vitesse. Une grille spatiale filtre les paires candidates initiales ; les paires impliquant des particules dont la vitesse a changé sont recalculées. Cette méthode suit le principe de la [simulation événementielle de disques durs de Princeton](https://algs4.cs.princeton.edu/61event/index.php). Aucun rééchelonnement global d’énergie ni déplacement correctif de recouvrement n’est appliqué.
 
@@ -161,3 +160,9 @@ La référence diluée 2D α ≈ 2 et son lien avec le second coefficient du vir
 La collecte automatique est facultative. Elle suit l’expérience visible, respecte le démarrage et le délai entre fenêtres, s’arrête en pause et reprend avec les mêmes conditions après un changement de rayon. À 10 000 relevés elle s’arrête sans supprimer les anciens. La liste abrégée affiche les 10 derniers ; le tableau est paginé par 100. Les graphiques, régressions, ajustements d’α et exports utilisent tous les relevés valides conservés. Les données restent en mémoire jusqu’au rechargement : exporter avant de quitter.
 
 La régression OLS affiche y = ax + b, R², n et les incertitudes-types u(a), u(b), calculées à partir de la variance résiduelle SSE/(n−2). Il faut 3 points et des X distincts ; R² reste indéfini pour Y constant. Les ± sont à 1 σ, pas à 95 %. Les [hypothèses OLS](https://itl.nist.gov/div898/handbook/pmd/section4/pmd431.htm) et les limites liées aux corrélations, aux erreurs sur X et à l’ajustement préalable d’α sont explicitées dans l’interface. Les unités sont celles des axes : Y/X pour a et Y pour b.
+
+### Grandeurs supplémentaires (0.10.1)
+
+Les axes proposent P(V − αV occupé)/T en J/K, avec une référence à nR, ainsi que 1/λ en mm⁻¹ et 1/τ en µs⁻¹ (inverses des moyennes mesurées sur la fenêtre, non moyennes des inverses). Les valeurs indisponibles ou nulles sont omises pour les inverses. Ces trois colonnes sont aussi exportées en CSV.
+
+À n constant, multiplier le ratio corrigé par nR ne change pas R². Pour tester une constante, regarder la compatibilité de la pente avec zéro et l’écart au niveau attendu ; un faible R² ne signifie pas que la correction échoue. Cette explication accompagne le tracé corrigé.

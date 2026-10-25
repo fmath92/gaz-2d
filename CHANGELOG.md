@@ -1,3 +1,10 @@
+## 0.10.1 — Navigation et grandeurs des relevés
+
+- Rayon commun aux quatre expériences, avec réinitialisation lors du changement et conservation des relevés antérieurs.
+- Retrait de l’onglet Échanges thermiques ; quatre expériences renumérotées.
+- Axes et CSV : P(V − αV occupé)/T en J/K, inverse du libre parcours moyen et inverse du temps moyen entre chocs.
+- Référence à nR et explication du R² pour une grandeur attendue constante.
+
 ## 0.10.0 — α ajustable, collecte et régressions
 
 - α réglable de 0 à 5 ; recalcul des relevés et ajustement automatique du rapprochement à 1 par moindres carrés.

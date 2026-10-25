@@ -111,12 +111,12 @@ function laboratory() {
 
 test('guided visit starts with pressure, fixes N at 1000 and removes particle count and cycle controls',()=>{
   const lab=laboratory();assert.equal(lab.metrics.count,1000);assert.equal(lab.analysis.experiment,'pressure');
-  for(const id of ['particles','particleNumber','preset-cycles','cycleSelect'])assert.ok(!lab.nodes.has(id));
+  for(const id of ['particles','particleNumber','preset-cycles','cycleSelect','tab-heat'])assert.ok(!lab.nodes.has(id));
   lab.advance(.4);assert.ok(lab.metrics.pressure>0);assert.equal(lab.metrics.work,0);assert.equal(lab.metrics.heat,0);
 });
-test('all five experience tabs retain independent state, and only the visible experiment evolves',()=>{
+test('all four experience tabs retain independent state, and only the visible experiment evolves',()=>{
   const lab=laboratory();lab.advance(.4);lab.click('pause');const time=lab.metrics.time;
-  for(const key of ['heat','free','adiabatic','comparison']){
+  for(const key of ['free','adiabatic','comparison']){
     lab.click('tab-'+key);assert.equal(lab.analysis.experiment,key);assert.equal(lab.metrics.count,1000);lab.advance(.1);
     assert.equal(lab.nodes.get('workbench').getAttribute('aria-labelledby'),'tab-'+key);
   }
@@ -125,8 +125,8 @@ test('all five experience tabs retain independent state, and only the visible ex
 });
 test('keyboard arrows, Home and End navigate experience tabs with correct focus',()=>{
   const lab=laboratory();lab.nodes.get('tab-pressure').dispatch('keydown',{key:'ArrowRight',preventDefault(){}});
-  assert.equal(lab.analysis.experiment,'heat');assert.ok(lab.nodes.get('tab-heat').focused);
-  lab.nodes.get('tab-heat').dispatch('keydown',{key:'End',preventDefault(){}});assert.equal(lab.analysis.experiment,'comparison');
+  assert.equal(lab.analysis.experiment,'free');assert.ok(lab.nodes.get('tab-free').focused);
+  lab.nodes.get('tab-free').dispatch('keydown',{key:'End',preventDefault(){}});assert.equal(lab.analysis.experiment,'comparison');
   lab.nodes.get('tab-comparison').dispatch('keydown',{key:'Home',preventDefault(){}});assert.equal(lab.analysis.experiment,'pressure');
 });
 test('pressure illustration follows a future collision, restores playback and keeps work controls out of this lesson',()=>{
@@ -150,17 +150,6 @@ test('work illustration launches the selected moving piston, shows its energy ex
   const e=lab.analysis.lastTour.events[0];assert.ok(e.wallVelocity<0);assert.ok(e.work>0);assert.ok(Math.abs(e.work+e.wallVelocity*e.impulse)<1e-9);
   assert.equal(lab.nodes.get('workLesson').hidden,false);assert.equal(lab.nodes.get('pressureLesson').hidden,true);
   lab.click('stop');const work=lab.metrics.work;lab.advance(.5);assert.equal(lab.metrics.work,work);
-});
-test('thermal illustration shows both energy transfer signs in order and restores editable controls',()=>{
-  const lab=laboratory();lab.click('tab-heat');lab.click('illustrate');assert.equal(lab.nodes.get('bathTemperature').disabled,true);lab.finishTour();
-  const events=lab.analysis.lastTour.events;assert.equal(events.length,2);assert.ok(events[0].heat>0&&events[1].heat<0);
-  for(const e of events){assert.equal(e.wall,'left');assert.equal(e.thermal,true);assert.equal(e.work,0);assert.ok(Math.abs(e.heat-e.energyAfter+e.energyBefore)<1e-10);}
-  assert.equal(lab.nodes.get('bathTemperature').disabled,false);assert.equal(lab.paused,false);assert.ok(Math.abs(lab.metrics.balanceError)<1e-8);
-});
-test('thermal slider changes future collisions only; isolation stops Q without deleting past exchanges',()=>{
-  const lab=laboratory();lab.click('tab-heat');lab.input('timeScale',1);lab.advance(.5);lab.click('pause');
-  const m=lab.metrics;lab.input('bathTemperature',100);assert.equal(lab.metrics.energy,m.energy);assert.equal(lab.metrics.heat,m.heat);assert.equal(lab.metrics.bathTemperature,.5);
-  lab.input('thermalMode','isolated');lab.click('pause');lab.advance(.5);assert.equal(lab.metrics.heat,m.heat);assert.equal(lab.metrics.work,0);
 });
 test('Joule–Gay–Lussac doubles V without changing E or T, with simulation and plot visible together',()=>{
   const lab=laboratory();lab.click('tab-free');const before=lab.metrics;lab.advance(.2);lab.click('start');
@@ -188,7 +177,7 @@ test('one adiabatic tab handles both directions with insulated walls and the cor
     assert.ok(key==='compression'?lab.metrics.work>0:lab.metrics.work<0);
   }
 });
-test('radius experiment uses one interacting gas, records measurements and resets only its radius',()=>{
+test('radius experiment uses one interacting gas, records measurements and shares its radius across experiments',()=>{
   const lab=laboratory();lab.click('tab-comparison');
   assert.equal(lab.comparisonMetrics,null);assert.equal(lab.metrics.particleModel,'hard-disks');
   lab.input('timeScale',4);lab.advance(1.3);assert.ok(lab.metrics.pairCollisions>0);
@@ -198,7 +187,8 @@ test('radius experiment uses one interacting gas, records measurements and reset
   assert.equal(lab.metrics.volume,old.volume);assert.ok(Math.abs(lab.metrics.temperature-1.5)<1e-9);
   assert.match(lab.nodes.get('radiusRecords').innerHTML,/PV/);assert.equal(lab.nodes.get('recordRadius').disabled,true);
   lab.click('capture');lab.advance(.2);assert.ok(lab.paused);assert.equal(lab.analysis.collision.kind,'pair');
-  lab.click('tab-pressure');assert.equal(lab.metrics.particleRadius,.04);
+  for (const key of ['pressure','free','adiabatic']) { lab.click('tab-'+key);assert.equal(lab.metrics.particleRadius,.07);lab.click('reset');assert.equal(lab.metrics.particleRadius,.07); }
+  lab.click('tab-comparison');assert.equal(lab.analysis.radiusRecords[0].radius,.04);
 });
 test('slow playback changes elapsed simulated time, and single-step is 0.02 without unpausing',()=>{
   const lab=laboratory();lab.input('timeScale',.05);lab.advance(1);assert.ok(lab.metrics.time>=.04&&lab.metrics.time<.06);
@@ -228,10 +218,6 @@ test('pause, reset and tab changes safely interrupt camera sequences without cha
   const time=lab.metrics.time;lab.advance(.3);assert.equal(lab.metrics.time,time);
   lab.click('illustrate');lab.advance(.3);lab.click('tab-free');lab.click('tab-pressure');assert.equal(lab.analysis.tour,null);assert.equal(lab.nodes.get('illustrate').disabled,false);
   lab.click('illustrate');lab.advance(.3);lab.click('reset');assert.equal(lab.analysis.tour,null);assert.equal(lab.metrics.time,0);assert.equal(lab.nodes.get('tourStatus').hidden,true);
-});
-test('thermal illustration is unavailable with insulation or zero accommodation',()=>{
-  const lab=laboratory();lab.click('tab-heat');lab.input('thermalMode','isolated');assert.equal(lab.nodes.get('illustrate').disabled,true);
-  lab.input('thermalMode','thermostat');assert.equal(lab.nodes.get('illustrate').disabled,false);lab.input('accommodation',0);assert.equal(lab.nodes.get('illustrate').disabled,true);
 });
 
 test('visible units and plot coordinates share fixed scales across presets and resets',()=>{
@@ -313,4 +299,20 @@ test('alpha reanalyses saved records without changing physics, and automatic col
   lab.input('timeScale',4);lab.advance(1.3);assert.equal(lab.analysis.radiusRecords.length,3);
   assert.ok(lab.analysis.recordPlot.fit);assert.match(lab.nodes.get('fitEquation').textContent,/R²/);assert.match(lab.nodes.get('fitUncertainty').textContent,/1 σ/);
   lab.check('linearFit',false);assert.equal(lab.analysis.recordPlot.fit,null);
+});
+
+test('corrected PV/T and inverse flight quantities use physical units and export matching columns',async()=>{
+  const lab=laboratory();lab.click('tab-comparison');lab.input('timeScale',4);lab.advance(1.3);lab.click('recordRadius');
+  const r=lab.analysis.radiusRecords[0];assert.ok(r);
+  lab.input('alphaNumber','2');lab.input('recordY','correctedPVT');
+  assert.ok(Math.abs(lab.analysis.recordPlot.points[0].y-r.ratio*(1-2*r.packing)/3)<1e-12);
+  assert.match(lab.analysis.recordPlot.yLabel,/J\/K/);
+  assert.match(lab.nodes.get('fitInterpretation').textContent,/ne change pas R²/);
+  lab.input('recordY','meanFreePath');const path=lab.analysis.recordPlot.points[0].y;
+  lab.input('recordY','inverseMeanFreePath');assert.ok(Math.abs(path*lab.analysis.recordPlot.points[0].y-1)<1e-12);
+  lab.input('recordY','meanCollisionTime');const time=lab.analysis.recordPlot.points[0].y;
+  lab.input('recordY','inverseMeanCollisionTime');assert.ok(Math.abs(time*lab.analysis.recordPlot.points[0].y-1)<1e-12);
+  lab.click('exportRecords');const csv=await lab.downloads.at(-1).blob.text();
+  const [head,line]=csv.trim().split(/\r?\n/).map(s=>s.replace(/^\uFEFF/,'').split(';'));
+  assert.equal(head.length,line.length);assert.ok(head.includes('P_V_moins_alpha_Voccupe_sur_T_J_K'));assert.ok(head.includes('inverse_libre_parcours_mm_moins_1'));
 });
