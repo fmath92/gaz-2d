@@ -24,7 +24,7 @@ function laboratory() {
     const node = {
       tagName: tag.toUpperCase(), attributes: { ...attrs }, dataset: {},
       disabled: Object.hasOwn(attrs, 'disabled'), checked: Object.hasOwn(attrs, 'checked'), hidden: Object.hasOwn(attrs, 'hidden'),
-      style: { setProperty() {} }, focus() { this.focused = true; },
+      setPointerCapture() {}, style: { setProperty() {} }, focus() { this.focused = true; },
       textContent: '', innerHTML: '', width: 0, height: 0,
       min: attrs.min ?? '', max: attrs.max ?? '', step: attrs.step ?? '',
       classList: { toggle(name, force) { const on = force ?? !classes.has(name); if (on) classes.add(name); else classes.delete(name); return on; }, contains: name => classes.has(name) },
@@ -33,7 +33,7 @@ function laboratory() {
       addEventListener(name, listener) { if (!listeners.has(name)) listeners.set(name, []); listeners.get(name).push(listener); },
       dispatch(name, event = {}) { for (const listener of listeners.get(name) || []) listener({ target: this, type: name, ...event }); },
       click() { if (!this.disabled) { this.dispatch('click'); if (tag === 'a') downloads.push({ href: this.href, download: this.download, blob: blobs.get(this.href) }); } },
-      getBoundingClientRect: () => ({ width: 800, height: tag === 'canvas' && attrs.id === 'chart' ? 220 : 380 }),
+      getBoundingClientRect: () => ({ left:0, top:0, width: 800, height: tag === 'canvas' && attrs.id === 'chart' ? 220 : 380 }),
       getContext: () => context2d,
       querySelector(selector) { if (selector === '[value="free"]') return freeOption; throw new Error('Unexpected selector ' + selector); }
     };
@@ -147,21 +147,50 @@ test('pressure gauge uses the true window impulse and piston length-time denomin
   assert.ok(Math.abs(m.pistonLengthTime-15)<1e-9);assert.equal(m.work,0);
   assert.match(lab.nodes.get('pressureCalculation').textContent,/P = ΣJ/);
 });
-test('work illustration guides all three cases, locks manual motion and returns smoothly',()=>{
- const lab=laboratory();lab.click('tab-adiabatic');lab.input('motionAction','compression');lab.input('duration',60);lab.click('illustrate');
- assert.equal(lab.analysis.lesson.kind,'work');assert.equal(lab.analysis.lesson.case,'fixed');assert.equal(lab.analysis.tour,null);
- assert.equal(lab.nodes.get('target').disabled,true);assert.equal(lab.nodes.get('motionAction').disabled,true);assert.equal(lab.nodes.get('start').disabled,true);
- assert.equal(lab.nodes.get('illustrate').textContent,'Retour à la simulation');assert.equal(lab.nodes.get('workLesson').hidden,true);assert.equal(lab.nodes.get('workCases').hidden,false);
- lab.advance(1);lab.click('pause');const time=lab.metrics.time;lab.advance(1);assert.equal(lab.metrics.time,time);lab.click('pause');
- for(let i=0;i<100&&lab.analysis.lesson.phase!=='done'&&lab.analysis.lesson.phase!=='unavailable';i++){if(lab.analysis.lesson.collisionPhase==='compare'){const time=lab.metrics.time;assert.match(lab.nodes.get('nextWorkCase').textContent,/Continuer/);lab.advance(10);assert.equal(lab.metrics.time,time);assert.equal(lab.analysis.lesson.collisionPhase,'compare');assert.equal(lab.nodes.get('workSpeedQuestion').hidden,false);assert.equal(lab.nodes.get('nextWorkCase').disabled,true);lab.click('nextWorkCase');assert.equal(lab.analysis.lesson.collisionPhase,'compare');const key=lab.analysis.lesson.case;lab.click(key==='fixed'?'speedLess':'speedEqual');assert.match(lab.nodes.get('speedFeedback').textContent,/Pas tout à fait/);assert.equal(lab.metrics.time,time);lab.click(key==='fixed'?'speedEqual':key==='compression'?'speedLess':'speedGreater');assert.match(lab.nodes.get('speedFeedback').textContent,/Oui/);assert.equal(lab.analysis.lesson.answer.correct,true);lab.click('nextWorkCase');assert.equal(lab.nodes.get('workSpeedQuestion').hidden,true);}if(lab.analysis.lesson.phase==='hold'){const time=lab.metrics.time,index=lab.analysis.lesson.index;assert.equal(lab.nodes.get('nextWorkCase').hidden,false);lab.advance(10);assert.equal(lab.metrics.time,time);assert.equal(lab.analysis.lesson.index,index);lab.click('nextWorkCase');assert.equal(lab.analysis.lesson.phase,'between');assert.equal(lab.nodes.get('nextWorkCase').hidden,true);}lab.advance(1);}
- const l=lab.analysis.lesson;assert.equal(l.phase,'done',l.message);assert.equal(l.results.length,3);
- assert.equal(l.results[0].work,0);assert.ok(l.results[1].work>0);assert.ok(l.results[2].work<0);
- for(const r of l.results)assert.ok(Math.abs(r.work-r.pressureWork)<1e-7);
- assert.match(lab.nodes.get('storyFormula').textContent,/−∫ P dV/);assert.match(lab.nodes.get('workCases').innerHTML,/Repos.*Compression.*Détente/);
- const end=lab.metrics.time;lab.advance(2);assert.equal(lab.metrics.time,end);
- lab.click('illustrate');assert.ok(lab.analysis.returning);lab.advance(3.2);assert.equal(lab.analysis.lesson,null);assert.equal(lab.paused,false);
- const work=lab.metrics.work;lab.advance(.3);assert.equal(lab.metrics.work,work);assert.equal(lab.nodes.get('motionAction').disabled,false);
- assert.equal(lab.nodes.get('workCases').hidden,true);assert.equal(lab.nodes.get('workLesson').hidden,false);assert.match(lab.nodes.get('workExplanation').textContent,/aucun travail/);
+test('work illustration requires a correct retry, then manual piston travel, with all controls on the canvas',()=>{
+ const lab=laboratory();lab.click('tab-adiabatic');lab.click('illustrate');
+ assert.equal(lab.analysis.lesson.case,'compression');assert.equal(lab.nodes.get('motionAction').disabled,true);
+ assert.ok(html.indexOf('id="continueSpeed"')<html.indexOf('id="comparisonChambers"'));
+ const seen=[];
+ for(let i=0;i<120&&lab.analysis.lesson.phase!=='free'&&lab.analysis.lesson.phase!=='unavailable';i++){
+  const l=lab.analysis.lesson;
+  if(l.collisionPhase==='compare'){
+   seen.push(l.case);const time=lab.metrics.time;
+   assert.equal(lab.nodes.get('continueSpeed').disabled,true);assert.equal(lab.nodes.get('nextWorkCase').hidden,true);
+   const wrong=l.case==='fixed'?'speedLess':'speedEqual';lab.click(wrong);
+   assert.match(lab.nodes.get('speedFeedback').textContent,/Essayez encore.*Indice/);
+   assert.doesNotMatch(lab.nodes.get('speedFeedback').textContent,/v entrante [<=>]/);
+   assert.equal(lab.nodes.get(wrong).getAttribute('aria-invalid'),'true');
+   assert.equal(lab.nodes.get('continueSpeed').disabled,true);lab.click('continueSpeed');lab.advance(2);
+   assert.equal(lab.metrics.time,time);assert.equal(lab.analysis.lesson.collisionPhase,'compare');
+   lab.click(l.case==='fixed'?'speedEqual':l.case==='compression'?'speedLess':'speedGreater');
+   assert.equal(lab.nodes.get(wrong).getAttribute('aria-invalid'),'false');assert.equal(lab.nodes.get('continueSpeed').disabled,false);
+   lab.click('continueSpeed');assert.equal(lab.nodes.get('workSpeedQuestion').hidden,true);
+  }
+  if(l.window?.canDrag){
+   assert.equal(lab.nodes.get('workPistonHandle').hidden,false);
+   lab.nodes.get('workPistonHandle').dispatch('keydown',{key:l.case==='compression'?'Home':'End',preventDefault(){}});
+  }
+  if(l.phase==='hold'){
+   const time=lab.metrics.time;lab.advance(2);assert.equal(lab.metrics.time,time);
+   assert.equal(lab.nodes.get('nextWorkCase').hidden,false);lab.click('nextWorkCase');
+  }
+  lab.advance(1);
+ }
+ assert.equal(lab.analysis.lesson.phase,'free');assert.deepEqual(seen,['compression','expansion','fixed']);
+ const results=lab.analysis.lesson.results;assert.equal(results.length,3);
+ assert.ok(results[0].work>0);assert.ok(results[1].work<0);assert.equal(results[2].work,0);
+ assert.match(lab.nodes.get('workCases').innerHTML,/Compression.*Détente.*Repos/);
+ lab.advance(3);assert.equal(lab.nodes.get('workPistonHandle').hidden,false);
+ const handle=lab.nodes.get('workPistonHandle'),x=parseFloat(handle.style.left)+17;
+ handle.dispatch('pointerdown',{pointerId:7,clientX:x,preventDefault(){}});
+ handle.dispatch('pointermove',{pointerId:7,clientX:x+10000});handle.dispatch('pointerup');
+ assert.equal(lab.analysis.lesson.window.requestedWidth,lab.analysis.lesson.window.maxWidth);
+ lab.advance(1);assert.ok(lab.metrics.width>results[2].startWidth);
+ lab.click('restartWorkPath');assert.equal(lab.analysis.lesson.window.work,0);assert.equal(lab.analysis.lesson.window.strokes.length,0);
+ lab.click('illustrate');lab.advance(3.2);assert.equal(lab.analysis.lesson,null);assert.equal(lab.paused,false);
+ assert.equal(lab.nodes.get('workMotionRibbon').hidden,true);assert.equal(handle.hidden,true);
+ const work=lab.metrics.work;lab.advance(.3);assert.equal(lab.metrics.work,work);
 });
 
 test('Joule–Gay–Lussac doubles V without changing E or T, with simulation and plot visible together',()=>{

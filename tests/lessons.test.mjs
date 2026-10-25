@@ -131,25 +131,26 @@ test('work windows sum actual full-piston collisions and recover the signed P–
  }
 });
 
-test('the work journey chains rest, compression and expansion on the same gas, then holds its result',()=>{
+test('work journey gates the quiz, guides compression and expansion, shows rest then allows free motion',()=>{
  const {WorkJourney}=globalThis.GasLessons;
  const sim=new GasSimulation({count:1000,width:11,temperature:1.5,particleModel:'hard-disks',particleRadius:.04,observeCollisions:true});
  const particles=sim.particles,l=new WorkJourney(sim,{planningBudget:Infinity}),seen=[],comparisons=[];
- for(let i=0;i<7000&&l.phase!=='done'&&l.phase!=='unavailable';i++){
+ for(let i=0;i<7000&&l.phase!=='free'&&l.phase!=='unavailable';i++){
   if(seen.at(-1)!==l.case)seen.push(l.case);
-  if(l.tour?.phase==='compare'){comparisons.push(l.case);const time=sim.time,particles=JSON.stringify(sim.particles);l.tick(60,sim,h=>{sim.step(h);return h;});assert.equal(sim.time,time);assert.equal(JSON.stringify(sim.particles),particles);assert.equal(l.tour.phase,'compare');l.continueComparison();assert.equal(l.tour.phase,'compare');l.answerComparison('invalid');assert.equal(l.answer,null);const expected=l.case==='fixed'?'=':l.case==='compression'?'<':'>';l.answerComparison(expected==='='?'<':'=');assert.equal(l.answer.correct,false);assert.equal(l.answer.relation,expected);assert.equal(JSON.stringify(sim.particles),particles);l.answerComparison(expected);assert.equal(l.answer.correct,true);l.continueComparison();}
+  if(l.tour?.phase==='compare'){comparisons.push(l.case);const time=sim.time,particles=JSON.stringify(sim.particles);l.tick(60,sim,h=>{sim.step(h);return h;});assert.equal(sim.time,time);assert.equal(JSON.stringify(sim.particles),particles);assert.equal(l.tour.phase,'compare');l.continueComparison();assert.equal(l.tour.phase,'compare');l.answerComparison('invalid');assert.equal(l.answer,null);const expected=l.case==='fixed'?'=':l.case==='compression'?'<':'>';l.answerComparison(expected==='='?'<':'=');assert.equal(l.answer.correct,false);assert.equal(l.answer.relation,expected);l.continueComparison();assert.equal(l.tour.phase,'compare');assert.equal(JSON.stringify(sim.particles),particles);l.answerComparison(expected);assert.equal(l.answer.correct,true);l.continueComparison();}
+  if(l.window?.canDrag)l.setPistonTarget(l.window.endWidth);
   if(l.phase==='hold'){const time=sim.time,index=l.index;l.tick(60,sim,h=>{sim.step(h);return h;});assert.equal(sim.time,time);assert.equal(l.index,index);assert.equal(l.phase,'hold');l.nextCase();l.nextCase();assert.equal(l.phase,'between');}
   l.tick(1/60,sim,h=>{sim.step(h);return h;});
  }
- assert.equal(l.phase,'done',l.message);assert.deepEqual(seen,['fixed','compression','expansion']);assert.deepEqual(comparisons,seen);
- assert.equal(sim.particles,particles);assert.equal(l.results.length,3);assert.equal(l.zoom,1);assert.equal(l.rate,0);assert.equal(sim.motion,null);
+ assert.equal(l.phase,'free',l.message);assert.deepEqual(seen,['compression','expansion','fixed']);assert.deepEqual(comparisons,seen);
+ assert.equal(sim.particles,particles);assert.equal(l.results.length,3);assert.equal(sim.motion,null);
  for(const [i,r] of l.results.entries()){
   assert.ok(r.events.length>20);assert.ok(r.collision.impulse>0);
   assert.ok(Math.abs(r.work-r.pressureWork)<1e-7);assert.ok(Math.abs(r.work-r.deltaEnergy)<1e-7);
-  assert.ok(i===0?r.work===0&&r.collision.work===0:i===1?r.work>0&&r.collision.work>0:r.work<0&&r.collision.work<0);
-  assert.ok(i===0?r.velocity===0:i===1?r.velocity<0:r.velocity>0);
+  assert.ok(i===2?r.work===0&&r.collision.work===0:i===0?r.work>0&&r.collision.work>0:r.work<0&&r.collision.work<0);
+  assert.ok(i===2?r.deltaVolume===0:i===0?r.deltaVolume<0:r.deltaVolume>0);
  }
- const frozen=JSON.stringify(sim.particles),time=sim.time;l.tick(20,sim,h=>sim.step(h));assert.equal(sim.time,time);assert.equal(JSON.stringify(sim.particles),frozen);
+ assert.equal(l.window.mode,'free');
  assert.ok(Math.abs(sim.metrics.balanceError)<1e-7);assert.equal(sim.metrics.heat,0);
 });
 
@@ -159,5 +160,46 @@ test('work preparation makes room at the compression limit using real motion, wi
  const particles=sim.particles,l=new WorkJourney(sim,{speed:4,planningBudget:Infinity});assert.equal(l.phase,'prepare');
  l.paused=true;l.tick(1,sim,h=>sim.step(h));assert.equal(sim.width,3);l.paused=false;
  for(let i=0;i<500&&l.phase==='prepare';i++)l.tick(1/60,sim,h=>{sim.step(h);return h;});
- assert.equal(l.phase,'collision');assert.equal(l.case,'fixed');assert.equal(sim.width,11);assert.equal(sim.particles,particles);assert.equal(sim.motion,null);
+ assert.equal(l.phase,'collision');assert.equal(l.case,'compression');assert.equal(sim.width,11);assert.equal(sim.particles,particles);assert.ok(sim.motion);
+});
+
+
+test('piston paths clamp direction, trace continuous pressure and preserve the energy balance',()=>{
+ const {WorkPath}=globalThis.GasLessons;
+ for(const mode of ['compression','expansion']){
+  const sim=new GasSimulation({count:1000,width:11,temperature:1.5,particleModel:'hard-disks',particleRadius:.022,observeCollisions:true,seed:314159});
+  const l=new WorkPath(sim,{mode});l.phase='draw';const start=sim.width;
+  l.setTarget(mode==='compression'?100:-100);assert.equal(l.requestedWidth,start);
+  l.setTarget(mode==='compression'?-100:100);assert.equal(l.requestedWidth,l.endWidth);
+  for(let i=0;i<1000&&l.phase!=='done';i++)l.tick(1/60,sim,h=>sim.step(h));
+  assert.equal(l.phase,'done');assert.equal(sim.width,l.endWidth);assert.ok(Math.abs(l.deltaVolume)>20);
+  assert.ok(l.events.length>100);assert.ok(l.samples.length>15);assert.equal(l.strokes.length,1);
+  assert.ok(Math.abs(l.work-l.deltaEnergy)<1e-7);assert.ok(Math.abs(l.pressureWork-l.work)<1e-7);
+  assert.ok(Math.abs(l.area/l.work-1)<.08,`Area approximation ${mode}: ${l.area/l.work}`);
+  assert.ok(mode==='compression'?l.area>0:l.area<0);
+  assert.equal(l.strokes[0].points[0].v,start*sim.height);assert.equal(l.strokes[0].points.at(-1).v,sim.width*sim.height);
+ }
+});
+
+test('free piston path keeps chronological branches and their signed areas on reversals',()=>{
+ const {WorkPath}=globalThis.GasLessons,sim=new GasSimulation({count:400,width:11,temperature:1.5,particleModel:'hard-disks',particleRadius:.022,observeCollisions:true});
+ const l=new WorkPath(sim,{mode:'free'});l.phase='draw';
+ const move=target=>{l.setTarget(target);for(let i=0;i<600&&(i===0||sim.motion);i++)l.tick(1/60,sim,h=>sim.step(h));assert.ok(Math.abs(sim.width-target)<1e-8);};
+ move(9);move(12);move(11);
+ assert.deepEqual(l.strokes.map(s=>s.direction),[-1,1,-1]);
+ assert.equal(l.deltaVolume,0);assert.ok(l.work>0);assert.ok(Math.abs(l.work-l.deltaEnergy)<1e-8);assert.ok(Math.abs(l.work-l.pressureWork)<1e-8);
+ const signed=l.strokes.map(s=>s.points.slice(1).reduce((sum,p,i)=>sum-(p.v-s.points[i].v)*(p.p+s.points[i].p)/2,0));
+ assert.ok(signed[0]>0&&signed[1]<0&&signed[2]>0);assert.ok(Math.abs(l.area-signed.reduce((a,b)=>a+b,0))<1e-10);
+ assert.equal(l.phase,'draw');assert.equal(l.canDrag,true);
+});
+
+test('work camera fits the orange band and keeps both piston endpoints visible',()=>{
+ const G=globalThis.LabGraphics,sim=new GasSimulation({count:100,width:11,temperature:1.5}),m=new globalThis.GasLessons.WorkPath(sim);
+ m.phase='draw';const story={window:m,zoom:1};
+ for(const [w,h] of [[700,390],[320,450]]){
+  const region=globalThis.GasLessons.workRegion(sim,story),cam=G.chamberCamera(w,h,sim,{region});
+  assert.ok(cam.X(m.minWidth)>35);assert.ok(cam.X(m.maxWidth)<w-40);
+  assert.ok(cam.Y(m.y1)>20);assert.ok(cam.Y(m.y0)<h-65);
+  if(w===700)assert.ok(Math.abs(cam.Y(m.y0)-cam.Y(m.y1)-(h-100))<1e-8);
+ }
 });

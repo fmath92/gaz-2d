@@ -86,6 +86,7 @@
     const q = tour?.zoom ?? region?.zoom ?? area?.zoom ?? 0, hit = tour?.target || (region ? {x:region.x,y:region.y,wall:'right',radius:0,particleId:null} : null);
     let magnification = Math.max(1, Math.min(12, (h - 70) / (baseScale * 1.4)));
     if(region)magnification=Math.max(1,(h-70)/(baseScale*(region.y1-region.y0+1)));
+    if(region?.fit)magnification=Math.max(1,Math.min((h-100)/(baseScale*(region.y1-region.y0)),(w-110)/(baseScale*(region.maxX-region.minX+1.2))));
     if(area)magnification=Math.max(1,Math.min((w-100)/(2*area.half*baseScale),(h-100)/(2*area.half*baseScale)));
     // Fixed laboratory location chosen once, never the current piston position.
     const cameraX = hit ? hit.x + (hit.wall === 'right' ? hit.radius : -hit.radius) : area?.cx??0;
@@ -97,8 +98,8 @@
     }
     const zoom = 1 + q * (magnification - 1), scale = baseScale * zoom;
     const anchorX = ox + cameraX * baseScale, anchorY = oy + (sim.height - cameraY) * baseScale;
-    const tx = q * ((area ? .5 : hit?.wall === 'left' ? .28 : .72) * w - anchorX) + (1 - zoom) * anchorX;
-    const ty = q * (h * .51 - anchorY) + (1 - zoom) * anchorY;
+    const tx = q * ((area||region?.fit ? .5 : hit?.wall === 'left' ? .28 : .72) * w - anchorX) + (1 - zoom) * anchorX;
+    const ty = q * (h * (region?.fit ? .46 : .51) - anchorY) + (1 - zoom) * anchorY;
     return { q, hit, zoom, scale,
       X: x => (ox + x * baseScale) * zoom + tx,
       Y: y => (oy + (sim.height - y) * baseScale) * zoom + ty };
@@ -160,10 +161,14 @@
     if(region){
       ctx.save();ctx.globalAlpha=region.opacity??1;
       if(region.work){
-        const m=region.work,origin=X(m.startWidth),color=m.velocity<0?'#c77e2f':m.velocity>0?'#337fba':'#268b80';
+        const m=region.work,origin=X(m.startWidth),color=m.mode==='compression'||m.velocity<0?'#c77e2f':m.mode==='expansion'||m.velocity>0?'#337fba':'#268b80';
         ctx.globalAlpha=.18*(region.opacity??1);ctx.fillStyle=color;ctx.fillRect(Math.min(origin,right),Math.max(0,top),Math.abs(right-origin),Math.min(h,bottom)-Math.max(0,top));
         ctx.globalAlpha=region.opacity??1;ctx.setLineDash([4,4]);line(ctx,origin,40,origin,h-46,color,1.5);ctx.setLineDash([]);
-        arrow(ctx,origin,h-56,right-origin,0,color,3);
+        arrow(ctx,origin,h-78,right-origin,0,color,3);
+        ctx.font='bold 12px system-ui';ctx.fillStyle=color;ctx.textAlign='center';
+        ctx.fillText('A',origin,57);
+        if(!m.free&&Math.abs(m.endWidth-m.startWidth)>.01){ctx.setLineDash([3,5]);line(ctx,X(m.endWidth),65,X(m.endWidth),h-95,color,1);ctx.setLineDash([]);ctx.fillText('B',X(m.endWidth),57);}
+
         ctx.font='11px system-ui';ctx.textAlign='left';ctx.fillStyle=color;
         ctx.fillText('u = '+U.text('velocity',m.velocity)+' · ΔV = '+U.text('volume',m.deltaVolume,3),14,36);
       }
@@ -176,7 +181,7 @@
         ctx.beginPath();ctx.arc(right,Y(e.y),3+age*200,0,2*Math.PI);ctx.strokeStyle='#d18b35';ctx.stroke();ctx.restore();
       }
       ctx.globalAlpha=region.opacity??1;ctx.textAlign='left';ctx.font='10px system-ui';ctx.fillStyle='#617b8d';
-      ctx.fillText(region.work?'ZOOM CENTRAL · CALCUL SUR TOUT LE PISTON':'MÊME SIMULATION · SURFACE S EN ORANGE',14,19);
+      ctx.fillText(region.work?'DU CHOC AU DÉPLACEMENT DU PISTON':'MÊME SIMULATION · SURFACE S EN ORANGE',14,19);
       if(q>.5)ctx.fillText(region.work?'Travail reçu par le gaz : '+U.text('energy',region.work.work,3):'Couleur = vitesse · chocs réellement reçus sur cette surface',14,h-12);
       ctx.restore();return;
     }

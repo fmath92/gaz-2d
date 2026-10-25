@@ -1,3 +1,12 @@
+## 0.18.0 — Réessayer, déplacer et intégrer
+
+- Quiz : indice après une erreur, choix rouge, réponse correcte obligatoire ; Continuer sur le bandeau de l’animation.
+- Parcours compression → détente → repos, puis manipulation libre du piston.
+- Poignée sur le piston, utilisable à la souris, au toucher et au clavier ; sens imposé pour les deux trajets guidés, déplacement physique continu et borné.
+- Zoom resserré sur la bande orange, repères A/B fixes et trajet de volume plus grand.
+- Courbe continue P(V) construite sur les pressions mesurées, aire colorée après le trajet ; comparaison de l’intégrale approchée au travail des chocs et à ΔEc.
+- Cas immobile avec largeur nulle sur les axes du trajet précédent ; manipulation libre avec branches et aires signées, nouveau tracé sans remise à zéro du gaz.
+
 ## 0.17.0 — Comparer activement les vitesses
 
 - Bandeau interactif sur le zoom : vitesse entrante <, = ou > vitesse sortante, pour les trois cas.

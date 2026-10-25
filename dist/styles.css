@@ -1784,3 +1784,11 @@ input[aria-invalid="true"] {
 .speed-choice-buttons button[aria-pressed="true"] { background:#176d68; color:white; border-color:#176d68; }
 #speedFeedback { font-size:12px; line-height:1.45; text-align:left; }
 @media(max-width:480px) { .speed-choice-row { flex-wrap:wrap; } .speed-choice-buttons { order:3; flex-basis:100%; justify-content:center; } .speed-choice-row strong { font-size:18px; } }
+
+.speed-choice-buttons button[aria-invalid="true"] { color:#a12732; background:#ffe8e8; border-color:#bf3c49; box-shadow:0 0 0 1px #bf3c49; }
+#continueSpeed { padding:8px 18px; font-size:12px; }
+.work-motion-ribbon { position:absolute; bottom:8px; left:10px; right:10px; padding:10px 12px; border:1px solid #d7c7ad; border-radius:10px; background:#fffaf2f7; display:flex; align-items:center; gap:12px; justify-content:space-between; font-size:12px; line-height:1.4; }
+.work-motion-ribbon button { flex-shrink:0; font-size:12px; padding:9px 12px; }
+.work-piston-handle { position:absolute; width:42px; height:60px; display:flex; align-items:center; justify-content:center; background:#dd9c40; color:#58360d; border:2px solid #a8691a; border-radius:12px; box-shadow:0 3px 10px #593c1829; cursor:ew-resize; touch-action:none; user-select:none; font-size:24px; font-weight:bold; }
+.work-piston-handle:focus-visible { outline:3px solid #247f91; outline-offset:3px; }
+@media(max-width:480px) { .work-motion-ribbon { flex-wrap:wrap; } #workbench[data-experience="adiabatic"]:has(#workCases:not([hidden])) #chamber { height:450px; } }

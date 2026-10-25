@@ -8,7 +8,7 @@
     pressure: { index: '01', label: 'LES CHOCS FONT LA PRESSION', title: 'Des chocs microscopiques à la pression.', description: 'Suivez un choc individuel, puis additionnez les poussées sur une même surface du piston.', width: 11, action: 'fixed', source: 'piston', chart: 'time', zoom: false, speed: 1 },
     temperature: {index:'02',label:'LES VITESSES DONNENT LA TEMPÉRATURE',title:'Comment le simulateur mesure-t-il la température ?',description:'Figez le gaz, examinez les vitesses, puis additionnez les énergies cinétiques.',width:11,action:'fixed',source:'mean',chart:'time',zoom:false,speed:1},
     free: { index: '03', label: 'DÉTENTE DE JOULE–GAY–LUSSAC', title: 'Plus de place. La même température ?', description: 'Ouvrez vers le vide, puis regardez le gaz occuper le nouvel espace. Les parois sont isolées.', width: 9, action: 'expansion', source: 'mean', chart: 'time', zoom: false, speed: 1 },
-    adiabatic: { index: '04', label: 'LE TRAVAIL DU PISTON', title: 'Détendre ou comprimer : l’énergie change de côté.', description: 'Comparez le piston au repos, en compression et en détente : des chocs au travail reçu par le gaz. Les parois sont isolées.', width: 11, action: 'expansion', source: 'mean', chart: 'time', zoom: false, speed: 1 },
+    adiabatic: { index: '04', label: 'LE TRAVAIL DU PISTON', title: 'Détendre ou comprimer : l’énergie change de côté.', description: 'Comprimez, détendez, puis comparez au piston immobile : des chocs au travail reçu par le gaz. Les parois sont isolées.', width: 11, action: 'expansion', source: 'mean', chart: 'time', zoom: false, speed: 1 },
     cycles: { index: '05', label: 'DES ALLERS-RETOURS DU PISTON', title: 'Suivre les cycles sur un diagramme P–V.', description: 'Comprimez puis détendez le gaz plusieurs fois. Comparez les trajets et le travail reçu par le gaz.', width:11, action:'compression', source:'piston', chart:'pv', zoom:false, speed:1 },
     comparison: { index: '06', label: 'LE RAYON DES PARTICULES', title: 'La taille des particules change-t-elle PV = nRT ?', description: 'Faites varier le rayon des disques, à quantité de gaz, volume et température initiale identiques. Comparez PV/(nRT) à 1.', width: 11, action: 'fixed', source: 'mean', chart: 'ratio', zoom: false, speed: 1 }
   };
@@ -134,7 +134,7 @@
     $('illustrate').disabled = touring || (active === 'heat' && (s.thermalMode === 'isolated' || s.accommodation === 0)) || (active === 'adiabatic' && !moving && Math.abs(target(s)-s.sim.width)<1e-3);
     $('endIllustration').hidden = !touring || ['pressure','adiabatic'].includes(active); $('tourStatus').hidden = !touring || !!s.returning;
     $('zoomPanel').hidden = !s.zoom || active !== 'comparison'; $('microObservation').hidden = s.zoom || touring || active === 'comparison';
-    $('microHint').textContent = active === 'temperature' ? 'L’illustration fige un état réel. Les flèches représentent les vitesses de cet instant ; leur réorganisation graphique ne modifie pas le gaz.' : active === 'cycles' ? 'Suivez les allers-retours du piston sur le diagramme P–V. La vitesse du piston change le travail et l’échauffement du gaz.' : active === 'comparison' ? 'Les chocs mutuels redistribuent les vitesses. Pour chaque rayon, attendez la stabilisation de la mesure ; un écart à 1 peut aussi fluctuer.' : active === 'pressure' ? 'Un seul parcours : un choc à la loupe, retour au gaz, puis zoom sur une surface pour additionner les poussées.' : active === 'heat' ? 'Le parcours montre deux échanges successifs : de la paroi vers le gaz, puis du gaz vers la paroi. Le flux moyen peut avoir un autre signe que celui d’un choc.' : active === 'adiabatic' ? 'Le parcours enchaîne repos, compression et détente. Chaque cas relie un choc, les poussées cumulées et l’aire sous la courbe P–V.' : 'L’espace vide se remplit sans travail du piston. Attendez le retour à un état homogène pour interpréter PV/(nRT).';
+    $('microHint').textContent = active === 'temperature' ? 'L’illustration fige un état réel. Les flèches représentent les vitesses de cet instant ; leur réorganisation graphique ne modifie pas le gaz.' : active === 'cycles' ? 'Suivez les allers-retours du piston sur le diagramme P–V. La vitesse du piston change le travail et l’échauffement du gaz.' : active === 'comparison' ? 'Les chocs mutuels redistribuent les vitesses. Pour chaque rayon, attendez la stabilisation de la mesure ; un écart à 1 peut aussi fluctuer.' : active === 'pressure' ? 'Un seul parcours : un choc à la loupe, retour au gaz, puis zoom sur une surface pour additionner les poussées.' : active === 'heat' ? 'Le parcours montre deux échanges successifs : de la paroi vers le gaz, puis du gaz vers la paroi. Le flux moyen peut avoir un autre signe que celui d’un choc.' : active === 'adiabatic' ? 'Le parcours enchaîne compression, détente et repos, puis une manipulation libre. Chaque cas relie un choc, les poussées cumulées et l’aire sous la courbe P–V.' : 'L’espace vide se remplit sans travail du piston. Attendez le retour à un état homogène pour interpréter PV/(nRT).';
     $('pause').textContent = s.playing ? 'Ⅱ Pause' : '▶ Reprendre'; $('pause').setAttribute('aria-label', s.playing ? 'Mettre en pause' : 'Reprendre la simulation');
     $('capture').disabled = !!s.seek || batching;
     const lesson=!!s.lesson;
@@ -149,11 +149,12 @@
     }else {$('step').disabled=false;$('extraChart').disabled=false;}
     const comparingWork=s.lesson?.kind==='work'&&s.lesson.tour?.phase==='compare';
     $('pause').disabled=!!s.returning||s.lesson?.phase==='hold'||comparingWork;
-    $('nextWorkCase').hidden=s.lesson?.kind!=='work'||(s.lesson.phase!=='hold'&&!comparingWork)||!!s.returning;
-    $('nextWorkCase').disabled=comparingWork&&!s.lesson.answer;
+    $('nextWorkCase').hidden=s.lesson?.kind!=='work'||s.lesson.phase!=='hold'||!!s.returning;
+    $('continueSpeed').disabled=!s.lesson?.answer?.correct;
     updateSpeedQuestion();
-    $('nextWorkCase').textContent=comparingWork?'Continuer après la comparaison →':'Cas suivant : '+(s.lesson?.index===0?'compression':'détente')+' →';
+    $('nextWorkCase').textContent=s.lesson?.index===2?'À vous de jouer librement →':'Cas suivant : '+(s.lesson?.index===0?'détente':'repos')+' →';
     if(s.lesson?.phase==='hold'||comparingWork)$('pause').textContent='Résultat figé';
+    updateWorkInteraction();
     if(['pressure','adiabatic'].includes(active)){
       $('illustrate').textContent=s.returning?'Retour en cours…':touring||lesson?'Retour à la simulation':active==='pressure'?'▶ Comprendre la pression':'▶ Comprendre le travail : les trois cas';
       $('illustrate').disabled=!!s.returning;
@@ -186,6 +187,7 @@
   function returnToSimulation(){
     const s=session();if(s.returning||(!s.lesson&&!s.tour))return;
     const l=s.lesson,v=s.tour?.view;
+    if(l?.kind==='work'){l.window?.closeStroke?.();s.sim.stopMotion();}
     s.returning=new GasLessons.SimulationReturn({zoom:l?.kind==='temperature'?l.visual.zoom:l?.zoom??v.zoom,
       rate:l?l.rate??0:v.rate,speed:s.speed,visual:l?.kind==='temperature'?l.visual:null});
     s.returning.tourView=v;s.pressureSequence=null;s.playing=false;accumulator=0;updateControls();render();
@@ -256,39 +258,86 @@
     $('quizIncoming').textContent=U.text('velocity',Math.hypot(e.before.vx,e.before.vy));
     $('quizOutgoing').textContent=U.text('velocity',Math.hypot(e.after.vx,e.after.vy));
     const a=l.answer;
-    for(const [id,choice] of [['speedLess','<'],['speedEqual','='],['speedGreater','>']])$(id).setAttribute('aria-pressed',String(a?.choice===choice));
-    const explanation=!a?'Choisissez un signe pour expliquer le choc.':a.relation==='='?'Les vitesses sont égales : la particule a poussé sur le piston et contribue à la pression, mais son énergie cinétique n’a pas changé. Le travail reçu est nul.':a.relation==='<'?'La vitesse sortante est plus grande : la particule a poussé sur le piston et contribue à la pression. Le piston lui a fourni de l’énergie : le travail reçu par le gaz est positif.':'La vitesse sortante est plus petite : la particule a poussé sur le piston et contribue à la pression. Elle a cédé de l’énergie au piston : le travail reçu par le gaz est négatif.';
-    const feedback=(a?(a.correct?'Oui. ':'Pas tout à fait : v entrante '+a.relation+' v sortante. '):'')+explanation;
+    for(const [id,choice] of [['speedLess','<'],['speedEqual','='],['speedGreater','>']]){
+      $(id).setAttribute('aria-pressed',String(a?.choice===choice));
+      $(id).setAttribute('aria-invalid',String(a?.choice===choice&&!a.correct));
+    }
+    let feedback='Choisissez un signe pour expliquer le choc.';
+    if(a&&!a.correct)feedback='Essayez encore. Indice : comparez les deux valeurs en m/s. La norme mesure la rapidité, quel que soit le sens de la flèche.';
+    if(a?.correct)feedback='Oui. '+(a.relation==='='?'Les vitesses sont égales : la particule a poussé sur le piston et contribue à la pression, mais son énergie cinétique n’a pas changé. Le travail reçu est nul.':a.relation==='<'?'La vitesse sortante est plus grande : la particule a poussé sur le piston et contribue à la pression. Le piston lui a fourni de l’énergie : le travail reçu par le gaz est positif.':'La vitesse sortante est plus petite : la particule a poussé sur le piston et contribue à la pression. Elle a cédé de l’énergie au piston : le travail reçu par le gaz est négatif.');
     if($('speedFeedback').textContent!==feedback)$('speedFeedback').textContent=feedback;
   }
   for(const [id,choice] of [['speedLess','<'],['speedEqual','='],['speedGreater','>']])$(id).addEventListener('click',()=>{
     const s=session();if(s.lesson?.kind!=='work'||s.returning)return;s.lesson.answerComparison(choice);updateControls();render();
   });
+  $('continueSpeed').addEventListener('click',()=>{const s=session();if(s.lesson?.kind!=='work'||s.returning)return;s.lesson.continueComparison();updateControls();render();});
+  function workCamera(){const s=session(),rect=$('chamber').getBoundingClientRect();return {rect,...G.chamberCamera(rect.width,rect.height,s.sim,{region:GasLessons.workRegion(s.sim,s.lesson)})};}
+  function updateWorkInteraction(){
+    const s=session(),l=s.lesson,m=l?.window,show=l?.kind==='work'&&!!m&&!s.returning&&l.phase!=='between';
+    $('workMotionRibbon').hidden=!show;
+    const draggable=show&&m.canDrag&&!l.paused;
+    $('workPistonHandle').hidden=!draggable;
+    $('restartWorkPath').hidden=!show||l.phase!=='free';
+    if(!show)return;
+    $('workDragHint').textContent=l.phase==='hold'?(l.case==='fixed'?'Même pression, aucun déplacement : aucune aire.':'Le trajet est terminé. L’aire donne le travail reçu par le gaz.'):
+      m.phase==='shade'?'L’aire sous la courbe se colore…':m.mode==='fixed'?'Piston immobile : les chocs continuent, mais ΔV = 0.':
+      m.mode==='free'?'Glissez le piston dans les deux sens. Chaque trajet contribue au travail.':
+      'Glissez le piston orange de A vers B '+(m.mode==='compression'?'←':'→')+' · ou utilisez les flèches du clavier.';
+    if(draggable){
+      const cam=workCamera(),handle=$('workPistonHandle');handle.style.left=(cam.X(s.sim.width)-17)+'px';handle.style.top=(cam.Y(m.y1)+35)+'px';
+      handle.setAttribute('aria-valuemin',String(m.minWidth*m.height*U.scales.volume*1000));
+      handle.setAttribute('aria-valuemax',String(m.maxWidth*m.height*U.scales.volume*1000));
+      handle.setAttribute('aria-valuenow',String(s.sim.width*m.height*U.scales.volume*1000));
+      handle.setAttribute('aria-valuetext',U.text('volume',s.sim.width*m.height));
+    }
+  }
+  let pistonDrag=null;
+  const pistonHandle=$('workPistonHandle');
+  pistonHandle.addEventListener('pointerdown',event=>{
+    const s=session();if(s.returning||s.lesson?.kind!=='work'||!s.lesson.window?.canDrag||s.lesson.paused)return;
+    event.preventDefault();const camera=workCamera();
+    pistonDrag={lesson:s.lesson,id:event.pointerId,offset:event.clientX-camera.rect.left-camera.X(s.sim.width)};
+    pistonHandle.setPointerCapture(event.pointerId);
+  });
+  pistonHandle.addEventListener('pointermove',event=>{
+    const s=session();if(!pistonDrag||pistonDrag.id!==event.pointerId||pistonDrag.lesson!==s.lesson||s.returning)return;
+    const camera=workCamera();s.lesson.setPistonTarget((event.clientX-camera.rect.left-pistonDrag.offset-camera.X(0))/camera.scale);
+  });
+  for(const name of ['pointerup','pointercancel','lostpointercapture'])pistonHandle.addEventListener(name,()=>{pistonDrag=null;});
+  pistonHandle.addEventListener('keydown',event=>{
+    const s=session(),m=s.lesson?.window;if(s.returning||!m?.canDrag||s.lesson.paused)return;
+    const delta=event.key==='ArrowLeft'?-.3:event.key==='ArrowRight'?.3:0;
+    if(!delta&&!['Home','End'].includes(event.key))return;
+    event.preventDefault();s.lesson.setPistonTarget(event.key==='Home'?m.minWidth:event.key==='End'?m.maxWidth:m.requestedWidth+delta);
+  });
+  $('restartWorkPath').addEventListener('click',()=>{
+    const s=session();if(s.lesson?.phase!=='free'||s.returning)return;s.sim.stopMotion();
+    s.lesson.window=new GasLessons.WorkPath(s.sim,{mode:'free',speed:s.speed});s.lesson.window.phase='draw';updateControls();render();
+  });
   function updateWorkStory(l){
-    const names=['Repos','Compression','Détente'],signs=['ΔV = 0 ; W = 0','ΔV < 0 ; W > 0','ΔV > 0 ; W < 0'];
+    const names=['Compression','Détente','Repos'],signs=['ΔV < 0 ; W > 0','ΔV > 0 ; W < 0','ΔV = 0 ; W = 0'];
     const m=l.window,e=l.tour?.event??l.collision;
-    const casesHTML=names.map((name,i)=>'<div class="work-case"'+(i===l.index?' aria-current="step"':'')+'><strong>'+(i+1)+' · '+name+'</strong><span>'+signs[i]+'</span>'+(l.results[i]?'<b>W = '+U.text('energy',l.results[i].work,3)+'</b>':'')+'</div>').join('');
+    const casesHTML=names.map((name,i)=>'<div class="work-case"'+(i===l.index?' aria-current="step"':'')+'><strong>'+(i+1)+' · '+name+'</strong><span>'+signs[i]+'</span>'+(l.results[i]?'<b>W = '+U.text('energy',l.results[i].work,2)+'</b>':'')+'</div>').join('');
     if(l.caseMarkup!==casesHTML){$('workCases').innerHTML=casesHTML;l.caseMarkup=casesHTML;}
     $('storyGauge').hidden=true;GasLessons.workGraph($('lessonCanvas'),l);
     const situation=l.case==='fixed'?'Piston au repos':l.case==='compression'?'Le piston avance · travail reçu':'Le piston recule · travail fourni';
-    $('storyTitle').textContent=l.phase==='done'?'Trois cas, une même règle':(l.index+1)+'/3 · '+situation;
-    $('storyText').textContent=l.phase==='collision'?'Suivez un choc réel. Le repère reste fixe dans le laboratoire pour voir le déplacement du piston.':l.phase==='hold'?'Prenez le temps de lire le résultat. Cliquez sur « Cas suivant » pour poursuivre le parcours.':l.phase==='between'?'Retour à la vue d’ensemble avant le cas suivant.':m&&['overview','zoom'].includes(m.phase)?'Un choc, puis tous les chocs : la mesure commence après le zoom.':'Le calcul additionne tous les chocs sur le piston, y compris ceux qui sont hors du zoom central.';
-    $('storyFormula').textContent=m?'W reçu = ΣδW = '+U.text('energy',m.work,3)+' ; −ΣPᵢΔVᵢ = '+U.text('energy',m.pressureWork,3):'δW reçu = −uJ'+(e?' = '+U.text('energy',e.work,4):'');
-    $('storyDetails').textContent=m?'Fenêtre : '+U.text('time',m.elapsed,3)+' · P moyenne = '+U.text('pressure',m.pressure,3)+' · ΔV = '+U.text('volume',m.deltaVolume,3)+' · '+m.events.length+' chocs · ΔE = '+U.text('energy',m.deltaEnergy,3)+'. Pᵢ est la pression mesurée sur chaque intervalle, sur tout le piston. À vitesse constante, W = −P moyenne × ΔV.':'u est la vitesse du piston vers la droite ; J est l’impulsion qu’il reçoit. W > 0 signifie que le gaz reçoit de l’énergie. Les parois sont isolées : Q = 0.';
+    $('storyTitle').textContent=l.phase==='free'?'À vous de jouer : choisissez le parcours':(l.index+1)+'/3 · '+situation;
+    $('storyText').textContent=l.phase==='collision'?'Suivez un choc réel. Le repère reste fixe pour voir le déplacement du piston.':l.phase==='hold'?'Lisez le résultat, puis passez au cas suivant sur le bandeau de l’animation.':l.phase==='between'?'Retour à la vue d’ensemble avant le cas suivant.':m&&['overview','zoom'].includes(m.phase)?'On élargit l’observation à une assemblée de collisions.':'Déplacez le piston : la pression mesurée dessine la courbe P(V). L’aire est comptée positivement en compression, négativement en détente.';
+    $('storyFormula').textContent=m?'W reçu ≈ −∫ P dV = '+U.text('energy',m.area,2)+' ; ΔEc du gaz = '+U.text('energy',m.deltaEnergy,2):'δW reçu = Ec après − Ec avant';
+    $('storyDetails').textContent=m?'ΔV = '+U.text('volume',m.deltaVolume,3)+' · '+m.events.length+' chocs sur le piston · travail des chocs = '+U.text('energy',m.work,2)+'. La courbe lisse les pressions mesurées ; son aire est une approximation. Parois isolées : Q = 0.':'La particule pousse toujours le piston. Comparez sa rapidité avant et après le choc pour déterminer si elle reçoit ou cède de l’énergie.';
     if(l.tour?.phase==='compare'){
       $('storyTitle').textContent=(l.index+1)+'/3 · Comparer avant de continuer';
-      $('storyText').textContent='Le temps est figé. Choisissez <, = ou > entre la vitesse entrante et la vitesse sortante sur le bandeau du zoom. Lisez l’explication avant de continuer.';
+      $('storyText').textContent='Le temps est figé. Choisissez <, = ou > entre la vitesse entrante et la vitesse sortante. Vous pouvez réessayer ; la bonne réponse débloque Continuer.';
     }
-    if(l.phase==='done'){
-      $('storyText').textContent='La pression peut être positive sans travail si le piston reste immobile. En mouvement : dV < 0 donne δW > 0 ; dV > 0 donne δW < 0.';
-      $('storyFormula').textContent='δW reçu = −P dV ; W reçu = −∫ P dV';
+    if(m?.mode==='fixed'){
+      $('storyText').textContent='Les particules poussent encore le piston, mais A et B sont confondus : la largeur sur le diagramme P–V est nulle, donc l’aire et le travail sont nuls.';
+      $('storyFormula').textContent='ΔV = 0 ⇒ W reçu = −∫ P dV = 0 ; ΔEc = 0';
     }
-    if(l.phase==='prepare'){
-      $('storyTitle').textContent='Préparer les trois cas';$('storyText').textContent='Le piston rejoint doucement un volume permettant une compression. Les trois mesures commenceront ensuite.';
-    }
+    if(l.phase==='prepare'){$('storyTitle').textContent='Préparer les trois cas';$('storyText').textContent='Le piston rejoint doucement un volume permettant une compression. Les mesures commenceront ensuite.';}
     if(l.phase==='unavailable'){$('storyTitle').textContent='Parcours interrompu';$('storyText').textContent=l.message;}
+    updateWorkInteraction();
   }
-  $('nextWorkCase').addEventListener('click',()=>{const s=session();if(s.lesson?.kind!=='work'||s.returning)return;if(s.lesson.tour?.phase==='compare')s.lesson.continueComparison();else s.lesson.nextCase();updateControls();render();});
+  $('nextWorkCase').addEventListener('click',()=>{const s=session();if(s.lesson?.kind!=='work'||s.returning)return;s.lesson.nextCase();updateControls();render();});
   $('illustrateTemperature').addEventListener('click',()=>session().lesson?returnToSimulation():beginMeasurementStory('temperature'));
   $('nextTemperatureStage').addEventListener('click',()=>{const l=session().lesson;if(l?.kind!=='temperature'||l.entry||session().returning)return;l.elapsed=[2,5,8,11,15,18].find(t=>t>l.elapsed+1e-8)??18;l.paused=true;updateControls();render();});
   function launchCycles() {

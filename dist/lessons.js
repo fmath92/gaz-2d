@@ -67,27 +67,120 @@
     }
     get summary(){return {start:this.start,elapsed:this.elapsed,phase:this.phase,events:this.events.map(e=>({...e})),velocity:this.velocity,startVolume:this.startWidth*this.height,deltaVolume:this.deltaVolume,pressure:this.pressure,work:this.work,pressureWork:this.pressureWork,deltaEnergy:this.deltaEnergy,bins:this.bins};}
   }
-  const workCases=['fixed','compression','expansion'];
+  // Samples come from the real full-piston collision ledger. The connected
+  // midpoint pressures form a continuous P(V) trace; its numerical area is an
+  // approximation, kept distinct from the exact collision energy balance.
+  class WorkPath {
+    constructor(sim,{mode='compression',speed=1}={}){
+      this.mode=mode;this.speed=speed;this.phase='overview';this.cameraTime=0;this.height=sim.height;
+      this.startWidth=this.currentWidth=this.width=sim.width;this.startEnergy=this.currentEnergy=sim.metrics.energy;
+      this.start=sim.time;this.elapsed=0;this.lastId=sim._collisions;this.events=[];this.samples=[];this.strokes=[];
+      this.impulse=0;this.work=0;this.duration=2;this.shade=0;this.velocity=0;
+      const travel=Math.min(3,mode==='compression'?sim.width-3:18-sim.width);
+      this.endWidth=mode==='fixed'?sim.width:sim.width+(mode==='compression'?-travel:travel);
+      this.minWidth=mode==='free'?Math.max(3,sim.width-2.5):Math.min(this.startWidth,this.endWidth);
+      this.maxWidth=mode==='free'?Math.min(18,sim.width+2.5):Math.max(this.startWidth,this.endWidth);
+      this.requestedWidth=sim.width;this.y0=sim.height*.3;this.y1=sim.height*.7;
+    }
+    get zoom(){return this.phase==='overview'?0:this.phase==='zoom'?ease(this.cameraTime/1.4):1;}
+    get rate(){return ['overview','zoom','draw','fixed'].includes(this.phase)?Math.min(.75,this.speed):0;}
+    get canDrag(){return this.phase==='draw'&&this.mode!=='fixed';}
+    setTarget(width){
+      if(!this.canDrag||!Number.isFinite(width))return;
+      let lower=this.minWidth,upper=this.maxWidth;
+      if(this.mode==='compression')upper=this.currentWidth;
+      if(this.mode==='expansion')lower=this.currentWidth;
+      this.requestedWidth=Math.max(lower,Math.min(upper,width));
+    }
+    get deltaVolume(){return (this.currentWidth-this.startWidth)*this.height;}
+    get deltaEnergy(){return this.currentEnergy-this.startEnergy;}
+    get pressure(){return this.elapsed>0?this.impulse/(this.height*this.elapsed):null;}
+    get pressureWork(){return this.samples.reduce((sum,b)=>sum-b.pressure*(b.v1-b.v0),0);}
+    get area(){return this.strokes.reduce((sum,stroke)=>sum+stroke.points.slice(1).reduce((a,p,i)=>a-(p.v-stroke.points[i].v)*(p.p+stroke.points[i].p)/2,0),0);}
+    flush(){
+      const b=this.pending;if(!b||b.dt<1e-10)return;
+      const sample={v0:b.v0,v1:this.currentWidth*this.height,pressure:b.impulse/(this.height*b.dt),dt:b.dt};
+      this.samples.push(sample);
+      const stroke=this.strokes.at(-1);
+      if(stroke){
+        stroke.bins.push(sample);
+        const bins=stroke.bins,first=bins[0],last=bins.at(-1);
+        // Average neighbouring measurement intervals to reduce collision noise.
+        // Keep the actual path order, including reversals; never sort by volume.
+        const middle=bins.map((x,i)=>{const nearby=bins.slice(Math.max(0,i-1),i+2);return {v:(x.v0+x.v1)/2,p:nearby.reduce((sum,b)=>sum+b.pressure*b.dt,0)/nearby.reduce((sum,b)=>sum+b.dt,0)};});
+        stroke.points=[{v:first.v0,p:middle[0].p},...middle,{v:last.v1,p:middle.at(-1).p}];
+      }
+      this.pending=null;
+    }
+    closeStroke(){this.flush();if(this.strokes.length)this.strokes.at(-1).complete=true;this.direction=0;}
+    advanceMeasured(dt,sim,advance){
+      let remaining=dt;
+      while(remaining>1e-10){
+        const h=Math.min(1/120,remaining,sim.motion?sim.motion.duration-sim.motion.elapsed:Infinity);
+        if(h<1e-10){sim.stopMotion();continue;}
+        const v0=sim.width*this.height,u=sim.motion?(sim.motion.targetWidth-sim.motion.startWidth)/sim.motion.duration:0;
+        const dir=Math.sign(u);
+        if(dir!==this.direction){this.closeStroke();this.direction=dir;if(dir)this.strokes.push({direction:dir,points:[],bins:[],complete:false});}
+        advance(h);remaining-=h;this.elapsed+=h;this.currentWidth=sim.width;this.currentEnergy=sim.metrics.energy;
+        const fresh=sim._events.filter(e=>e.id>this.lastId&&e.wall==='right');this.lastId=sim._collisions;
+        let impulse=0;
+        for(const e of fresh){this.events.push({...e});impulse+=e.impulse;this.work+=e.work;}
+        this.impulse+=impulse;
+        if(dir){
+          if(!this.pending)this.pending={v0,dt:0,impulse:0};
+          this.pending.dt+=h;this.pending.impulse+=impulse;
+          if(this.pending.dt>=.25-1e-10||!sim.motion)this.flush();
+        }
+      }
+    }
+    tick(seconds,sim,advance){
+      if(this.phase==='done')return;
+      if(['overview','zoom'].includes(this.phase)){
+        advanceTime(seconds*this.rate,advance);this.cameraTime+=seconds;
+        if(this.cameraTime>=(this.phase==='overview'?.6:1.4)){
+          this.phase=this.phase==='overview'?'zoom':this.mode==='fixed'?'fixed':'draw';this.cameraTime=0;
+          if(['fixed','draw'].includes(this.phase)){this.start=sim.time;this.startEnergy=this.currentEnergy=sim.metrics.energy;this.lastId=sim._collisions;}
+        }
+        return;
+      }
+      if(this.phase==='shade'){this.shade=clamp(this.shade+seconds/1.3);if(this.shade===1)this.phase='done';return;}
+      if(this.phase==='draw'){
+        const distance=this.requestedWidth-sim.width;
+        if(Math.abs(distance)>1e-6){
+          if(!sim.motion||Math.abs(sim.motion.targetWidth-this.requestedWidth)>1e-8){sim.setMotion({targetWidth:this.requestedWidth,duration:Math.abs(distance)/.55});}
+        }else if(sim.motion)sim.stopMotion();
+      }
+      this.velocity=sim.metrics.pistonVelocity;
+      this.advanceMeasured(seconds*this.rate,sim,advance);this.velocity=sim.metrics.pistonVelocity;
+      if(!sim.motion)this.closeStroke();
+      if(this.phase==='fixed'&&this.elapsed>=this.duration || this.phase==='draw'&&this.mode!=='free'&&Math.abs(sim.width-this.endWidth)<1e-6){
+        sim.stopMotion();this.closeStroke();this.phase='shade';
+      }
+    }
+    get summary(){return {mode:this.mode,phase:this.phase,start:this.start,elapsed:this.elapsed,velocity:this.velocity,startVolume:this.startWidth*this.height,deltaVolume:this.deltaVolume,pressure:this.pressure,work:this.work,pressureWork:this.pressureWork,area:this.area,deltaEnergy:this.deltaEnergy,events:this.events.map(e=>({...e})),samples:this.samples.map(b=>({...b})),strokes:this.strokes.map(s=>({direction:s.direction,complete:s.complete,points:s.points.map(p=>({...p}))})),startWidth:this.startWidth,endWidth:this.endWidth,minWidth:this.minWidth,maxWidth:this.maxWidth,requestedWidth:this.requestedWidth,canDrag:this.canDrag};}
+  }
+  const workCases=['compression','expansion','fixed'];
   class WorkJourney {
     constructor(sim,{speed=1,reducedMotion=false,planningBudget=9}={}){
       this.kind='work';this.sim=sim;this.speed=speed;this.reducedMotion=reducedMotion;this.planningBudget=planningBudget;
       this.index=0;this.paused=false;this.elapsed=0;this.results=[];this.window=null;this.tour=null;this.collision=null;
       sim.stopMotion();
-      // At the compression limit, make room with a real, explicitly labelled preparation.
-      if(sim.width<5){this.phase='prepare';sim.setMotion({targetWidth:11,duration:(11-sim.width)/.6});}
+      if(sim.width<7){this.phase='prepare';sim.setMotion({targetWidth:11,duration:(11-sim.width)/.6});}
       else this.beginCase();
     }
-    get case(){return workCases[this.index];}
+    get case(){return workCases[this.index]??'free';}
     answerComparison(choice){
       if(this.phase!=='collision'||this.tour.phase!=='compare'||!['<','=','>'].includes(choice))return;
       const e=this.tour.event,incoming=Math.hypot(e.before.vx,e.before.vy),outgoing=Math.hypot(e.after.vx,e.after.vy);
       const relation=Math.abs(incoming-outgoing)<=1e-10*Math.max(1,incoming,outgoing)?'=':incoming<outgoing?'<':'>';
       this.answer={choice,relation,correct:choice===relation,incoming,outgoing};
     }
-    continueComparison(){if(this.answer&&this.phase==='collision'&&this.tour.phase==='compare'){this.tour.continueComparison();this.paused=false;}}
+    continueComparison(){if(this.answer?.correct&&this.phase==='collision'&&this.tour.phase==='compare'){this.tour.continueComparison();this.paused=false;}}
     nextCase(){if(this.phase!=='hold')return;this.phase='between';this.elapsed=0;this.paused=false;}
+    setPistonTarget(width){if(!this.paused&&['measure','free'].includes(this.phase))this.window.setTarget(width);}
     beginCase(){
       this.sim.stopMotion();this.elapsed=0;this.window=null;this.collision=null;this.answer=null;
+      if(this.case==='free'){this.window=new WorkPath(this.sim,{mode:'free',speed:this.speed});this.phase='free';return;}
       if(this.case!=='fixed'){
         const direction=this.case==='compression'?-1:1;
         const travel=Math.min(2,direction<0?this.sim.width-3:18-this.sim.width);
@@ -96,25 +189,23 @@
       this.phase='collision';this.tour=new root.CollisionTour(this.sim,{kind:this.case==='fixed'?'pressure':'work',speed:this.speed,reducedMotion:this.reducedMotion,manualComparison:true});
     }
     get zoom(){return this.phase==='collision'?this.tour.zoom:this.phase==='between'?1-ease(this.elapsed/1.4):this.window?.zoom??0;}
-    get rate(){return this.paused?0:this.phase==='prepare'?this.speed:this.phase==='collision'?(this.tour.rate??0):this.phase==='measure'?this.window.rate:0;}
-    get progress(){const p=this.phase==='collision'?.2:this.phase==='measure'?.45+.4*this.window.elapsed/this.window.duration:.95;return this.phase==='prepare'?0:this.phase==='done'?1:(this.index+p)/3;}
+    get rate(){return this.paused?0:this.phase==='prepare'?this.speed:this.phase==='collision'?(this.tour.rate??0):['measure','free'].includes(this.phase)?this.window.rate:0;}
+    get progress(){const p=this.phase==='collision'?.2:this.phase==='measure'?.65:.95;return this.phase==='prepare'?0:this.phase==='free'?1:(this.index+p)/3;}
     tick(seconds,sim,advance){
-      if(this.paused||this.phase==='done'||this.phase==='hold'||this.phase==='unavailable')return;
-      if(this.phase==='prepare'){
-        advanceTime(seconds*this.speed,advance);if(!sim.motion)this.beginCase();return;
-      }
+      if(this.paused||this.phase==='hold'||this.phase==='unavailable')return;
+      if(this.phase==='prepare'){advanceTime(seconds*this.speed,advance);if(!sim.motion)this.beginCase();return;}
       if(this.phase==='collision'){
         this.tour.tick(seconds,advance,this.planningBudget);
         if(!this.tour.finished)return;
         if(this.tour.phase!=='done'){this.message=this.tour.message;this.phase='unavailable';sim.stopMotion();return;}
-        this.collision=this.tour.events.at(-1);this.tour=null;
-        this.window=new WorkWindow(sim,{cinematic:true,speed:this.speed});this.phase='measure';return;
+        this.collision=this.tour.events.at(-1);this.tour=null;sim.stopMotion();
+        this.window=new WorkPath(sim,{mode:this.case,speed:this.speed});this.phase='measure';return;
       }
-      if(this.phase==='measure'){
-        this.window.tick(seconds,sim,advance,this.speed);
-        if(this.window.phase==='done'){
+      if(['measure','free'].includes(this.phase)){
+        this.window.tick(seconds,sim,advance);
+        if(this.window.phase==='done'&&this.phase==='measure'){
           this.results.push({case:this.case,collision:{...this.collision},...this.window.summary});
-          sim.stopMotion();this.elapsed=0;this.phase=this.index===2?'done':'hold';
+          sim.stopMotion();this.elapsed=0;this.phase='hold';
         }
         return;
       }
@@ -207,13 +298,17 @@
     if(t>=2)text(c,t<5?'Toutes les vitesses de la zone encadrée':t<8?'On déplace et oriente les dessins, sans changer les normes':t<15?'Même masse : Ec = ½ m |v|² pour chaque marqueur':'La même méthode s’applique aux 1 000 particules',18,h-7,'#687f8a',10);
     c.globalAlpha=1;
   }
+  function workRegion(sim,story,options={}){
+    const m=story.window;
+    return {x:(m.minWidth+m.maxWidth)/2,y:sim.height/2,y0:m.y0,y1:m.y1,fit:true,minX:m.minWidth,maxX:m.maxWidth,
+      zoom:options.zoom??story.zoom,events:m.events,opacity:options.opacity??1,
+      work:{mode:m.mode,startWidth:m.startWidth,endWidth:m.endWidth,free:m.mode==='free',deltaVolume:m.deltaVolume,work:m.work,velocity:m.velocity}};
+  }
   function workChamber(canvas,sim,story,options={}){
     const G=root.LabGraphics,zoom=options.zoom??story.zoom;
     if(story.tour){G.chamber(canvas,sim,{...options,tour:{...story.tour.view,zoom,compareIncoming:true}});return;}
-    const m=story.window;
-    if(!m){G.chamber(canvas,sim,options);return;}
-    // The camera is anchored in the laboratory, never attached to the moving piston.
-    G.chamber(canvas,sim,{...options,region:{x:m.width,y:sim.height/2,y0:sim.height*.25,y1:sim.height*.75,zoom,events:m.events,opacity:options.opacity??1,work:{startWidth:['overview','zoom'].includes(m.phase)?sim.width:m.startWidth,deltaVolume:m.deltaVolume,work:m.work,velocity:m.velocity}}});
+    if(!story.window){G.chamber(canvas,sim,options);return;}
+    G.chamber(canvas,sim,{...options,region:workRegion(sim,story,options)});
   }
   function workGraph(canvas,story){
     const surf=root.LabGraphics.setup(canvas);if(!surf)return;const{ctx:c,w,h}=surf,m=story.window,e=story.tour?.event??story.collision;
@@ -224,7 +319,7 @@
       text(c,U.text('velocity',Math.hypot(e.before.vx,e.before.vy)),22,95,'#397fbe',24);
       text(c,'Vitesse sortante',22,133,'#258d79');
       text(c,U.text('velocity',Math.hypot(e.after.vx,e.after.vy)),22,163,'#258d79',24);
-      text(c,'δW reçu = Ec après − Ec avant = '+U.text('energy',e.work,4),22,207,color,13);
+      text(c,story.answer?.correct?'δW reçu = Ec après − Ec avant = '+U.text('energy',e.work,4):'Même masse : Ec = ½ m |v|²',22,207,color,13);
       text(c,'Choisissez <, = ou > sur le bandeau du zoom.',22,246,'#687f8a',11);
       return;
     }
@@ -237,27 +332,42 @@
       text(c,story.case==='fixed'?'u = 0 : rebond, mais aucune énergie échangée.':story.case==='compression'?'Le piston avance : la particule gagne de l’énergie.':'Le piston recule : la particule cède de l’énergie.',22,220,'#687f8a',11);
       return;
     }
-    const bins=m.bins,volume=m.startWidth*m.height,span=Math.max(.8,Math.abs(m.velocity*m.duration*m.height));
-    const vEnd=volume+m.velocity*m.duration*m.height,vMin=Math.min(volume,vEnd)-.25*span,vMax=Math.max(volume,vEnd)+.25*span;
-    const pMax=Math.max(1,...bins.map(b=>b.pressure))*1.22;
-    const left=54,right=w-22,top=36,bottom=h-62,X=v=>left+(v-vMin)/(vMax-vMin)*(right-left),Y=p=>bottom-p/pMax*(bottom-top);
-    text(c,'P (bar) · moyenne des chocs par intervalle',left,18,'#687f8a',11);
+    const all=m.strokes.flatMap(s=>s.points),volume=m.startWidth*m.height;
+    const prior=story.case==='fixed'?story.results?.[1]:null,reference=prior?.strokes?.flatMap(s=>s.points)??[];
+    const minWidth=prior?.minWidth??m.minWidth,maxWidth=prior?.maxWidth??m.maxWidth;
+    const span=Math.max(8,(maxWidth-minWidth)*m.height);
+    const vMin=minWidth*m.height-.12*span,vMax=maxWidth*m.height+.12*span;
+    const pMax=Math.max(1,m.pressure??0,...all.map(p=>p.p),...reference.map(p=>p.p))*1.18;
+    const left=54,right=w-22,top=36,bottom=h-68,X=v=>left+(v-vMin)/(vMax-vMin)*(right-left),Y=p=>bottom-p/pMax*(bottom-top);
+    text(c,'P (bar) · pression mesurée au piston',left,18,'#687f8a',11);
     line(c,left,top,left,bottom,'#9fb4be');line(c,left,bottom,right,bottom,'#9fb4be');
     for(let i=0;i<=3;i++){
       const p=i*pMax/3,y=Y(p);text(c,f(p*U.scales.pressure/1e5,2),5,y+4,'#687f8a',10);
-      const v=vMin+(vMax-vMin)*i/3; text(c,f(v*U.scales.volume*1000,3),X(v)-15,bottom+18,'#687f8a',10);
+      const v=vMin+(vMax-vMin)*i/3;text(c,f(v*U.scales.volume*1000,2),X(v)-15,bottom+18,'#687f8a',10);
     }
-    if(Math.abs(m.velocity)<1e-10){
+    if(story.case==='fixed'){
+      if(reference.length){c.setLineDash([4,5]);c.beginPath();reference.forEach((p,i)=>i?c.lineTo(X(p.v),Y(p.p)):c.moveTo(X(p.v),Y(p.p)));c.strokeStyle='#bdcdd9';c.lineWidth=1.5;c.stroke();c.setLineDash([]);text(c,'Pointillés : détente précédente',left+10,bottom-12,'#82949d',10);}
       const p=m.pressure??0;line(c,X(volume),bottom,X(volume),Y(p),color,3);
-      text(c,'ΔV = 0 : aucune aire, W = 0',left+12,top+22,color,13);
-    }else for(const b of bins){
-      const x=Math.min(X(b.v0),X(b.v1)),bw=Math.abs(X(b.v1)-X(b.v0));
-      c.globalAlpha=.25;c.fillStyle=color;c.fillRect(x,Y(b.pressure),bw,bottom-Y(b.pressure));c.globalAlpha=1;
-      line(c,X(b.v0),Y(b.pressure),X(b.v1),Y(b.pressure),color,2);
+      if(p>0){c.beginPath();c.arc(X(volume),Y(p),4,0,Math.PI*2);c.fillStyle=color;c.fill();}
+      text(c,'A = B : ΔV = 0',left+10,top+22,color,14);
+      text(c,'Aucune largeur, aucune aire.',left+10,top+43,'#687f8a',12);
+    }else{
+      for(const stroke of m.strokes){
+        const points=stroke.points;if(points.length<2)continue;
+        const tone=stroke.direction<0?'#c77e2f':'#337fba',shade=m.mode==='free'?(stroke.complete?1:.5):m.shade;
+        if(shade>0){
+          c.beginPath();c.moveTo(X(points[0].v),bottom);
+          for(const p of points)c.lineTo(X(p.v),bottom+(Y(p.p)-bottom)*shade);
+          c.lineTo(X(points.at(-1).v),bottom);c.closePath();c.fillStyle=tone;c.globalAlpha=.2;c.fill();c.globalAlpha=1;
+        }
+        c.beginPath();points.forEach((p,i)=>i?c.lineTo(X(p.v),Y(p.p)):c.moveTo(X(p.v),Y(p.p)));c.strokeStyle=tone;c.lineWidth=2.5;c.stroke();
+        const mid=Math.floor(points.length/2),p=points[mid],prev=points[Math.max(0,mid-1)];
+        if(Math.abs(p.v-prev.v)>.001)arrow(c,X(prev.v),Y(prev.p),X(p.v)-X(prev.v),Y(p.p)-Y(prev.p),tone);
+      }
+      if(!all.length)text(c,'Déplacez le piston : la courbe se dessine ici.',left+8,top+45,'#687f8a',11);
     }
-    if(m.elapsed>0&&m.velocity!==0)arrow(c,X(volume),bottom-8,X(volume+m.deltaVolume)-X(volume),0,color);
     text(c,'V (L)',right-28,bottom+38,'#687f8a',11);
-    text(c,'W reçu = −Σ Pᵢ ΔVᵢ = '+U.text('energy',m.work,3),left,h-5,color,14);
+    text(c,story.case==='fixed'?'W reçu = 0 J':'W reçu ≈ −∫ P dV = '+U.text('energy',m.area,2),left,h-7,color,14);
   }
   function pressureGraph(canvas,s){
     const surf=root.LabGraphics.setup(canvas);if(!surf)return;const{ctx:c,w,h}=surf;const left=35,right=w-18,X=t=>left+(t-s.start)/s.duration*(right-left),max=Math.max(1,...s.events.map(e=>e.impulse));
@@ -291,5 +401,5 @@
       text(c,'T = E totale / (nR) = '+f(s.temperature)+' K',25,241,'#248b7c',16);
     }else text(c,'Puis on fait la même somme sur tout le gaz.',25,165,'#687f8a');
   }
-  root.GasLessons={PressureWindow,WorkWindow,WorkJourney,workChamber,workGraph,TemperatureSnapshot,TemperatureLesson,SimulationReturn,pressureChamber,temperatureChamber,pressureGraph,temperatureGraph};
+  root.GasLessons={PressureWindow,WorkWindow,WorkPath,WorkJourney,workRegion,workChamber,workGraph,TemperatureSnapshot,TemperatureLesson,SimulationReturn,pressureChamber,temperatureChamber,pressureGraph,temperatureGraph};
 })(typeof globalThis!=='undefined'?globalThis:window);
