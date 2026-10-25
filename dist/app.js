@@ -8,7 +8,8 @@
     pressure: { index: '01', label: 'LES CHOCS FONT LA PRESSION', title: 'Des chocs microscopiques à la pression.', description: 'Suivez une particule jusqu’au piston et observez la poussée au moment du choc.', width: 11, action: 'fixed', source: 'piston', chart: 'time', zoom: false, speed: 1 },
     free: { index: '02', label: 'DÉTENTE DE JOULE–GAY–LUSSAC', title: 'Plus de place. La même température ?', description: 'Ouvrez vers le vide, puis regardez le gaz occuper le nouvel espace. Les parois sont isolées.', width: 9, action: 'expansion', source: 'mean', chart: 'time', zoom: false, speed: 1 },
     adiabatic: { index: '03', label: 'LE TRAVAIL DU PISTON', title: 'Détendre ou comprimer : l’énergie change de côté.', description: 'Choisissez le sens du mouvement, puis suivez un choc sur le piston mobile. Les parois sont isolées.', width: 11, action: 'expansion', source: 'mean', chart: 'time', zoom: false, speed: 1 },
-    comparison: { index: '04', label: 'LE RAYON DES PARTICULES', title: 'La taille des particules change-t-elle PV = nRT ?', description: 'Faites varier le rayon des disques, à quantité de gaz, volume et température initiale identiques. Comparez PV/(nRT) à 1.', width: 11, action: 'fixed', source: 'mean', chart: 'ratio', zoom: false, speed: 1 }
+    cycles: { index: '04', label: 'DES ALLERS-RETOURS DU PISTON', title: 'Suivre les cycles sur un diagramme P–V.', description: 'Comprimez puis détendez le gaz plusieurs fois. Comparez les trajets et le travail reçu par le gaz.', width:11, action:'compression', source:'piston', chart:'pv', zoom:false, speed:1 },
+    comparison: { index: '05', label: 'LE RAYON DES PARTICULES', title: 'La taille des particules change-t-elle PV = nRT ?', description: 'Faites varier le rayon des disques, à quantité de gaz, volume et température initiale identiques. Comparez PV/(nRT) à 1.', width: 11, action: 'fixed', source: 'mean', chart: 'ratio', zoom: false, speed: 1 }
   };
   const sessions = new Map();
   let sharedRadius = .04;
@@ -22,7 +23,7 @@
   const snapshots = sim => ({ speeds: sim.particles.map(p => Math.hypot(p.vx, p.vy)), energies: sim.particles.map(p => (p.vx ** 2 + p.vy ** 2) / 2) });
   function createSession(key, previous) {
     const config = experiments[key];
-    const s = { key, model: 'hard-disks', radius: sharedRadius, radiusRecords: previous?.radiusRecords ?? [], recordX: previous?.recordX ?? 'radius', recordY: previous?.recordY ?? 'ratio', lastRecordTime: null, alpha: previous?.alpha ?? 1, fitEnabled: previous?.fitEnabled ?? true, autoRecords: previous?.autoRecords ?? false, recordPage: previous?.recordPage ?? 0, initialTemperature: previous?.initialTemperature || 1.5,
+    const s = { key, model: 'hard-disks', radius: sharedRadius, radiusRecords: previous?.radiusRecords ?? [], recordX: previous?.recordX ?? 'radius', recordY: previous?.recordY ?? 'ratio', batch:null, batchMessage:'', cycle:null, lastRecordTime: null, alpha: previous?.alpha ?? 1, fitEnabled: previous?.fitEnabled ?? true, autoRecords: previous?.autoRecords ?? false, recordPage: previous?.recordPage ?? 0, initialTemperature: previous?.initialTemperature || 1.5,
       action: previous?.action ?? config.action, duration: 72, ratio: key === 'free' ? 200 : (previous?.action ?? config.action) === 'compression' ? 70 : 140,
       source: config.source, chart: config.chart, zoom: config.zoom, speed: config.speed, playing: true, vectors: false,
       bath: previous?.bath ?? 3, accommodation: previous?.accommodation ?? 1, allWalls: previous?.allWalls ?? false,
@@ -38,8 +39,8 @@
     const run = s.run;
     const m = s.sim.metrics;
     s.history.push({ ...m, pistonPressure: m.pressureByWall.right, other: s.other?.metrics ?? null,
-      runId: run?.id ?? 0, legId: 0, legStart: run?.start ?? 0, moving: !!s.sim.motion, freeExpansion: run?.free ?? false });
-    if (s.history.length > 6000) s.history.shift();
+      runId: run?.id ?? 0, legId: s.cycle?.leg ?? 0, legStart: run?.start ?? 0, moving: !!s.sim.motion, freeExpansion: run?.free ?? false });
+    if (s.history.length > (s.key === 'cycles' ? 20000 : 6000)) s.history.shift();
     s.nextSample = s.sim.time + 0.1;
   }
   function notify(message) { $('notice').textContent = message; }
@@ -72,10 +73,13 @@
     $('singleChamber').hidden = !!s.other; $('comparisonChambers').hidden = !s.other;
     $('pressureLesson').hidden = active !== 'pressure'; $('heatLesson').hidden = active !== 'heat';
     $('comparisonLesson').hidden = active !== 'comparison'; $('transformationLesson').hidden = active !== 'free'; $('workLesson').hidden = active !== 'adiabatic';
+    $('cycleLesson').hidden = $('cycleControls').hidden = active !== 'cycles';
+    $('mainChartSwitch').hidden = active === 'cycles';
     $('motionChoice').hidden = active !== 'adiabatic';
     $('motionFixedOption').hidden = $('motionFixedOption').disabled = active === 'adiabatic';
     $('heatControls').hidden = active !== 'heat'; $('thermalAdvanced').hidden = active !== 'heat';
     $('radiusControls').hidden = active !== 'comparison';
+    $('comparisonReturn').hidden = active !== 'comparison';
     $('recordAnalysis').hidden = active !== 'comparison';
     $('recordX').value = s.recordX; $('recordY').value = s.recordY;
     $('alpha').value = s.alpha; $('alphaNumber').value = s.alpha; $('alphaNumber').setAttribute('aria-invalid','false'); $('linearFit').checked = s.fitEnabled; $('autoRecords').checked = s.autoRecords;
@@ -115,25 +119,70 @@
     $('durationValue').value = U.text('time', duration(s));
     $('bathValue').value = U.text('temperature', s.bath); $('accommodationValue').value = Math.round(s.accommodation * 100) + ' %';
     const fixed = s.action === 'fixed';
-    $('volumeControl').hidden = fixed || active === 'heat'; $('durationControl').hidden = fixed || active === 'free' || active === 'heat';
+    $('volumeControl').hidden = active === 'cycles' || fixed || active === 'heat'; $('durationControl').hidden = fixed || active === 'free' || active === 'heat';
     $('start').hidden = ['heat','pressure','comparison'].includes(active); $('stop').hidden = !moving;
-    $('start').textContent = active === 'free' ? 'Ouvrir vers le vide' : fixed ? 'Isoler un choc' : expanding ? 'Lancer la détente' : 'Lancer la compression';
-    $('start').disabled = touring || moving || (!fixed && Math.abs(target(s) - s.sim.width) < 1e-3);
-    $('stop').disabled = !moving;
+    $('start').textContent = active === 'cycles' ? 'Lancer les cycles' : active === 'free' ? 'Ouvrir vers le vide' : fixed ? 'Isoler un choc' : expanding ? 'Lancer la détente' : 'Lancer la compression';
+    $('start').disabled = touring || moving || (active !== 'cycles' && !fixed && Math.abs(target(s) - s.sim.width) < 1e-3);
+    $('stop').disabled = !moving; $('cycleCount').disabled=moving;
+    const batching=!!s.batch;
+    for(const id of ['applyRadius','particleRadius','applyRecordTemperature','recordTemperature','applyInitial','initialTemperature','clearRadiusRecords','startTemperatureSeries','autoRecords','pressureSource','capture']) $(id).disabled=touring||batching;
+    $('stopTemperatureSeries').hidden=!batching;
     for (const id of ['motionAction', 'target', 'duration', 'motionProfile']) $(id).disabled = touring || moving || (id === 'target' && active === 'free' && !!s.run?.free);
-    for (const id of ['timeScale','thermalMode','accommodation','allWalls','particleRadius','applyRadius','initialTemperature','applyInitial']) $(id).disabled = touring;
+    for (const id of ['timeScale','thermalMode','accommodation','allWalls','particleRadius','applyRadius','initialTemperature','applyInitial']) $(id).disabled = touring || (batching && id !== 'timeScale');
     $('bathTemperature').disabled = touring || s.thermalMode === 'isolated';
     $('illustrate').disabled = touring || (active === 'heat' && (s.thermalMode === 'isolated' || s.accommodation === 0)) || (active === 'adiabatic' && !moving && Math.abs(target(s)-s.sim.width)<1e-3);
     $('endIllustration').hidden = !touring; $('tourStatus').hidden = !touring;
     $('zoomPanel').hidden = !s.zoom || active !== 'comparison'; $('microObservation').hidden = s.zoom || touring || active === 'comparison';
-    $('microHint').textContent = active === 'comparison' ? 'Les chocs mutuels redistribuent les vitesses. Pour chaque rayon, attendez la stabilisation de la mesure ; un écart à 1 peut aussi fluctuer.' : active === 'pressure' ? 'Le bouton suit un choc à venir : ralenti, rapprochement de la caméra, poussée sur le piston, puis retour à la vue d’ensemble.' : active === 'heat' ? 'Le parcours montre deux échanges successifs : de la paroi vers le gaz, puis du gaz vers la paroi. Le flux moyen peut avoir un autre signe que celui d’un choc.' : active === 'adiabatic' ? 'Le bouton d’illustration lance le trajet choisi si nécessaire. La paroi mobile et la particule échangent de l’énergie au moment du choc.' : 'L’espace vide se remplit sans travail du piston. Attendez le retour à un état homogène pour interpréter PV/(nRT).';
+    $('microHint').textContent = active === 'cycles' ? 'Suivez les allers-retours du piston sur le diagramme P–V. La vitesse du piston change le travail et l’échauffement du gaz.' : active === 'comparison' ? 'Les chocs mutuels redistribuent les vitesses. Pour chaque rayon, attendez la stabilisation de la mesure ; un écart à 1 peut aussi fluctuer.' : active === 'pressure' ? 'Le bouton suit un choc à venir : ralenti, rapprochement de la caméra, poussée sur le piston, puis retour à la vue d’ensemble.' : active === 'heat' ? 'Le parcours montre deux échanges successifs : de la paroi vers le gaz, puis du gaz vers la paroi. Le flux moyen peut avoir un autre signe que celui d’un choc.' : active === 'adiabatic' ? 'Le bouton d’illustration lance le trajet choisi si nécessaire. La paroi mobile et la particule échangent de l’énergie au moment du choc.' : 'L’espace vide se remplit sans travail du piston. Attendez le retour à un état homogène pour interpréter PV/(nRT).';
     $('pause').textContent = s.playing ? 'Ⅱ Pause' : '▶ Reprendre'; $('pause').setAttribute('aria-label', s.playing ? 'Mettre en pause' : 'Reprendre la simulation');
-    $('capture').disabled = !!s.seek;
+    $('capture').disabled = !!s.seek || batching;
     document.querySelectorAll('input[type="range"]').forEach(input => input.style.setProperty('--fill', ((+input.value - +input.min) / (+input.max - +input.min) * 100) + '%'));
   }
+  function launchCycles() {
+    const s=session();
+    s.cycle={running:true,leg:0,count:+$('cycleCount').value,wide:s.sim.width,narrow:s.sim.width*.7,legDuration:duration(s)};
+    s.run={id:++s.runId,start:s.sim.time,free:false};
+    s.chart='pv';s.source='piston';sample(s);
+    s.sim.setMotion({type:'smooth',targetWidth:s.cycle.narrow,duration:s.cycle.legDuration});
+    s.playing=true;accumulator=0;updateControls();render();
+  }
+  function nextCycleLeg(s) {
+    const c=s.cycle; c.leg++;
+    if(c.leg>=2*c.count){c.running=false;sample(s);return;}
+    sample(s);s.sim.setMotion({type:'smooth',targetWidth:c.leg%2?c.wide:c.narrow,duration:c.legDuration});
+  }
+  function startTemperatureState(batch) {
+    const previous=session(); previous.initialTemperature=batch.temperatures[batch.index]/200;
+    const next=createSession('comparison',previous);next.batch=batch;next.autoRecords=false;next.speed=4;
+    batch.warmup=Math.max(6,3*next.sim.width/Math.sqrt(next.initialTemperature));batch.measureAt=null;batch.nextCheck=batch.warmup+4;
+    sessions.set('comparison',next);accumulator=0;previousFrame=0;populateControls();render();
+  }
+  function tickTemperatureSeries(s) {
+    const b=s.batch,m=s.sim.metrics,w=s.sim.measurementWindow;
+    if(b.measureAt!=null && m.time>=b.measureAt){
+      recordRadius();b.index++;
+      if(b.index===b.temperatures.length){s.batch=null;s.batchMessage='Série terminée : 5 températures relevées au même rayon.';s.playing=false;updateControls();render();}
+      else startTemperatureState(b);
+      return;
+    }
+    if(m.time>Math.max(100,b.warmup*5)){s.batch=null;s.batchMessage='Série arrêtée : stabilisation non atteinte. Les points déjà mesurés sont conservés.';s.playing=false;updateControls();render();return;}
+    if(b.measureAt!=null || m.time<b.nextCheck)return;
+    b.nextCheck=m.time+w;
+    const old=s.history.filter(r=>r.time<=m.time-w).at(-1);
+    const stable=old && m.pressure>0 && Math.abs(m.pressure-old.pressure)/m.pressure<.1 && Math.abs(m.temperatureX-m.temperatureY)/m.temperature<.1;
+    if(stable)b.measureAt=m.time+w;
+  }
+  $('startTemperatureSeries').addEventListener('click',()=>{
+    if(session().batch)return;
+    if(session().radiusRecords.length>MAX_RECORDS-5){session().batchMessage='Il faut cinq places libres : exportez les relevés avant de les effacer.';readings();return;}
+    session().recordX='temperature';session().recordY='correctedPV';
+    startTemperatureState({temperatures:[200,300,400,500,600],index:0});
+  });
+  $('stopTemperatureSeries').addEventListener('click',()=>{session().batch=null;session().batchMessage='Série interrompue ; les points déjà relevés sont conservés.';session().playing=false;updateControls();render();});
   function launch() {
     const s = session();
     if (s.sim.motion || s.tour) return;
+    if (active === 'cycles') { launchCycles(); return; }
     if (s.action === 'fixed') { capture(); return; }
     sample(s);
     s.run = { id: ++s.runId, start: s.sim.time, free: active === 'free' };
@@ -160,7 +209,7 @@
   }
   function advance(s, dt) {
     const motion = s.sim.motion;
-    const h = motion ? Math.min(dt, Math.max(1e-10, motion.duration - motion.elapsed)) : dt;
+    const h = motion && motion.type !== 'oscillate' ? Math.min(dt, Math.max(1e-10, motion.duration - motion.elapsed)) : dt;
     for (const sim of states(s)) sim.step(h);
     if (s.sim.time >= s.nextSample || (motion && !s.sim.motion)) sample(s);
     chooseCollision(s);
@@ -171,6 +220,7 @@
         notify('Choc isolé à t = ' + U.text('time', event.time) + '. Examinez les vitesses et les échanges, puis reprenez ou isolez le suivant.'); updateControls(); render();
       } else if (s.sim.time >= s.seek.deadline) { s.seek = null; s.playing = false; notify('Aucun choc sur la zone suivie pendant la fenêtre de recherche Reprenez la lecture ou changez le mouvement.'); updateControls(); }
     }
+    if (motion && !s.sim.motion && s.cycle?.running) { nextCycleLeg(s); }
     if (motion && !s.sim.motion && !s.tour) { updateControls(); notify('Volume cible atteint. Les mesures continuent à piston immobile.'); }
     return h;
   }
@@ -255,11 +305,15 @@
     } else {
       const convert = r => ({ x: ['pt', 'vt', 'pvt'].includes(s.chart) ? r.temperature : r.volume, y: s.chart === 'vt' ? r.volume : s.chart === 'pvt' ? (pressure(r) ?? NaN) * r.volume : pressure(r) ?? NaN });
       series = groups.map(group => ({ color: group.color, scatter: s.chart === 'pvt', arrows: s.chart !== 'pvt', points: group.rows.flatMap((row, i, rows) => i && row.freeExpansion && Math.abs(row.time - rows[i - 1].time) < 1e-9 && row.volume !== rows[i - 1].volume ? [{ x: NaN, y: NaN }, convert(row)] : [convert(row)]) }));
+      if (active === 'cycles' && s.chart === 'pv' && s.cycle) {
+        series = Array.from({length:Math.min(s.cycle.leg+1,2*s.cycle.count)},(_,leg)=>({color:leg%2?'#287db4':'#ce8033',arrows:true,points:primary.filter(r=>r.runId===s.run?.id&&r.legId===leg).map(convert)}));
+      }
       xRange = G.dataRange(series.flatMap(line => line.points.map(p => p.x)), s.chart === 'pv' ? [s.initial.volume * .8, s.initial.volume * 1.2] : [s.initial.temperature * .8, s.initial.temperature * 1.2]);
       if (s.chart === 'pvt') series.unshift({ color: '#8c9eaa', dashed: true, points: xRange.map(x => ({ x, y: N * x })) });
       legend = '<span style="--color:#287db4">' + (s.other ? 'Disques durs' : 'Mesures') + '</span>' + (s.other ? '<span style="--color:#bd843b">Disques durs</span>' : '');
       hint = s.run?.free ? 'Une ouverture dans le vide est un saut de volume sans travail. Aucun segment ne relie ce saut dans le diagramme.' : s.chart === 'pv' ? 'Le travail reçu correspond à −∫P au piston dV. L’intégrale d’une pression lissée n’est qu’une estimation du travail réel aux chocs.' : s.chart === 'pvt' ? 'La droite PV = nRT est une référence idéale, indépendante de la pression mesurée.' : 'Les aires des diagrammes P–T et V–T ne représentent pas directement un travail.';
     }
+    if(active==='cycles'&&s.chart==='pv')legend='<span style="--color:#ce8033">Compression</span><span style="--color:#287db4">Détente</span>';
     yRange = G.dataRange(series.flatMap(line => line.points.map(p => p.y)), s.chart === 'ratio' ? [.8,1.2] : [0,1.5], s.chart !== 'log');
     let fx = x => x, fy = y => y;
     if (s.chart === 'time' || s.chart === 'ratio') {
@@ -339,19 +393,22 @@
     $('heatFlux').textContent = 'Flux moyen à gauche : ' + U.text('flux', m.heatFluxByWall.left);
     $('diskRatio').textContent = format(ratio(m));
     $('correctedRatio').textContent = format(ratio(m) == null ? null : ratio(m)*(1-s.alpha*m.packingFraction));
-    $('recordRadius').disabled = active !== 'comparison' || m.time < nextRecordTime(s) || s.radiusRecords.length >= MAX_RECORDS;
+    $('recordRadius').disabled = !!s.batch || active !== 'comparison' || m.time < nextRecordTime(s) || s.radiusRecords.length >= MAX_RECORDS;
     const windowText = U.text('time',s.sim.measurementWindow,3);
-    $('recordCount').textContent = s.radiusRecords.length.toLocaleString('fr-FR')+' / 10 000 relevés · les 10 derniers ci-dessous';
-    $('autoRecords').disabled = s.radiusRecords.length >= MAX_RECORDS;
+    $('recordCount').textContent = s.radiusRecords.length.toLocaleString('fr-FR')+' relevé(s) conservé(s)';
+    $('autoRecords').disabled = !!s.batch || s.radiusRecords.length >= MAX_RECORDS;
     $('radiusStatus').textContent = s.radiusRecords.length >= MAX_RECORDS ? 'Limite de 10 000 atteinte : exportez avant d’effacer. Aucun relevé n’a été supprimé.' : m.time < s.sim.measurementWindow
       ? 'Démarrage écarté : encore '+U.text('time',s.sim.measurementWindow-m.time,3)+' de temps simulé, puis une fenêtre complète de '+windowText+'.'
       : m.time < nextRecordTime(s) ? 'Fenêtre en cours : encore '+U.text('time',nextRecordTime(s)-m.time,3)+' de temps simulé avant un relevé sans chevauchement.'
       : 'Prêt : fenêtre de '+U.text('time',m.measurementStart,3)+' à '+U.text('time',m.time,3)+'. Les observations ne seront pas reprises dans le prochain relevé.';
+    if(s.batch) $('radiusStatus').textContent='Série automatique en cours : le relevé attend la stabilisation puis une fenêtre complète.';
     $('radiusRecords').innerHTML = s.radiusRecords.slice(-10).map(r => '<li>r = ' + format(r.radius * U.scales.length * 1000) + ' mm · PV/(nRT) = ' + format(r.ratio) + ' · T = ' + U.text('temperature',r.temperature) + ' · fenêtre : ' + U.text('time',r.windowStart,3) + ' → ' + U.text('time',r.time,3) + ' · ' + (r.source === 'mean' ? 'toutes les parois' : 'piston') + '</li>').join('');
     $('pairCount').textContent = format(other?.pairCollisions ?? m.pairCollisions,0);
     $('packingFraction').textContent = 'Surface des disques : ' + format((other?.packingFraction ?? m.packingFraction) * 100,1) + ' %';
     $('directionTemperatures').textContent = 'Tₓ = ' + U.text('temperature', m.temperatureX) + ' ; Tᵧ = ' + U.text('temperature', m.temperatureY) + (other ? ' · Disques : Tₓ = ' + U.text('temperature', other.temperatureX) + ' ; Tᵧ = ' + U.text('temperature', other.temperatureY) : '');
     $('thermalFallbacks').textContent = 'Réflexions élastiques de contact thermique multiple : ' + format(m.thermalContactFallbacks,0) + '.';
+    $('temperatureSeriesStatus').textContent=s.batch ? 'Température '+(s.batch.index+1)+'/5 · '+s.batch.temperatures[s.batch.index]+' K · '+(s.playing?'':'en pause · ')+(s.batch.measureAt ? 'mesure sur une fenêtre complète…':'stabilisation…') : s.batchMessage || 'Les relevés précédents restent conservés.';
+    $('cycleStatus').textContent=s.cycle ? (s.cycle.running?'En cours · ':'Terminé / arrêté · ')+Math.floor(s.cycle.leg/2)+' / '+s.cycle.count+' allers-retours'+(s.cycle.running?' · '+(s.cycle.leg%2?'détente':'compression'):'') : 'Choisissez la durée d’un trajet, puis lancez les cycles.';
     $('logAnalysis').hidden = s.chart !== 'log';
   }
   function draw() {
@@ -389,9 +446,10 @@
     meanCollisionTime: {label:'Temps moyen entre chocs (µs)', value:r => r.meanCollisionTime == null ? null : r.meanCollisionTime * U.scales.time * 1e6},
     completedFlights: {label:'Trajets complets comptés', value:r => r.completedFlights}
   };
+  function selectedRecords(s) { return s.recordY==='correctedPV' ? s.radiusRecords.filter(r=>Math.abs(r.radius-s.radius)<1e-12) : s.radiusRecords; }
   function recordPlotData() {
     const s = session(), xf = recordFields[s.recordX], yf = recordFields[s.recordY];
-    const points = s.radiusRecords.map((r,i) => ({x:xf.value(r), y:yf.value(r), index:i+1})).filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
+    const points = selectedRecords(s).map((r,i) => ({x:xf.value(r), y:yf.value(r), index:i+1})).filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
     const reference = key => key === 'correctedPVT' ? U.scales.nR : ['ratio','correctedRatio'].includes(key) ? 1 : null;
     const xr = reference(s.recordX), yr = reference(s.recordY);
     const xRange = G.dataRange(points.map(p=>p.x),[0,1]), yRange = G.dataRange(points.map(p=>p.y).concat(yr == null ? [] : [yr]),[0,1]);
@@ -408,7 +466,7 @@
       yRange[0]=Math.min(yRange[0],...referencePoints.map(p=>p.y)); yRange[1]=Math.max(yRange[1],...referencePoints.map(p=>p.y));
       series.unshift({color:'#18857d',dashed:true,points:referencePoints,lineWidth:2});
     }
-    const fit = s.fitEnabled ? GasAnalysis.linearRegression(points) : null;
+    const fit = s.fitEnabled && !(s.recordX==='radius' && s.recordY==='ratio') ? GasAnalysis.linearRegression(points) : null;
     if (fit) {
       const endpoints = xRange.map(x=>({x,y:fit.slope*x+fit.intercept}));
       yRange[0] = Math.min(yRange[0],...endpoints.map(p=>p.y)); yRange[1] = Math.max(yRange[1],...endpoints.map(p=>p.y));
@@ -418,25 +476,32 @@
   }
   function drawRecordPlot() {
     if (active !== 'comparison') return;
-    const s = session(), data = recordPlotData(); G.plot($('recordChart'),data);
+    const s = session(), data = recordPlotData();
+    $('temperatureProtocol').hidden=$('correctionControls').hidden=!data.excludedVolumePlot;
+    $('recordRadius').hidden=data.excludedVolumePlot;
+    $('plotRadius').setAttribute('aria-pressed',String(!data.excludedVolumePlot)); $('plotExcludedVolume').setAttribute('aria-pressed',String(data.excludedVolumePlot));
+    $('recordQuestion').textContent=data.excludedVolumePlot?'La correction de volume retrouve-t-elle la pente nR ?':'Gaz dilué : PV/(nRT) est-il proche de 1 ?';
+    G.plot($('recordChart'),data);
     $('recordChart').setAttribute('aria-label',data.yLabel+' en fonction de '+data.xLabel);
-    $('recordPlotHint').textContent = s.radiusRecords.length ? data.points.length+' point(s) sur '+s.radiusRecords.length+' relevé(s). Chaque point est un relevé conservé ; les points ne sont pas reliés.'+(data.points.length<s.radiusRecords.length?' Les mesures indisponibles sont omises.':'') : data.excludedVolumePlot ? 'Gardez le rayon fixe et relevez au moins trois températures distinctes avec « Relever ce rayon ».' : 'Relevez au moins une mesure avec « Relever ce rayon », puis changez le rayon pour comparer.';
+    $('recordPlotHint').textContent = s.radiusRecords.length ? data.points.length+' point(s) sur '+s.radiusRecords.length+' relevé(s). Chaque point est un relevé conservé ; les points ne sont pas reliés.'+(data.points.length<s.radiusRecords.length?' Seuls les relevés valides du rayon sélectionné sont tracés en mode température.':'') : data.excludedVolumePlot ? 'Gardez le rayon fixe et relevez au moins trois températures distinctes avec « Relever ce rayon ».' : 'Relevez au moins une mesure avec « Relever ce rayon », puis changez le rayon pour comparer.';
     $('exportRecords').disabled = !s.radiusRecords.length;
     $('alphaValue').textContent = format(s.alpha,3);
-    const best = GasAnalysis.optimalAlpha(s.radiusRecords);
+    const best = GasAnalysis.optimalAlpha(selectedRecords(s));
     $('optimizeAlpha').disabled = !best;
-    let error=0; for (const r of s.radiusRecords) error+=(r.ratio*(1-s.alpha*r.packing)-1)**2;
-    $('alphaScore').textContent = s.radiusRecords.length ? 'Écart quadratique moyen à 1 (RMS) : '+format(Math.sqrt(error/s.radiusRecords.length),4)+' · chaque relevé a le même poids.' : 'α = 0 : aucune correction · α = 1 : volume matériel · α ≈ 2 : référence diluée 2D.';
+    const selected=selectedRecords(s);
+    let error=0; for (const r of selected) error+=(r.ratio*(1-s.alpha*r.packing)-1)**2;
+    $('alphaScore').textContent = selected.length ? 'Écart quadratique moyen à 1 (RMS) : '+format(Math.sqrt(error/selected.length),4)+' · chaque relevé a le même poids.' : 'α = 0 : aucune correction · α = 1 : volume matériel · α ≈ 2 : référence diluée 2D.';
     const significant = v => v == null || !Number.isFinite(v) ? 'indéfini' : v.toLocaleString('fr-FR',{maximumSignificantDigits:5});
     const fit = data.fit;
     const interceptSymbol=data.excludedVolumePlot?'c':'b';
-    $('recordReference').textContent = data.excludedVolumePlot ? 'Pointillés verts : P(V − b) = nRT, pente nR = '+format(U.scales.nR,4)+' J/K, ordonnée à l’origine nulle. Orange : régression des mesures.'+(new Set(s.radiusRecords.map(r=>r.radius)).size>1?' Attention : ces relevés mélangent plusieurs rayons, donc plusieurs volumes exclus b. Pour tester un b constant, exportez puis effacez les relevés et gardez un seul rayon.':'') : '';
+    $('recordReference').textContent = data.excludedVolumePlot ? 'b = αV occupé · pointillés verts : P(V − b) = nRT, pente nR = '+format(U.scales.nR,4)+' J/K, ordonnée à l’origine nulle. Orange : régression des mesures.'+' Rayon courant uniquement : '+format(s.radius*U.scales.length*1000)+' mm.' : '';
+    $('fitEquation').hidden=s.recordX==='radius'&&s.recordY==='ratio';
     $('fitEquation').textContent = !s.fitEnabled ? 'Régression désactivée.' : !fit ? (data.points.length<3 ? 'Il faut au moins 3 relevés valides pour estimer les incertitudes.' : 'Les abscisses doivent varier pour déterminer une pente.') : 'y = ('+significant(fit.slope)+') x '+(fit.intercept<0?'− ':'+ ')+significant(Math.abs(fit.intercept))+' · R² = '+significant(fit.rSquared);
     $('fitUncertainty').textContent = fit ? 'a = '+significant(fit.slope)+' ± '+significant(fit.slopeSE)+' ; '+interceptSymbol+' = '+significant(fit.intercept)+' ± '+significant(fit.interceptSE)+' (incertitudes-types, 1 σ) · n = '+fit.count+' · degrés de liberté = '+fit.degreesOfFreedom+'. Unités : a en unité Y / unité X ; '+interceptSymbol+' en unité Y.' : '';
     $('fitInterpretation').textContent = ['correctedRatio','correctedPVT'].includes(s.recordY) ? 'On cherche ici une grandeur constante : une pente compatible avec zéro et une valeur proche de '+(s.recordY==='correctedPVT'?'nR = '+format(U.scales.nR,4)+' J/K':'1')+'. Un faible R² peut donc être attendu : il ne mesure pas la qualité de cette correction. Multiplier par nR ne change pas R².' : data.excludedVolumePlot ? 'Régression y = aT + c : comparer a à nR et c à zéro. c est l’ordonnée à l’origine, distincte du volume exclu b. Un R² élevé ne suffit pas à valider la correction ; varier aussi la densité permet de la mettre à l’épreuve.' : '';
     const pages = Math.max(1,Math.ceil(s.radiusRecords.length/RECORD_PAGE_SIZE));
     s.recordPage = Math.max(0,Math.min(s.recordPage,pages-1));
-    $('recordPageStatus').textContent = 'Page '+(s.recordPage+1)+' / '+pages+' · 100 lignes par page ; graphique, régression et export : tous les relevés.';
+    $('recordPageStatus').textContent = 'Page '+(s.recordPage+1)+' / '+pages+' · 100 lignes par page ; tableau et export : tous les relevés. Graphique thermique : rayon courant.';
     $('recordsPrevious').disabled = s.recordPage===0; $('recordsNext').disabled = s.recordPage===pages-1;
     $('recordTable').innerHTML = s.radiusRecords.slice(s.recordPage*RECORD_PAGE_SIZE,(s.recordPage+1)*RECORD_PAGE_SIZE).map((r,i)=>'<tr><td>'+(s.recordPage*RECORD_PAGE_SIZE+i+1)+'</td><td>'+format(recordFields.radius.value(r))+'</td><td>'+format(r.ratio,3)+'</td><td>'+format(recordFields.correctedRatio.value(r),3)+'</td><td>'+format(recordFields.meanFreePath.value(r))+'</td><td>'+format(recordFields.packing.value(r))+'</td><td>'+format(recordFields.pressure.value(r),3)+'</td><td>'+format(recordFields.temperature.value(r))+'</td><td>'+format(recordFields.meanCollisionTime.value(r))+'</td><td>'+r.completedFlights+'</td><td>'+U.text('time',r.windowStart,3)+' → '+U.text('time',r.time,3)+'</td><td>'+(r.source==='mean'?'Toutes les parois':'Piston')+'</td></tr>').join('');
   }
@@ -460,7 +525,8 @@
         if (performance.now() - started > 12) break;
       }
     }
-    if (active === 'comparison' && s.autoRecords && s.playing && s.sim.time >= nextRecordTime(s)) recordRadius();
+    if (active === 'comparison' && s.batch && s.playing) tickTemperatureSeries(s);
+    if (active === 'comparison' && !s.batch && s===session() && s.autoRecords && s.playing && s.sim.time >= nextRecordTime(s)) recordRadius();
     draw();
     if (timestamp - lastUI > 100) { readings(); drawChart(); lastUI = timestamp; }
     requestAnimationFrame(frame);
@@ -483,7 +549,7 @@
   $('pause').addEventListener('click', () => { if (session().tour) { cancelIllustration(true); return; } session().playing = !session().playing; session().seek = null; if (!session().playing) sample(session()); accumulator = 0; updateControls(); render(); });
   $('step').addEventListener('click', () => { const s = session(); if (s.tour) cancelIllustration(true); s.playing = false; s.seek = null; advance(s,.02); chooseCollision(s,true); sample(s); accumulator = 0; updateControls(); render(); });
   $('reset').addEventListener('click', reset); $('start').addEventListener('click',launch); $('capture').addEventListener('click',capture);
-  $('stop').addEventListener('click', () => { const s = session(); if (s.tour) cancelIllustration(); for (const sim of states(s)) sim.stopMotion(); sample(s); updateControls(); render(); notify('Piston arrêté : les prochains chocs ne fournissent plus de travail, même si la pression reste non nulle.'); });
+  $('stop').addEventListener('click', () => { const s = session(); if (s.cycle) s.cycle.running=false; if (s.tour) cancelIllustration(); for (const sim of states(s)) sim.stopMotion(); sample(s); updateControls(); render(); notify('Piston arrêté : les prochains chocs ne fournissent plus de travail, même si la pression reste non nulle.'); });
   $('illustrate').addEventListener('click', illustrate);
   $('endIllustration').addEventListener('click', () => cancelIllustration());
   $('timeScale').addEventListener('input', () => { session().speed = +$('timeScale').value; accumulator = 0; });
@@ -522,9 +588,10 @@
   $('alpha').addEventListener('input',()=>setAlpha(+$('alpha').value));
   $('alphaNumber').addEventListener('input',()=>setAlpha($('alphaNumber').value.trim()===''?NaN:Number($('alphaNumber').value)));
   $('optimizeAlpha').addEventListener('click',()=>{
-    const best=GasAnalysis.optimalAlpha(session().radiusRecords); if (!best) return;
+    const best=GasAnalysis.optimalAlpha(selectedRecords(session())); if (!best) return;
     setAlpha(best.alpha); notify('α ajusté sur '+best.count+' relevés : minimum de Σ[Z(1 − αφ) − 1]², avec 0 ≤ α ≤ 5.'+(best.bounded?' Minimum atteint à une borne du réglage.':''));
   });
+  $('plotRadius').addEventListener('click',()=>{const s=session();s.recordX='radius';s.recordY='ratio';$('recordX').value=s.recordX;$('recordY').value=s.recordY;drawRecordPlot();});
   $('plotExcludedVolume').addEventListener('click',()=>{const s=session();s.recordX='temperature';s.recordY='correctedPV';$('recordX').value=s.recordX;$('recordY').value=s.recordY;drawRecordPlot();});
   $('recordTemperature').addEventListener('input',()=>{$('recordTemperatureValue').value=U.text('temperature',+$('recordTemperature').value/200);});
   $('applyRecordTemperature').addEventListener('click',()=>{session().initialTemperature=+$('recordTemperature').value/200;reset();});
@@ -560,6 +627,6 @@
   selectExperiment('pressure'); requestAnimationFrame(frame);
   Object.defineProperty(window,'gaz2D',{value:{
     get metrics(){return {...session().sim.metrics};}, get comparisonMetrics(){return session().other ? {...session().other.metrics} : null;},
-    get paused(){return !session().playing;}, get analysis(){const s=session();return {experiment:active,chartType:s.chart,pressureSource:s.source,count:N,history:s.history.map(r=>({...r})),collision:s.focus,plot:chartData(),recordPlot:recordPlotData(),alpha:s.alpha,autoRecords:s.autoRecords,radiusRecords:s.radiusRecords.map(r=>({...r,correctedRatio:recordFields.correctedRatio.value(r)})),run:s.run,seek:!!s.seek,tour:s.tour?.view ?? null,lastTour:s.lastTour};}
+    get paused(){return !session().playing;}, get analysis(){const s=session();return {experiment:active,chartType:s.chart,pressureSource:s.source,count:N,history:s.history.map(r=>({...r})),collision:s.focus,plot:chartData(),recordPlot:recordPlotData(),alpha:s.alpha,autoRecords:s.autoRecords,radiusRecords:s.radiusRecords.map(r=>({...r,correctedRatio:recordFields.correctedRatio.value(r)})),run:s.run,batch:s.batch?{...s.batch}:null,cycle:s.cycle?{...s.cycle}:null,seek:!!s.seek,tour:s.tour?.view ?? null,lastTour:s.lastTour};}
   },writable:false});
 })();

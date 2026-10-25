@@ -1,3 +1,10 @@
+## 0.12.0 — Parcours guidé, séries de températures et cycles
+
+- Onglet Rayon recentré sur deux graphiques pédagogiques, simulation et tracé côte à côte.
+- Série automatique de cinq températures avec stabilisation, fenêtre de mesure dédiée, pause et arrêt.
+- Analyse P(V − b) et ajustement d’α limités au rayon courant, sans effacer les autres relevés.
+- Nouvel onglet Cycles P–V : 1, 3 ou 5 allers-retours, durée réglable, branches colorées et bilan énergétique.
+
 ## 0.11.0 — Volume exclu et retour aux expériences
 
 - Tracé P(V − b) en fonction de T, b = αV occupé, référence de pente nR et régression libre.

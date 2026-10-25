@@ -1730,3 +1730,27 @@ input[aria-invalid="true"] {
 .record-pagination { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:12px 0; }
 .analysis-methods { margin:12px 0; font-size:12px; color:#557082; line-height:1.6; }
 #fitEquation { color:#b56c25; }
+
+/* Guided radius lab: one question and its plot beside the gas. */
+.guided-choices { display:flex; gap:8px; flex-wrap:wrap; }
+.guided-choices [aria-pressed="true"] { background:#e2f2ee; border-color:#218878; color:#14685a; }
+[hidden] { display:none !important; }
+#workbench[data-experience="comparison"] { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); gap:16px; }
+#workbench[data-experience="comparison"] > * { grid-column:1 / -1; }
+#workbench[data-experience="comparison"] .bench-grid { display:contents; }
+#workbench[data-experience="comparison"] .microscope { grid-column:1; grid-row:3; align-self:start; }
+#workbench[data-experience="comparison"] .measurements { display:none; }
+#workbench[data-experience="comparison"] #recordAnalysis { grid-column:2; grid-row:3; margin:0; }
+#workbench[data-experience="comparison"] .micro-toolbar { display:none; }
+#workbench[data-experience="comparison"] #recordChart { height:260px; }
+#workbench[data-experience="comparison"] #comparisonExplanation { margin-bottom:0; }
+#temperatureProtocol { padding-top:0; margin-top:8px; }
+#temperatureProtocol details { margin-top:8px; font-size:12px; }
+#temperatureProtocol p { margin:8px 0; }
+#comparisonReturn { padding:16px; background:#eef5f3; border-radius:14px; }
+#comparisonReturn p { font-size:13px; line-height:1.6; }
+#comparisonReturn button { margin-right:14px; }
+@media(max-width:900px) {
+ #workbench[data-experience="comparison"] { display:block; }
+ #workbench[data-experience="comparison"] #recordAnalysis { margin:16px 0; }
+}

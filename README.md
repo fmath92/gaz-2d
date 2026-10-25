@@ -2,7 +2,7 @@
 
 **[Ouvrir le démonstrateur](https://fmath92.github.io/gaz-2d/)** · [Code source](https://github.com/fmath92/gaz-2d)
 
-Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.11.0 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
+Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.12.0 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
 
 ## La visite
 
@@ -11,11 +11,12 @@ Un laboratoire de thermodynamique pour relier les collisions microscopiques à l
 | 01 | Pression | Un choc à venir, sa poussée sur le piston immobile et sa contribution à la pression. |
 | 02 | Joule–Gay–Lussac | Ouverture vers le vide (doublement du volume par défaut), énergie et température conservées en mode isolé. |
 | 03 | Détente et compression adiabatiques | Choix du sens du mouvement ; zoom sur un choc au piston mobile et sur le travail reçu ou fourni. |
-| 04 | Rayon & loi des gaz | Une simulation de disques durs à rayon réglable ; relevés de PV/(nRT) à n, V et T initiale identiques. |
+| 04 | Cycles P–V | Allers-retours isolés du piston, branches compression/détente et échauffement éventuel. |
+| 05 | Rayon & loi des gaz | Une simulation de disques durs à rayon réglable ; relevés de PV/(nRT) à n, V et T initiale identiques. |
 
-Toutes les expériences utilisent **1 000 disques durs** avec collisions élastiques mutuelles. Le rayon commun vaut initialement 0,04 unité interne (≈ 0,92 mm équivalents). Son réglage dans le dernier onglet s’applique aux quatre expériences et les réinitialise ; les relevés conservés gardent leur rayon d’origine. Le dernier onglet propose de 0,005 à 0,07 unité (≈ 0,11 à 1,61 mm). Le rayon dessiné est le rayon de collision. Le modèle ponctuel reste disponible dans la bibliothèque et ses tests, mais n’est plus proposé dans l’interface.
+Toutes les expériences utilisent **1 000 disques durs** avec collisions élastiques mutuelles. Le rayon commun vaut initialement 0,04 unité interne (≈ 0,92 mm équivalents). Son réglage dans le dernier onglet s’applique aux cinq expériences et les réinitialise ; les relevés conservés gardent leur rayon d’origine. Le dernier onglet propose de 0,005 à 0,07 unité (≈ 0,11 à 1,61 mm). Le rayon dessiné est le rayon de collision. Le modèle ponctuel reste disponible dans la bibliothèque et ses tests, mais n’est plus proposé dans l’interface.
 
-Chaque onglet garde son état, ses réglages, sa pause et ses mesures jusqu’au rechargement de la page. Seule l’expérience affichée évolue. « Recommencer » efface les données de l’expérience courante. L’expérience de cycles périodiques a été retirée de l’interface ; les déplacements proposés sont des trajets simples, à vitesse constante ou progressifs.
+Chaque onglet garde son état, ses réglages, sa pause et ses mesures jusqu’au rechargement de la page. Seule l’expérience affichée évolue. « Recommencer » efface les données de l’expérience courante. L’onglet Cycles P–V propose 1, 3 ou 5 allers-retours progressifs, entre le volume de départ et 70 % de ce volume.
 
 ## Observer et mesurer
 
@@ -89,7 +90,7 @@ La jauge utilise cette pression mesurée, avec une échelle visuelle de 0 à qua
 
 Le travail cumulé est calculé aux impacts et non à partir d’une pression déduite de l’équation d’état. Son lien avec un diagramme est W reçu = −∫Ppiston dV. Une intégrale utilisant la pression glissante reste une estimation, et les aires de P–T ou de V–T ne sont pas des travaux.
 
-L’onglet d’échanges thermiques a été retiré de la visite. Le moteur thermique reste disponible dans la bibliothèque et couvert par ses tests ; les quatre expériences proposées utilisent des parois isolées.
+L’onglet d’échanges thermiques a été retiré de la visite. Le moteur thermique reste disponible dans la bibliothèque et couvert par ses tests ; les cinq expériences proposées utilisent des parois isolées.
 
 Lors d’un choc thermique, le moteur tire la vitesse sortante dans le référentiel de la paroi : normale intérieure suivant la loi de flux `|cn| = √(−2 Tb ln U)` et tangente gaussienne de variance Tb. La chaleur reçue est la variation d’énergie dans ce référentiel. À paroi fixe :
 
@@ -104,7 +105,7 @@ La flèche thermique traverse le point de contact dans le sens de l’énergie �
 
 Le modèle utilisé dans l’interface contient des disques durs en interaction élastique. Les chocs isolés sur les parois sont élastiques ; au piston de vitesse u, vx après = 2u − vx avant. Un piston peut rendre les températures directionnelles différentes : Tx = moyenne(vx²), Ty = moyenne(vy²). Les collisions mutuelles permettent leur rééquilibrage ; une compression rapide peut néanmoins créer une anisotropie transitoire.
 
-Les disques durs ont un rayon 0,04 par défaut, réglable dans la quatrième expérience. Ils sont placés sans recouvrement et leur centre reste à cette distance des parois. Un choc entre deux disques conserve exactement, aux arrondis numériques près, l’énergie cinétique et la quantité de mouvement de la paire. L’énergie échangée entre particules n’est ni W ni Q, car elle reste interne au gaz.
+Les disques durs ont un rayon 0,04 par défaut, réglable dans la cinquième expérience. Ils sont placés sans recouvrement et leur centre reste à cette distance des parois. Un choc entre deux disques conserve exactement, aux arrondis numériques près, l’énergie cinétique et la quantité de mouvement de la paire. L’énergie échangée entre particules n’est ni W ni Q, car elle reste interne au gaz.
 
 Le moteur prédit les dates de contact, les traite dans une file de priorité et invalide les prédictions après les changements de vitesse. Une grille spatiale filtre les paires candidates initiales ; les paires impliquant des particules dont la vitesse a changé sont recalculées. Cette méthode suit le principe de la [simulation événementielle de disques durs de Princeton](https://algs4.cs.princeton.edu/61event/index.php). Aucun rééchelonnement global d’énergie ni déplacement correctif de recouvrement n’est appliqué.
 
@@ -174,3 +175,13 @@ Le bouton « Tracer P(V − b) en fonction de T » choisit T en K en abscisse et
 Un réglage de température près du graphique permet de préparer plusieurs états à rayon et volume fixes, sans effacer les relevés. Il faut attendre le démarrage et la fenêtre de mesure après chaque réinitialisation. Des rayons mélangés déclenchent une indication : b varie alors entre les relevés. Ici b est le volume total exclu, soit n fois le covolume molaire usuel. Une bonne linéarité seule ne valide pas b : comparer la pente à nR et explorer plusieurs densités.
 
 Des boutons invitent à revenir à la pression, à Joule–Gay–Lussac et aux adiabatiques avec le rayon commun choisi, pour réexaminer les résultats du gaz dilué.
+
+## Parcours guidé et séries automatiques (0.12.0)
+
+L’onglet Rayon affiche la simulation et un seul graphique côte à côte. Deux choix remplacent les axes libres : effet du rayon sur PV/(nRT), puis P(V − b) en fonction de T. Les autres grandeurs restent dans le CSV, sans commandes supplémentaires. Les incertitudes et explications techniques se déplient à la demande. Le second graphique et l’ajustement d’α utilisent uniquement les relevés au rayon courant ; les autres relevés sont conservés et exportés.
+
+« Relever les 5 températures » prépare successivement 200, 300, 400, 500 et 600 K au rayon et volume fixes. Pour chaque état, la préparation réinitialise les positions et vitesses (ce n’est pas un chauffage par thermostat). La stabilisation dure au moins max(6, 3L/√T) unités internes, puis compare deux fenêtres de pression non recouvrantes à 10 % près et exige |Tx−Ty|/T < 10 %. Une fenêtre complète supplémentaire est réservée à la mesure. La série s’arrête sans relever l’état si la stabilisation dépasse max(100, 5 fois le délai initial). Ce critère est pratique et ne démontre pas l’équilibre ni l’indépendance statistique.
+
+La série se met en pause avec la simulation ou lors d’un changement d’onglet. On peut l’arrêter ou réinitialiser ; les points déjà relevés sont conservés. Le rayon, les températures manuelles et l’effacement des données sont verrouillés pendant la série. La lecture automatique utilise ×4 et s’arrête après les cinq points.
+
+Les cycles utilisent des trajets sinusoïdaux progressifs entre V0 et 0,7 V0. Le curseur de durée règle chaque demi-cycle. La pression représentée est celle du piston ; orange = compression, bleu = détente. Pause, arrêt et réinitialisation sont disponibles. Les parois restent isolées : des allers-retours mécaniques ne sont pas forcément des cycles fermés en température et pression, et le gaz peut s’échauffer. Aucun segment artificiel ne ferme les branches du diagramme.

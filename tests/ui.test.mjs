@@ -114,9 +114,9 @@ test('guided visit starts with pressure, fixes N at 1000 and removes particle co
   for(const id of ['particles','particleNumber','preset-cycles','cycleSelect','tab-heat'])assert.ok(!lab.nodes.has(id));
   lab.advance(.4);assert.ok(lab.metrics.pressure>0);assert.equal(lab.metrics.work,0);assert.equal(lab.metrics.heat,0);
 });
-test('all four experience tabs retain independent state, and only the visible experiment evolves',()=>{
+test('all five experience tabs retain independent state, and only the visible experiment evolves',()=>{
   const lab=laboratory();lab.advance(.4);lab.click('pause');const time=lab.metrics.time;
-  for(const key of ['free','adiabatic','comparison']){
+  for(const key of ['free','adiabatic','cycles','comparison']){
     lab.click('tab-'+key);assert.equal(lab.analysis.experiment,key);assert.equal(lab.metrics.count,1000);lab.advance(.1);
     assert.equal(lab.nodes.get('workbench').getAttribute('aria-labelledby'),'tab-'+key);
   }
@@ -337,4 +337,37 @@ test('excluded-volume plot compares temperature series with nR and retains recor
     lab.click(button);assert.equal(lab.analysis.experiment,key);lab.click('tab-comparison');
   }
   assert.equal(lab.analysis.radiusRecords.length,3);
+  lab.input('particleRadius',70);lab.click('applyRadius');assert.equal(lab.analysis.recordPlot.points.length,0);assert.equal(lab.nodes.get('optimizeAlpha').disabled,true);
+  lab.click('plotRadius');assert.equal(lab.analysis.recordPlot.points.length,3);assert.equal(lab.analysis.recordPlot.fit,null);
+});
+
+test('automatic temperature series stabilizes five states and keeps a fixed radius',()=>{
+  const lab=laboratory();lab.click('tab-comparison');lab.click('plotExcludedVolume');lab.click('startTemperatureSeries');
+  assert.equal(lab.nodes.get('applyRadius').disabled,true);assert.equal(lab.nodes.get('recordRadius').disabled,true);
+  lab.advance(1);assert.equal(lab.analysis.radiusRecords.length,0);
+  lab.click('pause');const t=lab.metrics.time;lab.advance(.5);assert.equal(lab.metrics.time,t);
+  lab.click('tab-pressure');lab.advance(.2);lab.click('tab-comparison');assert.equal(lab.metrics.time,t);
+  lab.click('pause');
+  for(let i=0;i<100&&lab.analysis.batch;i++)lab.advance(1);
+  assert.equal(lab.analysis.batch,null);assert.equal(lab.analysis.radiusRecords.length,5);assert.ok(lab.paused);
+  for(const [i,r] of lab.analysis.radiusRecords.entries()){
+    assert.equal(r.radius,.04);assert.ok(Math.abs(r.temperature*200-(200+i*100))<1e-8);
+    const warmup=Math.max(6,33/Math.sqrt(r.temperature));assert.ok(r.windowStart>=warmup+4-1e-8);
+    assert.ok(Math.abs(r.time-r.windowStart-2)<1e-8);
+  }
+  assert.equal(lab.analysis.recordPlot.points.length,5);assert.ok(lab.analysis.recordPlot.fit);
+  assert.equal(lab.nodes.get('applyRadius').disabled,false);
+  lab.click('startTemperatureSeries');lab.advance(.1);lab.click('stopTemperatureSeries');
+  assert.equal(lab.analysis.batch,null);assert.equal(lab.analysis.radiusRecords.length,5);
+});
+
+test('cycles repeat compression and expansion, preserve energy balance and can stop',()=>{
+  const lab=laboratory();lab.click('tab-cycles');lab.input('duration',35);lab.input('cycleCount','3');lab.input('timeScale',4);lab.click('start');
+  assert.equal(lab.analysis.chartType,'pv');assert.equal(lab.analysis.pressureSource,'piston');
+  lab.advance(.3);assert.ok(lab.metrics.width<11);lab.click('pause');const time=lab.metrics.time;lab.advance(.2);assert.equal(lab.metrics.time,time);lab.click('pause');
+  for(let i=0;i<20&&lab.analysis.cycle.running;i++)lab.advance(.5);
+  assert.equal(lab.analysis.cycle.running,false);assert.equal(lab.analysis.cycle.leg,6);assert.ok(Math.abs(lab.metrics.width-11)<1e-9);
+  assert.equal(lab.metrics.heat,0);assert.ok(Math.abs(lab.metrics.balanceError)<1e-6);
+  assert.ok(lab.analysis.plot.series.some(s=>s.color==='#ce8033'&&s.points.length>2));assert.ok(lab.analysis.plot.series.some(s=>s.color==='#287db4'&&s.points.length>2));
+  lab.click('start');lab.advance(.1);lab.click('stop');const width=lab.metrics.width;lab.advance(.2);assert.equal(lab.metrics.width,width);assert.equal(lab.analysis.cycle.running,false);
 });
