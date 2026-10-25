@@ -316,3 +316,25 @@ test('corrected PV/T and inverse flight quantities use physical units and export
   const [head,line]=csv.trim().split(/\r?\n/).map(s=>s.replace(/^\uFEFF/,'').split(';'));
   assert.equal(head.length,line.length);assert.ok(head.includes('P_V_moins_alpha_Voccupe_sur_T_J_K'));assert.ok(head.includes('inverse_libre_parcours_mm_moins_1'));
 });
+
+test('excluded-volume plot compares temperature series with nR and retains records when T changes',async()=>{
+  const lab=laboratory();lab.click('tab-comparison');lab.input('alphaNumber',2);
+  for(const temperature of [200,400,600]){
+    lab.input('recordTemperature',temperature);lab.click('applyRecordTemperature');
+    assert.ok(Math.abs(lab.metrics.temperature-temperature/200)<1e-10);
+    lab.input('timeScale',4);lab.advance(1.3);lab.click('recordRadius');
+  }
+  lab.click('plotExcludedVolume');const plot=lab.analysis.recordPlot;
+  assert.equal(plot.points.length,3);assert.ok(plot.fit);assert.ok(plot.excludedVolumePlot);
+  for(const [i,r] of lab.analysis.radiusRecords.entries()){
+    assert.ok(Math.abs(plot.points[i].x-r.temperature*200)<1e-10);
+    assert.ok(Math.abs(plot.points[i].y-r.pressure*r.volume*(1-2*r.packing)/15)<1e-9);
+  }
+  for(const point of plot.series[0].points)assert.ok(Math.abs(point.y-point.x/3)<1e-10);
+  assert.match(lab.nodes.get('fitUncertainty').textContent,/c =/);
+  lab.click('exportRecords');const csv=await lab.downloads.at(-1).blob.text();assert.match(csv,/P_V_moins_b_J/);
+  for(const [button,key] of [['revisitFree','free'],['revisitAdiabatic','adiabatic'],['revisitPressure','pressure']]){
+    lab.click(button);assert.equal(lab.analysis.experiment,key);lab.click('tab-comparison');
+  }
+  assert.equal(lab.analysis.radiusRecords.length,3);
+});

@@ -2,7 +2,7 @@
 
 **[Ouvrir le démonstrateur](https://fmath92.github.io/gaz-2d/)** · [Code source](https://github.com/fmath92/gaz-2d)
 
-Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.10.1 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
+Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.11.0 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
 
 ## La visite
 
@@ -166,3 +166,11 @@ La régression OLS affiche y = ax + b, R², n et les incertitudes-types u(a), u(
 Les axes proposent P(V − αV occupé)/T en J/K, avec une référence à nR, ainsi que 1/λ en mm⁻¹ et 1/τ en µs⁻¹ (inverses des moyennes mesurées sur la fenêtre, non moyennes des inverses). Les valeurs indisponibles ou nulles sont omises pour les inverses. Ces trois colonnes sont aussi exportées en CSV.
 
 À n constant, multiplier le ratio corrigé par nR ne change pas R². Pour tester une constante, regarder la compatibilité de la pente avec zéro et l’écart au niveau attendu ; un faible R² ne signifie pas que la correction échoue. Cette explication accompagne le tracé corrigé.
+
+### Volume exclu et température (0.11.0)
+
+Le bouton « Tracer P(V − b) en fonction de T » choisit T en K en abscisse et P(V − b) en J en ordonnée, avec b = αV occupé. La droite verte de référence a une pente nR = 1/3 J/K et passe par l’origine. La régression orange reste libre, avec pente a et ordonnée c (pour ne pas confondre l’interception avec le volume b). Le CSV exporte aussi P(V − b).
+
+Un réglage de température près du graphique permet de préparer plusieurs états à rayon et volume fixes, sans effacer les relevés. Il faut attendre le démarrage et la fenêtre de mesure après chaque réinitialisation. Des rayons mélangés déclenchent une indication : b varie alors entre les relevés. Ici b est le volume total exclu, soit n fois le covolume molaire usuel. Une bonne linéarité seule ne valide pas b : comparer la pente à nR et explorer plusieurs densités.
+
+Des boutons invitent à revenir à la pression, à Joule–Gay–Lussac et aux adiabatiques avec le rayon commun choisi, pour réexaminer les résultats du gaz dilué.

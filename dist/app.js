@@ -89,6 +89,7 @@
     $('pressureSource').value = s.source; $('extraChart').value = s.chart;
     $('thermalMode').value = s.thermalMode; $('bathTemperature').value = s.bath * 200; $('accommodation').value = s.accommodation * 100;
     $('allWalls').checked = s.allWalls; $('vectors').checked = s.vectors; $('zoomEnabled').checked = s.zoom;
+    $('recordTemperature').value = s.initialTemperature*200; $('recordTemperatureValue').value = U.text('temperature',s.initialTemperature);
     $('initialTemperature').value = s.initialTemperature * 200; $('initialTemperatureValue').value = U.text('temperature', s.initialTemperature);
     $('motionProfile').value = s.profile; $('gamma').value = s.gamma;
     $('predictionTitle').textContent = active === 'free' ? 'Sans travail et sans chaleur' : 'L’énergie change par le travail';
@@ -377,6 +378,7 @@
     radius: {label:'Rayon (mm)', value:r => r.radius * U.scales.length * 1000},
     ratio: {label:'PV/(nRT)', value:r => r.ratio},
     correctedRatio: {label:'P(V − αV occupé)/(nRT)', value:r => r.ratio*(1-session().alpha*r.packing)},
+    correctedPV: {label:'P(V − b) (J), b = αV occupé', value:r => r.pressure*r.volume*(1-session().alpha*r.packing)*U.scales.energy},
     correctedPVT: {label:'P(V − αV occupé)/T (J/K)', value:r => r.ratio*(1-session().alpha*r.packing)*U.scales.nR},
     inverseMeanFreePath: {label:'Inverse du libre parcours moyen (mm⁻¹)', value:r => r.meanFreePath > 0 ? 1/(r.meanFreePath*U.scales.length*1000) : null},
     inverseMeanCollisionTime: {label:'Inverse du temps moyen entre chocs (µs⁻¹)', value:r => r.meanCollisionTime > 0 ? 1/(r.meanCollisionTime*U.scales.time*1e6) : null},
@@ -399,19 +401,26 @@
       xRange[0] = Math.min(xRange[0],xr*.95); xRange[1] = Math.max(xRange[1],xr*1.05);
       series.unshift({color:'#8c9eaa',dashed:true,points:yRange.map(y=>({x:xr,y}))});
     }
+    const excludedVolumePlot = s.recordX === 'temperature' && s.recordY === 'correctedPV';
+    if (excludedVolumePlot) {
+      if (!points.length) { xRange[0]=0; xRange[1]=1000; }
+      const referencePoints=xRange.map(x=>({x,y:U.scales.nR*x}));
+      yRange[0]=Math.min(yRange[0],...referencePoints.map(p=>p.y)); yRange[1]=Math.max(yRange[1],...referencePoints.map(p=>p.y));
+      series.unshift({color:'#18857d',dashed:true,points:referencePoints,lineWidth:2});
+    }
     const fit = s.fitEnabled ? GasAnalysis.linearRegression(points) : null;
     if (fit) {
       const endpoints = xRange.map(x=>({x,y:fit.slope*x+fit.intercept}));
       yRange[0] = Math.min(yRange[0],...endpoints.map(p=>p.y)); yRange[1] = Math.max(yRange[1],...endpoints.map(p=>p.y));
       series.push({color:'#ce8033',points:endpoints,lineWidth:2});
     }
-    return {series,xRange,yRange,xLabel:xf.label,yLabel:yf.label,points,fit};
+    return {series,xRange,yRange,xLabel:xf.label,yLabel:yf.label,points,fit,excludedVolumePlot};
   }
   function drawRecordPlot() {
     if (active !== 'comparison') return;
     const s = session(), data = recordPlotData(); G.plot($('recordChart'),data);
     $('recordChart').setAttribute('aria-label',data.yLabel+' en fonction de '+data.xLabel);
-    $('recordPlotHint').textContent = s.radiusRecords.length ? data.points.length+' point(s) sur '+s.radiusRecords.length+' relevé(s). Chaque point est un relevé conservé ; les points ne sont pas reliés.'+(data.points.length<s.radiusRecords.length?' Les mesures indisponibles sont omises.':'') : 'Relevez au moins une mesure avec « Relever ce rayon », puis changez le rayon pour comparer.';
+    $('recordPlotHint').textContent = s.radiusRecords.length ? data.points.length+' point(s) sur '+s.radiusRecords.length+' relevé(s). Chaque point est un relevé conservé ; les points ne sont pas reliés.'+(data.points.length<s.radiusRecords.length?' Les mesures indisponibles sont omises.':'') : data.excludedVolumePlot ? 'Gardez le rayon fixe et relevez au moins trois températures distinctes avec « Relever ce rayon ».' : 'Relevez au moins une mesure avec « Relever ce rayon », puis changez le rayon pour comparer.';
     $('exportRecords').disabled = !s.radiusRecords.length;
     $('alphaValue').textContent = format(s.alpha,3);
     const best = GasAnalysis.optimalAlpha(s.radiusRecords);
@@ -420,9 +429,11 @@
     $('alphaScore').textContent = s.radiusRecords.length ? 'Écart quadratique moyen à 1 (RMS) : '+format(Math.sqrt(error/s.radiusRecords.length),4)+' · chaque relevé a le même poids.' : 'α = 0 : aucune correction · α = 1 : volume matériel · α ≈ 2 : référence diluée 2D.';
     const significant = v => v == null || !Number.isFinite(v) ? 'indéfini' : v.toLocaleString('fr-FR',{maximumSignificantDigits:5});
     const fit = data.fit;
+    const interceptSymbol=data.excludedVolumePlot?'c':'b';
+    $('recordReference').textContent = data.excludedVolumePlot ? 'Pointillés verts : P(V − b) = nRT, pente nR = '+format(U.scales.nR,4)+' J/K, ordonnée à l’origine nulle. Orange : régression des mesures.'+(new Set(s.radiusRecords.map(r=>r.radius)).size>1?' Attention : ces relevés mélangent plusieurs rayons, donc plusieurs volumes exclus b. Pour tester un b constant, exportez puis effacez les relevés et gardez un seul rayon.':'') : '';
     $('fitEquation').textContent = !s.fitEnabled ? 'Régression désactivée.' : !fit ? (data.points.length<3 ? 'Il faut au moins 3 relevés valides pour estimer les incertitudes.' : 'Les abscisses doivent varier pour déterminer une pente.') : 'y = ('+significant(fit.slope)+') x '+(fit.intercept<0?'− ':'+ ')+significant(Math.abs(fit.intercept))+' · R² = '+significant(fit.rSquared);
-    $('fitUncertainty').textContent = fit ? 'a = '+significant(fit.slope)+' ± '+significant(fit.slopeSE)+' ; b = '+significant(fit.intercept)+' ± '+significant(fit.interceptSE)+' (incertitudes-types, 1 σ) · n = '+fit.count+' · degrés de liberté = '+fit.degreesOfFreedom+'. Unités : a en unité Y / unité X ; b en unité Y.' : '';
-    $('fitInterpretation').textContent = ['correctedRatio','correctedPVT'].includes(s.recordY) ? 'On cherche ici une grandeur constante : une pente compatible avec zéro et une valeur proche de '+(s.recordY==='correctedPVT'?'nR = '+format(U.scales.nR,4)+' J/K':'1')+'. Un faible R² peut donc être attendu : il ne mesure pas la qualité de cette correction. Multiplier par nR ne change pas R².' : '';
+    $('fitUncertainty').textContent = fit ? 'a = '+significant(fit.slope)+' ± '+significant(fit.slopeSE)+' ; '+interceptSymbol+' = '+significant(fit.intercept)+' ± '+significant(fit.interceptSE)+' (incertitudes-types, 1 σ) · n = '+fit.count+' · degrés de liberté = '+fit.degreesOfFreedom+'. Unités : a en unité Y / unité X ; '+interceptSymbol+' en unité Y.' : '';
+    $('fitInterpretation').textContent = ['correctedRatio','correctedPVT'].includes(s.recordY) ? 'On cherche ici une grandeur constante : une pente compatible avec zéro et une valeur proche de '+(s.recordY==='correctedPVT'?'nR = '+format(U.scales.nR,4)+' J/K':'1')+'. Un faible R² peut donc être attendu : il ne mesure pas la qualité de cette correction. Multiplier par nR ne change pas R².' : data.excludedVolumePlot ? 'Régression y = aT + c : comparer a à nR et c à zéro. c est l’ordonnée à l’origine, distincte du volume exclu b. Un R² élevé ne suffit pas à valider la correction ; varier aussi la densité permet de la mettre à l’épreuve.' : '';
     const pages = Math.max(1,Math.ceil(s.radiusRecords.length/RECORD_PAGE_SIZE));
     s.recordPage = Math.max(0,Math.min(s.recordPage,pages-1));
     $('recordPageStatus').textContent = 'Page '+(s.recordPage+1)+' / '+pages+' · 100 lignes par page ; graphique, régression et export : tous les relevés.';
@@ -514,13 +525,17 @@
     const best=GasAnalysis.optimalAlpha(session().radiusRecords); if (!best) return;
     setAlpha(best.alpha); notify('α ajusté sur '+best.count+' relevés : minimum de Σ[Z(1 − αφ) − 1]², avec 0 ≤ α ≤ 5.'+(best.bounded?' Minimum atteint à une borne du réglage.':''));
   });
+  $('plotExcludedVolume').addEventListener('click',()=>{const s=session();s.recordX='temperature';s.recordY='correctedPV';$('recordX').value=s.recordX;$('recordY').value=s.recordY;drawRecordPlot();});
+  $('recordTemperature').addEventListener('input',()=>{$('recordTemperatureValue').value=U.text('temperature',+$('recordTemperature').value/200);});
+  $('applyRecordTemperature').addEventListener('click',()=>{session().initialTemperature=+$('recordTemperature').value/200;reset();});
+  for (const [id,key] of [['revisitPressure','pressure'],['revisitFree','free'],['revisitAdiabatic','adiabatic']]) $(id).addEventListener('click',()=>selectExperiment(key,true));
   $('recordsPrevious').addEventListener('click',()=>{session().recordPage--;drawRecordPlot();});
   $('recordsNext').addEventListener('click',()=>{session().recordPage++;drawRecordPlot();});
   for (const id of ['recordX','recordY']) $(id).addEventListener('input', () => { session()[id] = $(id).value; drawRecordPlot(); });
   $('exportRecords').addEventListener('click', () => {
     const number = v => v == null || !Number.isFinite(v) ? '' : v.toPrecision(10).replace('.',',');
     const rows = session().radiusRecords.map((r,i)=>[i+1,...Object.values(recordFields).map(f=>number(f.value(r))),number(U.value('time',r.windowStart)),number(U.value('time',r.time)),r.source,number(session().alpha)].join(';'));
-    const header = 'releve;rayon_mm;PV_sur_nRT;P_V_moins_alpha_Voccupe_sur_nRT;P_V_moins_alpha_Voccupe_sur_T_J_K;inverse_libre_parcours_mm_moins_1;inverse_temps_chocs_us_moins_1;libre_parcours_moyen_mm;surface_occupee_pct;pression_bar;temperature_K;temps_moyen_entre_chocs_us;trajets_complets_fenetre;debut_fenetre_ms;fin_fenetre_ms;capteur;alpha_analyse';
+    const header = 'releve;rayon_mm;PV_sur_nRT;P_V_moins_alpha_Voccupe_sur_nRT;P_V_moins_b_J;P_V_moins_alpha_Voccupe_sur_T_J_K;inverse_libre_parcours_mm_moins_1;inverse_temps_chocs_us_moins_1;libre_parcours_moyen_mm;surface_occupee_pct;pression_bar;temperature_K;temps_moyen_entre_chocs_us;trajets_complets_fenetre;debut_fenetre_ms;fin_fenetre_ms;capteur;alpha_analyse';
     const url=URL.createObjectURL(new Blob(['\uFEFF'+header+'\r\n'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'}));
     const a=document.createElement('a');a.href=url;a.download='gaz-2d-releves.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   });

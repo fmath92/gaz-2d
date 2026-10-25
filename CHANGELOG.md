@@ -1,3 +1,9 @@
+## 0.11.0 — Volume exclu et retour aux expériences
+
+- Tracé P(V − b) en fonction de T, b = αV occupé, référence de pente nR et régression libre.
+- Température réglable près du graphique, relevés conservés et distinction entre volume b et interception c.
+- Invitation à revisiter les trois premières expériences avec des disques plus grands.
+
 ## 0.10.1 — Navigation et grandeurs des relevés
 
 - Rayon commun aux quatre expériences, avec réinitialisation lors du changement et conservation des relevés antérieurs.
