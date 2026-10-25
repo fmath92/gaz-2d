@@ -9,11 +9,30 @@
   function text(c,str,x,y,color='#294b5b',size=12){c.font=size+'px system-ui';c.fillStyle=color;c.textAlign='left';c.fillText(str,x,y);}
   function dot(c,x,y,r,color){c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.fillStyle=color;c.fill();}
   class PressureWindow {
-    constructor(sim){this.kind='pressure';this.start=sim.time;this.duration=2;this.y0=sim.height*.25;this.y1=sim.height*.75;this.width=sim.width;this.lastId=sim._collisions;this.events=[];this.elapsed=0;this.paused=false;this.phase='collect';}
+    constructor(sim,{cinematic=false}={}){this.cinematic=cinematic;this.cameraTime=0;this.accumulator=0;this.kind='pressure';this.start=sim.time;this.duration=2;this.y0=sim.height*.25;this.y1=sim.height*.75;this.width=sim.width;this.lastId=sim._collisions;this.events=[];this.elapsed=0;this.paused=false;this.phase=cinematic?'overview':'collect';}
     collect(sim){
       for(const e of sim._events)if(e.id>this.lastId&&e.time>this.start&&e.time<=this.start+this.duration+1e-9&&e.wall==='right'&&e.y>=this.y0&&e.y<=this.y1)this.events.push({...e});
       this.lastId=sim._collisions;this.events.sort((a,b)=>a.time-b.time||a.id-b.id);
       this.elapsed=Math.min(this.duration,sim.time-this.start);if(this.elapsed>=this.duration-1e-9)this.phase='done';
+    }
+    get zoom(){return this.phase==='overview'?0:this.phase==='zoom'?ease(this.cameraTime/1.4):1;}
+    tick(seconds,sim,advance,speed=1){
+      if(this.paused||this.phase==='done')return;
+      const phase=this.phase;
+      const rate=phase==='overview'?speed:phase==='zoom'?speed+(Math.min(.25,speed)-speed)*this.zoom:Math.min(.25,speed);
+      this.accumulator=Math.min(.15,this.accumulator+seconds*rate);
+      for(let i=0;i<24&&this.accumulator>=1/120&&this.phase!=='done';i++){
+        const dt=phase==='collect'?Math.min(1/120,this.duration-this.elapsed):1/120;
+        advance(dt);this.accumulator=Math.max(0,this.accumulator-dt);
+        if(phase==='collect')this.collect(sim);
+      }
+      if(phase==='overview'||phase==='zoom'){
+        this.cameraTime+=seconds;
+        if(this.cameraTime>=(phase==='overview'?.8:1.4)){
+          this.phase=phase==='overview'?'zoom':'collect';this.cameraTime=0;
+          if(this.phase==='collect'){this.start=sim.time;this.lastId=sim._collisions;this.accumulator=0;}
+        }
+      }
     }
     get impulse(){return this.events.reduce((sum,e)=>sum+e.impulse,0);}
     get pressure(){return this.elapsed>1e-10?this.impulse/((this.y1-this.y0)*this.elapsed):null;}
@@ -35,15 +54,9 @@
     get counted(){return Math.round(clamp((this.elapsed-11)/4)*this.local.length);}
     get partialEnergy(){return this.local.slice(0,this.counted).reduce((s,p)=>s+p.energy,0);}
   }
-  function pressureChamber(canvas,sim,story){
-    const surf=root.LabGraphics.setup(canvas);if(!surf)return;const{ctx:c,w,h}=surf;
-    const x0=sim.width-3, x1=sim.width+.85,y0=story.y0-.45,y1=story.y1+.45;
-    const X=x=>20+(x-x0)/(x1-x0)*(w-40),Y=y=>h-28-(y-y0)/(y1-y0)*(h-55);
-    c.save();c.beginPath();c.rect(18,24,w-36,h-50);c.clip();c.fillStyle='#eff5f6';c.fillRect(X(sim.width),20,w,h);
-    for(const p of sim.particles)if(p.x>=x0&&p.y>=y0&&p.y<=y1)dot(c,X(p.x),Y(p.y),Math.max(2,sim.radius*(w-40)/(x1-x0)),'#4a96ad');
-    line(c,X(sim.width),Y(story.y0),X(sim.width),Y(story.y1),'#d08a36',7);
-    for(const e of story.events){const age=sim.time-e.time;if(age<.18){const q=1-age/.18;c.globalAlpha=q;arrow(c,X(sim.width)-5,Y(e.y),Math.min(65,e.impulse*10),0,'#d08a36');c.beginPath();c.arc(X(sim.width),Y(e.y),7+age*160,-Math.PI/2,Math.PI/2);c.strokeStyle='#d08a36';c.stroke();c.globalAlpha=1;}}
-    c.restore();text(c,'Une même surface S du piston',20,16);text(c,'Chaque flèche = une impulsion réellement reçue',20,h-8,'#687f8a',10);
+  function pressureChamber(canvas,sim,story,options={}){
+    // Reuse the normal simulation renderer: same particles, radii, colors and walls.
+    root.LabGraphics.chamber(canvas,sim,{...options,region:{x:sim.width,y:(story.y0+story.y1)/2,y0:story.y0,y1:story.y1,zoom:story.zoom,events:story.events}});
   }
   function temperatureChamber(canvas,story){
     const surf=root.LabGraphics.setup(canvas);if(!surf)return;const{ctx:c,w,h}=surf;

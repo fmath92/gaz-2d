@@ -40,3 +40,28 @@ test('temperature animation freezes all velocities and sums squared norms, local
  assert.equal(s.partialEnergy,s.localEnergy);assert.equal(JSON.stringify(sim.particles),before);assert.equal(sim.time,0);
  sim.particles[0].vx=999;assert.notEqual(s.particles[0].vx,999);
 });
+
+test('continuous pressure scene advances the same gas, zooms from the full view and starts its window afterwards',()=>{
+ const sim=new GasSimulation({count:1000,width:11,temperature:1.5,particleModel:'hard-disks',particleRadius:.04,seed:314159}),control=sim.fork();
+ const l=new PressureWindow(sim,{cinematic:true}),particles=sim.particles;
+ const advance=dt=>{sim.step(dt);control.step(dt);};
+ assert.equal(l.phase,'overview');assert.equal(l.zoom,0);
+ for(let i=0;i<60;i++)l.tick(1/60,sim,advance);
+ assert.equal(l.phase,'zoom');assert.ok(l.zoom>0&&l.zoom<1);assert.equal(l.events.length,0);assert.ok(sim.time>0);
+ while(l.phase!=='collect')l.tick(1/60,sim,advance);
+ assert.equal(l.zoom,1);assert.equal(l.start,sim.time);assert.equal(l.elapsed,0);
+ const t=sim.time;l.paused=true;l.tick(1,sim,advance);assert.equal(sim.time,t);l.paused=false;
+ for(let i=0;i<600&&l.phase!=='done';i++)l.tick(1/60,sim,advance);
+ assert.equal(l.phase,'done');assert.ok(l.events.length>10);assert.ok(l.events.every(e=>e.time>l.start&&e.time<=l.start+2+1e-9));
+ assert.equal(sim.particles,particles);assert.deepEqual(sim.particles,control.particles);
+});
+
+test('region camera shares normal coordinates at zero zoom and never changes particle state',()=>{
+ require('../dist/graphics.js');const G=globalThis.LabGraphics;
+ const sim=new GasSimulation({count:100,width:11,temperature:1.5});const before=JSON.stringify(sim.particles);
+ const region={x:11,y:sim.height/2,y0:sim.height/4,y1:sim.height*3/4,zoom:0};
+ const ordinary=G.chamberCamera(700,340,sim),start=G.chamberCamera(700,340,sim,{region});
+ for(const p of sim.particles){assert.equal(start.X(p.x),ordinary.X(p.x));assert.equal(start.Y(p.y),ordinary.Y(p.y));}
+ const middle=G.chamberCamera(700,340,sim,{region:{...region,zoom:.5}}),end=G.chamberCamera(700,340,sim,{region:{...region,zoom:1}});
+ assert.ok(middle.scale>start.scale&&middle.scale<end.scale);assert.equal(end.X(11),.72*700);assert.equal(JSON.stringify(sim.particles),before);
+});

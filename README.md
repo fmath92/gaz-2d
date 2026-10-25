@@ -2,7 +2,7 @@
 
 **[Ouvrir le démonstrateur](https://fmath92.github.io/gaz-2d/)** · [Code source](https://github.com/fmath92/gaz-2d)
 
-Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.13.0 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
+Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.14.0 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
 
 ## La visite
 
@@ -194,3 +194,11 @@ Le premier onglet conserve l’illustration d’un choc et ajoute « Additionner
 Le nouvel onglet Température capture un instant immuable. Une zone centrale est agrandie ; toutes ses particules sont montrées (au moins 12, sans sélection par vitesse). Les flèches sont translatées et orientées à l’écran à longueur conservée, puis transformées en barres proportionnelles à Ec = m|v|²/2. Les énergies locales s’ajoutent successivement. La dernière étape revient à la cavité entière et présente E et E/N calculés sur les 1 000 particules, puis T = E/(nR), convention du modèle 2D. L’estimation locale est explicitement distinguée de la température globale. Les masses et énergies affichées sont celles des marqueurs représentatifs.
 
 L’animation dure 18 secondes, sans faire évoluer le temps physique. Pause et Étape suivante permettent de l’examiner ; chaque passage manuel suspend l’animation. La préférence « réduire les animations » la démarre en pause. Reprendre, Retour, changer d’onglet ou Recommencer ne modifie pas les vitesses capturées ; la reprise retrouve le vrai gaz. Les tests vérifient la somme de tous les impacts, les limites de fenêtre, l’invariance des particules pendant le récit et l’accord de la température globale avec celle du moteur.
+
+## Parcours unique de pression (0.14.0)
+
+« Comprendre la pression » enchaîne l’illustration individuelle existante, son dézoom complet, une vue d’ensemble de 0,8 s, puis un zoom de 1,4 s vers la moitié centrale du piston. Les particules continuent à évoluer pendant ces déplacements de caméra. Une fois le second zoom terminé, la fenêtre de cumul des impulsions commence ; les chocs survenus pendant la transition n’entrent pas dans cette mesure.
+
+Le second plan utilise désormais exactement le rendu de la cavité principale : mêmes particules, rayons, palette de vitesses, parois et repères. Aucune trajectoire n’est générée pour l’illustration. La caméra interpole depuis les coordonnées de la vue d’ensemble ; chaque flèche de poussée correspond à un événement du journal physique. Le test de continuité compare le gaz animé à un témoin avancé avec les mêmes pas, sans réinitialisation entre les séquences.
+
+Le deuxième bouton de lancement a été retiré. À la fin, le résultat reste lisible en pause ; Retour restaure l’état de lecture antérieur à l’ensemble du parcours. Une interruption du premier zoom annule l’enchaînement.

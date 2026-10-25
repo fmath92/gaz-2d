@@ -80,15 +80,16 @@
     ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
   }
   const palette = ['#397bd1', '#479ac3', '#4caaa6', '#81b78a', '#c4b767', '#db9852', '#d76f47'];
-  function chamberCamera(w, h, sim, { maxWidth = 18, tour = null } = {}) {
+  function chamberCamera(w, h, sim, { maxWidth = 18, tour = null, region = null } = {}) {
     const baseScale = Math.min((w - 58) / maxWidth, (h - 54) / sim.height);
     const ox = 26, oy = (h - sim.height * baseScale) / 2 + 3;
-    const q = tour?.zoom || 0, hit = tour?.target;
+    const q = tour?.zoom ?? region?.zoom ?? 0, hit = tour?.target || (region ? {x:region.x,y:region.y,wall:'right',radius:0,particleId:null} : null);
     let magnification = Math.max(1, Math.min(12, (h - 70) / (baseScale * 1.4)));
+    if(region)magnification=Math.max(1,(h-70)/(baseScale*(region.y1-region.y0+1)));
     // Fixed laboratory location chosen once, never the current piston position.
     const cameraX = hit ? hit.x + (hit.wall === 'right' ? hit.radius : -hit.radius) : 0;
     const cameraY = hit?.y || 0;
-    if (hit && tour.kind === 'work') {
+    if (hit && tour?.kind === 'work') {
       const travel = Math.abs(cameraX-tour.startWidth);
       const room = cameraX < tour.startWidth ? .28*w-55 : .72*w-55;
       if (travel>0) magnification = Math.max(1,Math.min(magnification,room/(travel*baseScale)));
@@ -109,10 +110,10 @@
     const vx=-event.before.vx, vy=event.before.vy;
     return { vx, vy, speed:Math.hypot(vx,vy), energy:.5*(vx*vx+vy*vy) };
   }
-  function chamber(canvas, sim, { initialTemperature = 1.5, vectors = false, focus = null, maxWidth = 18, target = null, tour = null } = {}) {
+  function chamber(canvas, sim, { initialTemperature = 1.5, vectors = false, focus = null, maxWidth = 18, target = null, tour = null, region = null } = {}) {
     const surface = setup(canvas); if (!surface) return;
     const { ctx, w, h } = surface;
-    const { q, hit, zoom, scale, X, Y } = chamberCamera(w,h,sim,{maxWidth,tour});
+    const { q, hit, zoom, scale, X, Y } = chamberCamera(w,h,sim,{maxWidth,tour,region});
     const left = X(0), right = X(sim.width), top = Y(sim.height), bottom = Y(0), end = X(maxWidth);
     ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = '#edf4f9'; ctx.fillRect(left, top, right - left, bottom - top);
@@ -122,7 +123,7 @@
       const x = X(p.x), y = Y(p.y), selected = hit?.particleId === p.id;
       if (x < -20 || x > w+20 || y < -20 || y > h+20) continue;
       const color = palette[Math.min(6, Math.floor(Math.hypot(p.vx, p.vy) / Math.sqrt(2 * initialTemperature) * 3))];
-      ctx.globalAlpha = q && !selected ? 1 - q * .7 : 1;
+      ctx.globalAlpha = q && !selected && !region ? 1 - q * .7 : 1;
       if (vectors || selected) line(ctx, x, y, x + p.vx * scale * .06, y - p.vy * scale * .06, color + '80');
       circle(ctx, x, y, (sim.radius || .04) * scale, selected ? '#247f91' : color);
       if (selected) { ctx.strokeStyle = '#dc9a3d'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x,y,(sim.radius || .04)*scale+4,0,2*Math.PI); ctx.stroke(); }
@@ -144,6 +145,20 @@
     if (focus && !tour) {
       const p = focus.kind==='pair' ? focus.before[0] : focus;
       ctx.strokeStyle='#dd9c36';ctx.setLineDash([3,3]);ctx.strokeRect(X(p.x)-8,Y(p.y)-8,16,16);ctx.setLineDash([]);
+    }
+    if(region){
+      line(ctx,right,Y(region.y0),right,Y(region.y1),'#d18b35',6);
+      for(const e of region.events){
+        const age=sim.time-e.time;if(age<0||age>.2)continue;
+        ctx.globalAlpha=1-age/.2;
+        arrow(ctx,right,Y(e.y),Math.min(75,e.impulse*14),0,'#ce8b37',2.5);
+        ctx.save();ctx.beginPath();ctx.rect(right,0,pistonThickness,h);ctx.clip();
+        ctx.beginPath();ctx.arc(right,Y(e.y),3+age*200,0,2*Math.PI);ctx.strokeStyle='#d18b35';ctx.stroke();ctx.restore();
+      }
+      ctx.globalAlpha=1;ctx.textAlign='left';ctx.font='10px system-ui';ctx.fillStyle='#617b8d';
+      ctx.fillText('MÊME SIMULATION · SURFACE S EN ORANGE',14,19);
+      if(q>.5)ctx.fillText('Couleur = vitesse · chocs réellement reçus sur cette surface',14,h-12);
+      return;
     }
     if (!hit || q < .2) return;
     const particle=sim.particles.find(p=>p.id===hit.particleId), e=tour.event;

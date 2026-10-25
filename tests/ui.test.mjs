@@ -135,7 +135,8 @@ test('pressure illustration follows a future collision, restores playback and ke
   assert.ok(lab.analysis.tour);assert.equal(lab.nodes.get('timeScale').disabled,true);
   assert.equal(lab.nodes.get('energyBalance').hidden,true);assert.equal(lab.nodes.get('motionChoice').hidden,true);assert.equal(lab.nodes.get('workLesson').hidden,true);
   lab.finishTour();const e=lab.analysis.lastTour.events[0];assert.ok(e.time>initial);assert.equal(e.wall,'right');assert.ok(e.impulse>0);assert.equal(e.wallVelocity,0);
-  assert.ok(Math.abs(e.energyAfter-e.energyBefore)<1e-10);assert.equal(lab.paused,false);
+  assert.ok(Math.abs(e.energyAfter-e.energyBefore)<1e-10);assert.equal(lab.analysis.lesson.phase,'overview');assert.equal(lab.analysis.lesson.zoom,0);
+  assert.ok(!lab.nodes.has('illustratePressureSum'));lab.advance(12);assert.equal(lab.analysis.lesson.phase,'done');lab.click('finishMeasurementStory');assert.equal(lab.paused,false);
   assert.equal(lab.nodes.get('timeScale').value,'0.25');assert.equal(lab.nodes.get('timeScale').disabled,false);assert.equal(lab.nodes.get('tourStatus').hidden,true);
   const time=lab.metrics.time;lab.advance(.4);assert.ok(lab.metrics.time>time+.08&&lab.metrics.time<time+.12);
 });
@@ -384,7 +385,7 @@ test('temperature lesson freezes physical time, pauses and completes the sum on 
 });
 
 test('pressure illustration accumulates a real surface-window and restores prior playback',()=>{
- const lab=laboratory();lab.advance(.1);lab.click('pause');lab.click('illustratePressureSum');lab.advance(8.2);
+ const lab=laboratory();lab.advance(.1);lab.click('pause');lab.click('illustrate');lab.finishTour();const transitionTime=lab.metrics.time;lab.advance(1.3);assert.equal(lab.analysis.lesson.phase,'zoom');assert.ok(lab.analysis.lesson.zoom>0&&lab.analysis.lesson.zoom<1);assert.equal(lab.analysis.lesson.events.length,0);lab.advance(11);assert.ok(lab.analysis.lesson.start>transitionTime);
  const l=lab.analysis.lesson;assert.equal(l.phase,'done');assert.ok(l.events.length>10);assert.ok(l.pressure>0);
  assert.ok(Math.abs(l.pressure-l.impulse/((l.y1-l.y0)*l.elapsed))<1e-10);
  assert.equal(lab.metrics.work,0);assert.equal(lab.metrics.heat,0);assert.match(lab.nodes.get('storyDetails').textContent,/moitié|S =/);

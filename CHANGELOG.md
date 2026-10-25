@@ -1,3 +1,10 @@
+## 0.14.0 — Un parcours continu pour la pression
+
+- Un seul bouton : choc individuel, dézoom, vue d’ensemble, puis zoom sur le cumul des poussées.
+- Réutilisation du rendu principal et continuité des trajectoires réelles pendant les deux zooms.
+- Fenêtre de mesure ouverte uniquement après le second zoom, sans réinitialiser le gaz.
+- Tests du passage entre séquences, du retour à la vue d’ensemble et de l’identité avec une simulation témoin.
+
 ## 0.13.0 — Comprendre les mesures de pression et de température
 
 - Accumulation réelle des impulsions sur une surface du piston pendant une fenêtre définie, avec somme, force moyenne et pression locale.
