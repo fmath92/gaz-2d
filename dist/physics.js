@@ -132,7 +132,7 @@
       this._segments = [];
       this._collisions = 0;
       this._pairCollisions = 0;
-      this._flightDistanceSum = 0; this._flightTimeSum = 0; this._flightCount = 0;
+      this._flightDistanceSum = 0; this._flightTimeSum = 0; this._flightCount = 0; this._flightEvents = [];
       for (const p of this.particles) { p.flightDistance = 0; p.lastPairTime = null; }
       this._lastThermalContact = new Float64Array(count).fill(-Infinity);
       this._thermalContactFallbacks = 0;
@@ -146,6 +146,7 @@
       copy.motion = this.motion ? { ...this.motion } : null;
       copy.heatByWall = { ...this.heatByWall };
       copy._events = this._events.map(e => ({ ...e }));
+      copy._flightEvents = this._flightEvents.map(e => ({ ...e }));
       copy._segments = this._segments.map(s => ({ ...s }));
       copy._lastThermalContact = new Float64Array(this._lastThermalContact);
       copy._thermalRandom = this._thermalRandom.clone();
@@ -381,6 +382,7 @@
               this._flightDistanceSum += p.flightDistance;
               this._flightTimeSum += this.time + t - p.lastPairTime;
               this._flightCount++;
+              this._flightEvents.push({start:p.lastPairTime, end:this.time+t, distance:p.flightDistance, duration:this.time+t-p.lastPairTime});
             }
             p.flightDistance = 0; p.lastPairTime = this.time + t;
           }
@@ -441,7 +443,8 @@
       }
       const cutoff = this.time - this.measurementWindow;
       // Les événements de chaque particule sont ordonnés localement, pas globalement.
-      this._events = this._events.filter(e => e.time >= cutoff - EPS);
+      this._events = this._events.filter(e => e.time > cutoff);
+      this._flightEvents = this._flightEvents.filter(e => e.end > cutoff);
       this._segments = this._segments.filter(s => s.end > cutoff);
       return this;
     }
@@ -455,7 +458,7 @@
       let windowWork = 0, windowHeat = 0;
       const windowHeatByWall = { left: 0, right: 0, top: 0, bottom: 0 };
       for (const event of this._events) {
-        if (event.time < cutoff - EPS) continue;
+        if (event.time <= cutoff) continue;
         impulses[event.wall] += event.impulse;
         windowWork += event.work;
         windowHeat += event.heat;
@@ -478,6 +481,12 @@
         sumImpulse += impulses[wall];
       }
       const perimeterIntegral = 2 * (this.height * duration + widthIntegral);
+      // Attribute each completed flight to its final mutual collision, once per
+      // non-overlapping recording window. Exclude flights starting in warm-up.
+      let flightDistance = 0, flightTime = 0, flightCount = 0;
+      for (const f of this._flightEvents) if (f.end > cutoff && f.start >= this.measurementWindow) {
+        flightDistance += f.distance; flightTime += f.duration; flightCount++;
+      }
       return {
         time: this.time, width: this.width, height: this.height, count: this.count,
         volume: this.width * this.height, energy, temperature: energy / this.count,
@@ -501,6 +510,10 @@
         meanFreePath: this._flightCount ? this._flightDistanceSum / this._flightCount : null,
         meanCollisionTime: this._flightCount ? this._flightTimeSum / this._flightCount : null,
         completedFlights: this._flightCount,
+        windowMeanFreePath: flightCount ? flightDistance / flightCount : null,
+        windowMeanCollisionTime: flightCount ? flightTime / flightCount : null,
+        windowCompletedFlights: flightCount,
+        measurementStart: this.time-duration, measurementEnd: this.time,
         thermalContactFallbacks: this._thermalContactFallbacks,
         packingFraction: this.count * Math.PI * this.radius ** 2 / (this.width * this.height),
         pistonVelocity: this._pistonVelocity

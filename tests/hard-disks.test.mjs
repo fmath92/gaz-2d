@@ -113,3 +113,24 @@ test('mean free path counts complete mutual flights including wall bounces, not 
   close(copy.metrics.meanFreePath,10.84,1e-7);close(copy.metrics.meanCollisionTime,10.84,1e-7);
   copy.reset({count:10,particleModel:'hard-disks'});assert.equal(copy.metrics.completedFlights,0);assert.equal(copy.metrics.meanFreePath,null);
 });
+
+test('window flight metrics exclude warm-up and old endings, with independent forecast storage',()=>{
+  const sim=new GasSimulation({count:10,particleModel:'hard-disks'});sim.time=6;
+  sim._flightEvents=[
+    {start:1,end:5,distance:100,duration:4}, // warm-up start: ignored
+    {start:2,end:4,distance:80,duration:2}, // left boundary: ignored
+    {start:3,end:5,distance:6,duration:2},
+    {start:4,end:6,distance:4,duration:2}
+  ];
+  const m=sim.metrics;assert.equal(m.windowCompletedFlights,2);
+  close(m.windowMeanFreePath,5);close(m.windowMeanCollisionTime,2);
+  const copy=sim.fork();copy._flightEvents[2].distance=99;
+  assert.equal(sim._flightEvents[2].distance,6);
+  sim.time=8;assert.equal(sim.metrics.windowCompletedFlights,0);assert.equal(sim.metrics.windowMeanFreePath,null);
+});
+test('pressure windows assign boundary impulses to only one recording interval',()=>{
+  const sim=new GasSimulation({count:10,particleModel:'hard-disks'});
+  sim._events=[{time:2,wall:'right',impulse:9,work:0,heat:0},{time:4,wall:'right',impulse:5,work:0,heat:0}];
+  sim.time=4;assert.equal(sim.metrics.impulseByWall.right,5);
+  sim.time=6;assert.equal(sim.metrics.impulseByWall.right,0);
+});

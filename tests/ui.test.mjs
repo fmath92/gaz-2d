@@ -265,9 +265,32 @@ test('record axes use immutable saved measurements and export all radii independ
   assert.equal(lab.analysis.recordPlot.points.length,2);
   lab.click('exportRecords');const csv=await lab.downloads.at(-1).blob.text();
   assert.match(csv,/libre_parcours_moyen_mm/);assert.equal(csv.trim().split(/\r?\n/).length,3);
-  for(const key of ['radius','ratio','packing','meanFreePath','temperature','pressure','meanCollisionTime','completedFlights']) {
+  for(const key of ['radius','ratio','correctedRatio','packing','meanFreePath','temperature','pressure','meanCollisionTime','completedFlights']) {
     lab.input('recordX',key);lab.input('recordY',key);assert.equal(lab.analysis.recordPlot.points.length,2);
     assert.equal(lab.analysis.recordPlot.points[0].x,lab.analysis.recordPlot.points[0].y);
   }
   lab.click('clearRadiusRecords');assert.equal(lab.analysis.recordPlot.points.length,0);assert.equal(lab.nodes.get('exportRecords').disabled,true);
+});
+
+test('recording excludes warm-up, blocks overlap including after clearing, and saves the corrected ratio',async()=>{
+  const lab=laboratory();lab.click('tab-comparison');lab.input('timeScale',4);
+  lab.advance(.8);lab.click('recordRadius');assert.equal(lab.analysis.radiusRecords.length,0);
+  lab.advance(.5);lab.click('recordRadius');assert.equal(lab.analysis.radiusRecords.length,1);
+  const first=lab.analysis.radiusRecords[0];assert.ok(first.windowStart>=2);
+  assert.ok(Math.abs(first.time-first.windowStart-2)<1e-9);
+  assert.equal(first.correctedRatio,first.ratio*(1-first.packing));
+  assert.equal(first.meanFreePath,lab.metrics.windowMeanFreePath);
+  lab.click('recordRadius');assert.equal(lab.analysis.radiusRecords.length,1);
+  lab.input('recordY','correctedRatio');assert.equal(lab.analysis.recordPlot.points[0].y,first.correctedRatio);
+  lab.click('pause');lab.advance(1);lab.click('recordRadius');assert.equal(lab.analysis.radiusRecords.length,1);
+  lab.click('pause');lab.advance(.3);lab.click('recordRadius');assert.equal(lab.analysis.radiusRecords.length,1);
+  lab.advance(.3);lab.click('recordRadius');assert.equal(lab.analysis.radiusRecords.length,2);
+  const second=lab.analysis.radiusRecords[1];assert.ok(second.windowStart>=first.time);
+  lab.click('exportRecords');const csv=await lab.downloads.at(-1).blob.text();
+  const lines=csv.trim().replace(/^\uFEFF/,'').split(/\r?\n/), header=lines[0].split(';');
+  const row=Object.fromEntries(lines[1].split(';').map((v,i)=>[header[i],v]));
+  assert.ok(Math.abs(Number(row.P_V_moins_Voccupe_sur_nRT.replace(',','.'))-first.correctedRatio)<1e-8);
+  assert.ok(Number(row.fin_fenetre_ms.replace(',','.'))>Number(row.debut_fenetre_ms.replace(',','.')));
+  lab.click('clearRadiusRecords');lab.click('recordRadius');assert.equal(lab.analysis.radiusRecords.length,0);
+  assert.equal(lab.nodes.get('recordRadius').disabled,true);
 });

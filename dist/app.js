@@ -21,7 +21,7 @@
   const snapshots = sim => ({ speeds: sim.particles.map(p => Math.hypot(p.vx, p.vy)), energies: sim.particles.map(p => (p.vx ** 2 + p.vy ** 2) / 2) });
   function createSession(key, previous) {
     const config = experiments[key];
-    const s = { key, model: 'hard-disks', radius: key === 'comparison' ? (previous?.radius ?? .04) : .04, radiusRecords: previous?.radiusRecords ?? [], recordX: previous?.recordX ?? 'radius', recordY: previous?.recordY ?? 'ratio', initialTemperature: previous?.initialTemperature || 1.5,
+    const s = { key, model: 'hard-disks', radius: key === 'comparison' ? (previous?.radius ?? .04) : .04, radiusRecords: previous?.radiusRecords ?? [], recordX: previous?.recordX ?? 'radius', recordY: previous?.recordY ?? 'ratio', lastRecordTime: null, initialTemperature: previous?.initialTemperature || 1.5,
       action: previous?.action ?? config.action, duration: 72, ratio: key === 'free' ? 200 : (previous?.action ?? config.action) === 'compression' ? 70 : 140,
       source: config.source, chart: config.chart, zoom: config.zoom, speed: config.speed, playing: true, vectors: false,
       bath: previous?.bath ?? 3, accommodation: previous?.accommodation ?? 1, allWalls: previous?.allWalls ?? false,
@@ -276,6 +276,9 @@
     xRange = xRange.map(fx); yRange = yRange.map(fy);
     return { series, xRange, yRange, xLabel, yLabel, legend, hint };
   }
+  function nextRecordTime(s) {
+    return Math.max(2*s.sim.measurementWindow, s.lastRecordTime == null ? 0 : s.lastRecordTime+s.sim.measurementWindow);
+  }
   function readings() {
     const s = session(), m = s.sim.metrics, other = s.other?.metrics, event = s.focus;
     if (active === 'heat') {
@@ -332,9 +335,14 @@
       : 'Le zoom reste fixe dans le laboratoire. Après le choc, comparez le rebond réel au rebond hypothétique sur un piston immobile.';
     $('heatFlux').textContent = 'Flux moyen à gauche : ' + U.text('flux', m.heatFluxByWall.left);
     $('diskRatio').textContent = format(ratio(m));
-    $('recordRadius').disabled = active !== 'comparison' || m.time < 4;
-    $('radiusStatus').textContent = m.time < 4 ? 'Laissez les collisions redistribuer les vitesses avant de relever la mesure.' : 'Relevé sur la fenêtre de pression courante : répétez pour apprécier les fluctuations.';
-    $('radiusRecords').innerHTML = s.radiusRecords.map(r => '<li>r = ' + format(r.radius * U.scales.length * 1000) + ' mm · PV/(nRT) = ' + format(r.ratio) + ' · T = ' + U.text('temperature',r.temperature) + ' · t = ' + U.text('time',r.time) + ' · ' + (r.source === 'mean' ? 'toutes les parois' : 'piston') + '</li>').join('');
+    $('correctedRatio').textContent = format(ratio(m) == null ? null : ratio(m)*(1-m.packingFraction));
+    $('recordRadius').disabled = active !== 'comparison' || m.time < nextRecordTime(s);
+    const windowText = U.text('time',s.sim.measurementWindow,3);
+    $('radiusStatus').textContent = m.time < s.sim.measurementWindow
+      ? 'Démarrage écarté : encore '+U.text('time',s.sim.measurementWindow-m.time,3)+' de temps simulé, puis une fenêtre complète de '+windowText+'.'
+      : m.time < nextRecordTime(s) ? 'Fenêtre en cours : encore '+U.text('time',nextRecordTime(s)-m.time,3)+' de temps simulé avant un relevé sans chevauchement.'
+      : 'Prêt : fenêtre de '+U.text('time',m.measurementStart,3)+' à '+U.text('time',m.time,3)+'. Les observations ne seront pas reprises dans le prochain relevé.';
+    $('radiusRecords').innerHTML = s.radiusRecords.map(r => '<li>r = ' + format(r.radius * U.scales.length * 1000) + ' mm · PV/(nRT) = ' + format(r.ratio) + ' · T = ' + U.text('temperature',r.temperature) + ' · fenêtre : ' + U.text('time',r.windowStart,3) + ' → ' + U.text('time',r.time,3) + ' · ' + (r.source === 'mean' ? 'toutes les parois' : 'piston') + '</li>').join('');
     $('pairCount').textContent = format(other?.pairCollisions ?? m.pairCollisions,0);
     $('packingFraction').textContent = 'Surface des disques : ' + format((other?.packingFraction ?? m.packingFraction) * 100,1) + ' %';
     $('directionTemperatures').textContent = 'Tₓ = ' + U.text('temperature', m.temperatureX) + ' ; Tᵧ = ' + U.text('temperature', m.temperatureY) + (other ? ' · Disques : Tₓ = ' + U.text('temperature', other.temperatureX) + ' ; Tᵧ = ' + U.text('temperature', other.temperatureY) : '');
@@ -364,6 +372,7 @@
   const recordFields = {
     radius: {label:'Rayon (mm)', value:r => r.radius * U.scales.length * 1000},
     ratio: {label:'PV/(nRT)', value:r => r.ratio},
+    correctedRatio: {label:'P(V − V occupé)/(nRT)', value:r => r.correctedRatio},
     meanFreePath: {label:'Libre parcours moyen (mm)', value:r => r.meanFreePath == null ? null : r.meanFreePath * U.scales.length * 1000},
     packing: {label:'Surface occupée (%)', value:r => r.packing * 100},
     pressure: {label:'Pression (bar)', value:r => U.value('pressure',r.pressure)},
@@ -374,10 +383,10 @@
   function recordPlotData() {
     const s = session(), xf = recordFields[s.recordX], yf = recordFields[s.recordY];
     const points = s.radiusRecords.map((r,i) => ({x:xf.value(r), y:yf.value(r), index:i+1})).filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
-    const xRange = G.dataRange(points.map(p=>p.x),[0,1]), yRange = G.dataRange(points.map(p=>p.y).concat(s.recordY === 'ratio' ? [1] : []),[0,1]);
+    const xRange = G.dataRange(points.map(p=>p.x),[0,1]), yRange = G.dataRange(points.map(p=>p.y).concat(['ratio','correctedRatio'].includes(s.recordY) ? [1] : []),[0,1]);
     const series = [{color:'#287db4',scatter:true,radius:4,points}];
-    if (s.recordY === 'ratio') series.unshift({color:'#8c9eaa',dashed:true,points:xRange.map(x=>({x,y:1}))});
-    if (s.recordX === 'ratio') {
+    if (['ratio','correctedRatio'].includes(s.recordY)) series.unshift({color:'#8c9eaa',dashed:true,points:xRange.map(x=>({x,y:1}))});
+    if (['ratio','correctedRatio'].includes(s.recordX)) {
       xRange[0] = Math.min(xRange[0],.95); xRange[1] = Math.max(xRange[1],1.05);
       series.unshift({color:'#8c9eaa',dashed:true,points:yRange.map(y=>({x:1,y}))});
     }
@@ -389,7 +398,7 @@
     $('recordChart').setAttribute('aria-label',data.yLabel+' en fonction de '+data.xLabel);
     $('recordPlotHint').textContent = s.radiusRecords.length ? data.points.length+' point(s) sur '+s.radiusRecords.length+' relevé(s). Chaque point est un relevé conservé ; les points ne sont pas reliés.'+(data.points.length<s.radiusRecords.length?' Les mesures indisponibles sont omises.':'') : 'Relevez au moins une mesure avec « Relever ce rayon », puis changez le rayon pour comparer.';
     $('exportRecords').disabled = !s.radiusRecords.length;
-    $('recordTable').innerHTML = s.radiusRecords.map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+format(recordFields.radius.value(r))+'</td><td>'+format(r.ratio,3)+'</td><td>'+format(recordFields.meanFreePath.value(r))+'</td><td>'+format(recordFields.packing.value(r))+'</td><td>'+format(recordFields.pressure.value(r),3)+'</td><td>'+format(recordFields.temperature.value(r))+'</td><td>'+format(recordFields.meanCollisionTime.value(r))+'</td><td>'+r.completedFlights+'</td><td>'+U.text('time',r.time)+'</td><td>'+(r.source==='mean'?'Toutes les parois':'Piston')+'</td></tr>').join('');
+    $('recordTable').innerHTML = s.radiusRecords.map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+format(recordFields.radius.value(r))+'</td><td>'+format(r.ratio,3)+'</td><td>'+format(r.correctedRatio,3)+'</td><td>'+format(recordFields.meanFreePath.value(r))+'</td><td>'+format(recordFields.packing.value(r))+'</td><td>'+format(recordFields.pressure.value(r),3)+'</td><td>'+format(recordFields.temperature.value(r))+'</td><td>'+format(recordFields.meanCollisionTime.value(r))+'</td><td>'+r.completedFlights+'</td><td>'+U.text('time',r.windowStart,3)+' → '+U.text('time',r.time,3)+'</td><td>'+(r.source==='mean'?'Toutes les parois':'Piston')+'</td></tr>').join('');
   }
   function render() { readings(); draw(); drawChart(); drawRecordPlot(); }
   function changeChart(key) { const s = session(); s.chart = key; $('extraChart').value = key; render(); }
@@ -453,16 +462,17 @@
   });
   $('recordRadius').addEventListener('click', () => {
     const s = session(), m = s.sim.metrics;
-    if (active !== 'comparison' || m.time < 4 || ratio(m) == null) return;
-    s.radiusRecords.push({radius:s.radius, ratio:ratio(m), time:m.time, temperature:m.temperature, source:s.source, pressure:pressure(m), volume:m.volume, packing:m.packingFraction, meanFreePath:m.meanFreePath, meanCollisionTime:m.meanCollisionTime, completedFlights:m.completedFlights});
+    if (active !== 'comparison' || m.time < nextRecordTime(s) || ratio(m) == null) return;
+    s.radiusRecords.push({radius:s.radius, ratio:ratio(m), time:m.time, temperature:m.temperature, source:s.source, pressure:pressure(m), volume:m.volume, packing:m.packingFraction, meanFreePath:m.windowMeanFreePath, meanCollisionTime:m.windowMeanCollisionTime, completedFlights:m.windowCompletedFlights, windowStart:m.measurementStart, correctedRatio:ratio(m)*(1-m.packingFraction)});
+    s.lastRecordTime = m.time;
     if (s.radiusRecords.length > 30) s.radiusRecords.shift();
-    render(); notify('Relevé conservé. Changez le rayon puis appliquez-le pour comparer.');
+    render(); notify('Relevé conservé. Un nouveau relevé attendra '+U.text('time',s.sim.measurementWindow,3)+' de temps simulé ; changer d’axe ou effacer la liste ne raccourcit pas cette attente.');
   });
   for (const id of ['recordX','recordY']) $(id).addEventListener('input', () => { session()[id] = $(id).value; drawRecordPlot(); });
   $('exportRecords').addEventListener('click', () => {
     const number = v => v == null || !Number.isFinite(v) ? '' : v.toPrecision(10).replace('.',',');
-    const rows = session().radiusRecords.map((r,i)=>[i+1,...Object.values(recordFields).map(f=>number(f.value(r))),number(U.value('time',r.time)),r.source].join(';'));
-    const header = 'releve;rayon_mm;PV_sur_nRT;libre_parcours_moyen_mm;surface_occupee_pct;pression_bar;temperature_K;temps_moyen_entre_chocs_us;trajets_complets;temps_ms;capteur';
+    const rows = session().radiusRecords.map((r,i)=>[i+1,...Object.values(recordFields).map(f=>number(f.value(r))),number(U.value('time',r.windowStart)),number(U.value('time',r.time)),r.source].join(';'));
+    const header = 'releve;rayon_mm;PV_sur_nRT;P_V_moins_Voccupe_sur_nRT;libre_parcours_moyen_mm;surface_occupee_pct;pression_bar;temperature_K;temps_moyen_entre_chocs_us;trajets_complets_fenetre;debut_fenetre_ms;fin_fenetre_ms;capteur';
     const url=URL.createObjectURL(new Blob(['\uFEFF'+header+'\r\n'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'}));
     const a=document.createElement('a');a.href=url;a.download='gaz-2d-releves.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   });

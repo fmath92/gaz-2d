@@ -1,3 +1,10 @@
+## 0.9.1 — Fenêtres de relevé et correction de volume
+
+- Relevés sur une même fenêtre glissante, après une fenêtre initiale de démarrage écartée ; délai d’au moins une fenêtre entre deux clics.
+- Trajets attribués à leur collision finale ; exclusion des trajets commencés pendant le démarrage et conservation des bornes temporelles dans le tableau/CSV.
+- Ajout de P(V − V occupé)/(nRT) aux mesures, axes, tableau et export, avec sa définition géométrique.
+- Documentation de la différence entre absence de chevauchement et indépendance statistique.
+
 ## 0.9.0 — Graphiques des relevés
 
 - Axes X/Y libres pour comparer ratio, rayon, libre parcours moyen, occupation, pression, température, temps entre collisions et nombre de trajets.
