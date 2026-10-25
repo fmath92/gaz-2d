@@ -1765,3 +1765,9 @@ input[aria-invalid="true"] {
 #workbench[data-experience="temperature"] .micro-toolbar { display:none; }
 #workbench[data-experience="temperature"] .bench-grid { align-items:start; }
 #workbench[data-experience="temperature"] #microObservation { display:none; }
+
+.work-cases { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; margin:10px 0; }
+.work-case { border:1px solid #dbe6e9; border-radius:9px; padding:8px; color:#6d858f; font-size:11px; }
+.work-case strong,.work-case span { display:block; margin-bottom:4px; }
+.work-case[aria-current="step"] { border-color:#268b80; background:#edf7f4; color:#24615a; }
+#workbench[data-experience="adiabatic"]:has(#workCases:not([hidden])) #chamber { height:390px; }

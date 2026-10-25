@@ -1,3 +1,12 @@
+## 0.16.0 — Trois cas pour comprendre le travail
+
+- Parcours guidé : piston au repos, compression, puis détente sur le même gaz.
+- Pour chaque cas : choc individuel, comparaison des vitesses, puis cumul des chocs sur tout le piston.
+- Repère fixe et volume balayé visibles ; convention du travail reçu par le gaz explicitée.
+- Diagramme P–V avec aire signée, travail mesuré et variation d’énergie sur la même fenêtre.
+- Résultats des trois cas conservés, pause et retour progressif, réglages manuels disponibles hors parcours.
+- Tests du signe du travail, de l’égalité avec l’aire et ΔE, des enchaînements et des interruptions.
+
 ## 0.15.0 — Entrée et retour progressifs des illustrations
 
 - Température : ralentissement en vue générale, capture à l’arrêt, tracé du cadre, puis zoom sur les vitesses.

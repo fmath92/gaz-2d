@@ -146,13 +146,23 @@ test('pressure gauge uses the true window impulse and piston length-time denomin
   assert.ok(Math.abs(m.pistonLengthTime-15)<1e-9);assert.equal(m.work,0);
   assert.match(lab.nodes.get('pressureCalculation').textContent,/P = ΣJ/);
 });
-test('work illustration launches the selected moving piston, shows its energy exchange and can be stopped',()=>{
-  const lab=laboratory();lab.click('tab-adiabatic');lab.input('motionAction','compression');lab.input('duration',60);lab.click('illustrate');
-  assert.equal(lab.nodes.get('target').disabled,true);assert.equal(lab.nodes.get('motionAction').disabled,true);lab.finishTour();
-  const e=lab.analysis.lastTour.events[0];assert.ok(e.wallVelocity<0);assert.ok(e.work>0);assert.ok(Math.abs(e.work+e.wallVelocity*e.impulse)<1e-9);
-  assert.equal(lab.nodes.get('workLesson').hidden,false);assert.equal(lab.nodes.get('pressureLesson').hidden,true);
-  lab.click('stop');const work=lab.metrics.work;lab.advance(.5);assert.equal(lab.metrics.work,work);
+test('work illustration guides all three cases, locks manual motion and returns smoothly',()=>{
+ const lab=laboratory();lab.click('tab-adiabatic');lab.input('motionAction','compression');lab.input('duration',60);lab.click('illustrate');
+ assert.equal(lab.analysis.lesson.kind,'work');assert.equal(lab.analysis.lesson.case,'fixed');assert.equal(lab.analysis.tour,null);
+ assert.equal(lab.nodes.get('target').disabled,true);assert.equal(lab.nodes.get('motionAction').disabled,true);assert.equal(lab.nodes.get('start').disabled,true);
+ assert.equal(lab.nodes.get('illustrate').textContent,'Retour à la simulation');assert.equal(lab.nodes.get('workLesson').hidden,true);assert.equal(lab.nodes.get('workCases').hidden,false);
+ lab.advance(1);lab.click('pause');const time=lab.metrics.time;lab.advance(1);assert.equal(lab.metrics.time,time);lab.click('pause');
+ for(let i=0;i<100&&lab.analysis.lesson.phase!=='done'&&lab.analysis.lesson.phase!=='unavailable';i++)lab.advance(1);
+ const l=lab.analysis.lesson;assert.equal(l.phase,'done',l.message);assert.equal(l.results.length,3);
+ assert.equal(l.results[0].work,0);assert.ok(l.results[1].work>0);assert.ok(l.results[2].work<0);
+ for(const r of l.results)assert.ok(Math.abs(r.work-r.pressureWork)<1e-7);
+ assert.match(lab.nodes.get('storyFormula').textContent,/−∫ P dV/);assert.match(lab.nodes.get('workCases').innerHTML,/Repos.*Compression.*Détente/);
+ const end=lab.metrics.time;lab.advance(2);assert.equal(lab.metrics.time,end);
+ lab.click('illustrate');assert.ok(lab.analysis.returning);lab.advance(3.2);assert.equal(lab.analysis.lesson,null);assert.equal(lab.paused,false);
+ const work=lab.metrics.work;lab.advance(.3);assert.equal(lab.metrics.work,work);assert.equal(lab.nodes.get('motionAction').disabled,false);
+ assert.equal(lab.nodes.get('workCases').hidden,true);assert.equal(lab.nodes.get('workLesson').hidden,false);assert.match(lab.nodes.get('workExplanation').textContent,/aucun travail/);
 });
+
 test('Joule–Gay–Lussac doubles V without changing E or T, with simulation and plot visible together',()=>{
   const lab=laboratory();lab.click('tab-free');const before=lab.metrics;lab.advance(.2);lab.click('start');
   assert.equal(lab.metrics.width,18);assert.equal(lab.metrics.volume,2*before.volume);assert.ok(Math.abs(lab.metrics.energy-before.energy)<1e-8);assert.equal(lab.metrics.work,0);assert.equal(lab.metrics.heat,0);
@@ -414,4 +424,15 @@ test('return button also exits early pressure and temperature sequences and surv
  lab.click('illustrateTemperature');assert.equal(lab.analysis.returning.zoom,0);assert.ok(lab.analysis.returning.rate>0);
  lab.advance(3.2);assert.equal(lab.analysis.lesson,null);assert.ok(lab.metrics.time>time);
  lab.click('illustrateTemperature');lab.advance(5);lab.click('illustrateTemperature');lab.click('reset');assert.equal(lab.analysis.returning,null);assert.equal(lab.analysis.lesson,null);
+});
+
+
+test('work journey can return during a moving case, retain its state across tabs and reset cleanly',()=>{
+ const lab=laboratory();lab.click('tab-adiabatic');lab.click('illustrate');
+ for(let i=0;i<45&&lab.analysis.lesson.case!=='compression';i++)lab.advance(1);
+ assert.equal(lab.analysis.lesson.case,'compression');lab.advance(2);
+ const before=lab.metrics.time;lab.click('tab-pressure');lab.advance(.3);lab.click('tab-adiabatic');assert.equal(lab.metrics.time,before);assert.equal(lab.analysis.lesson.case,'compression');
+ lab.click('illustrate');lab.advance(3.2);assert.equal(lab.analysis.lesson,null);assert.equal(lab.analysis.returning,null);
+ const width=lab.metrics.width,work=lab.metrics.work;lab.advance(.3);assert.equal(lab.metrics.width,width);assert.equal(lab.metrics.work,work);
+ lab.click('illustrate');lab.click('reset');assert.equal(lab.analysis.lesson,null);assert.equal(lab.metrics.time,0);assert.equal(lab.metrics.width,11);
 });

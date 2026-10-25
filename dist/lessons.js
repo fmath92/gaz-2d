@@ -8,13 +8,13 @@
   function arrow(c,x,y,dx,dy,color){const a=Math.atan2(dy,dx);line(c,x,y,x+dx,y+dy,color,2);line(c,x+dx,y+dy,x+dx-5*Math.cos(a-.5),y+dy-5*Math.sin(a-.5),color,2);line(c,x+dx,y+dy,x+dx-5*Math.cos(a+.5),y+dy-5*Math.sin(a+.5),color,2);}
   function text(c,str,x,y,color='#294b5b',size=12){c.font=size+'px system-ui';c.fillStyle=color;c.textAlign='left';c.fillText(str,x,y);}
   class PressureWindow {
-    constructor(sim,{cinematic=false,speed=1}={}){this.speed=speed;this.cinematic=cinematic;this.cameraTime=0;this.accumulator=0;this.kind='pressure';this.start=sim.time;this.duration=2;this.y0=sim.height*.25;this.y1=sim.height*.75;this.width=sim.width;this.lastId=sim._collisions;this.events=[];this.elapsed=0;this.paused=false;this.phase=cinematic?'overview':'collect';}
+    constructor(sim,{cinematic=false,speed=1}={}){this.slowRate=.25;this.speed=speed;this.cinematic=cinematic;this.cameraTime=0;this.accumulator=0;this.kind='pressure';this.start=sim.time;this.duration=2;this.y0=sim.height*.25;this.y1=sim.height*.75;this.width=sim.width;this.lastId=sim._collisions;this.events=[];this.elapsed=0;this.paused=false;this.phase=cinematic?'overview':'collect';}
     collect(sim){
       for(const e of sim._events)if(e.id>this.lastId&&e.time>this.start&&e.time<=this.start+this.duration+1e-9&&e.wall==='right'&&e.y>=this.y0&&e.y<=this.y1)this.events.push({...e});
       this.lastId=sim._collisions;this.events.sort((a,b)=>a.time-b.time||a.id-b.id);
       this.elapsed=Math.min(this.duration,sim.time-this.start);if(this.elapsed>=this.duration-1e-9)this.phase='done';
     }
-    get rate(){return this.paused||this.phase==='done'?0:this.phase==='overview'?(this.speed??1):this.phase==='zoom'?(this.speed??1)+(Math.min(.25,this.speed??1)-(this.speed??1))*this.zoom:Math.min(.25,this.speed??1);}
+    get rate(){return this.paused||this.phase==='done'?0:this.phase==='overview'?(this.speed??1):this.phase==='zoom'?(this.speed??1)+(Math.min(this.slowRate,this.speed??1)-(this.speed??1))*this.zoom:Math.min(this.slowRate,this.speed??1);}
     get zoom(){return this.phase==='overview'?0:this.phase==='zoom'?ease(this.cameraTime/1.4):1;}
     tick(seconds,sim,advance,speed=1){
       if(this.paused||this.phase==='done')return;
@@ -36,6 +36,85 @@
     get impulse(){return this.events.reduce((sum,e)=>sum+e.impulse,0);}
     get pressure(){return this.elapsed>1e-10?this.impulse/((this.y1-this.y0)*this.elapsed):null;}
     get surface(){return (this.y1-this.y0)*U.scales.length*U.scales.depth;}
+  }
+  class WorkWindow extends PressureWindow {
+    constructor(sim,options={}){
+      super(sim,options);this.kind='work-window';this.duration=1.5;this.slowRate=.4;
+      this.height=sim.height;this.y0=0;this.y1=sim.height;this.captureStart(sim);
+    }
+    captureStart(sim){
+      this.startWidth=this.currentWidth=sim.width;this.startEnergy=this.currentEnergy=sim.metrics.energy;
+      this.velocity=sim.metrics.pistonVelocity;
+    }
+    collect(sim){super.collect(sim);this.currentWidth=sim.width;this.currentEnergy=sim.metrics.energy;}
+    tick(seconds,sim,advance,speed=1){
+      const before=this.phase;super.tick(seconds,sim,advance,speed);
+      if(before==='zoom'&&this.phase==='collect')this.captureStart(sim);
+    }
+    get work(){return this.events.reduce((sum,e)=>sum+e.work,0);}
+    get deltaVolume(){return (this.currentWidth-this.startWidth)*this.height;}
+    get deltaEnergy(){return this.currentEnergy-this.startEnergy;}
+    get pressureWork(){return -(this.pressure??0)*this.deltaVolume;}
+    get bins(){
+      const dt=this.duration/12,bins=[];
+      for(let i=0;i<12&&i*dt<this.elapsed-1e-10;i++){
+        const t0=i*dt,t1=Math.min(this.elapsed,(i+1)*dt);
+        const impulse=this.events.filter(e=>e.time-this.start>(i===0?0:t0+1e-9)&&e.time-this.start<=t1+1e-9).reduce((sum,e)=>sum+e.impulse,0);
+        const pressure=impulse/(this.height*(t1-t0));
+        bins.push({pressure,v0:(this.startWidth+this.velocity*t0)*this.height,v1:(this.startWidth+this.velocity*t1)*this.height});
+      }
+      return bins;
+    }
+    get summary(){return {start:this.start,elapsed:this.elapsed,phase:this.phase,events:this.events.map(e=>({...e})),velocity:this.velocity,startVolume:this.startWidth*this.height,deltaVolume:this.deltaVolume,pressure:this.pressure,work:this.work,pressureWork:this.pressureWork,deltaEnergy:this.deltaEnergy,bins:this.bins};}
+  }
+  const workCases=['fixed','compression','expansion'];
+  class WorkJourney {
+    constructor(sim,{speed=1,reducedMotion=false,planningBudget=9}={}){
+      this.kind='work';this.sim=sim;this.speed=speed;this.reducedMotion=reducedMotion;this.planningBudget=planningBudget;
+      this.index=0;this.paused=false;this.elapsed=0;this.results=[];this.window=null;this.tour=null;this.collision=null;
+      sim.stopMotion();
+      // At the compression limit, make room with a real, explicitly labelled preparation.
+      if(sim.width<5){this.phase='prepare';sim.setMotion({targetWidth:11,duration:(11-sim.width)/.6});}
+      else this.beginCase();
+    }
+    get case(){return workCases[this.index];}
+    beginCase(){
+      this.sim.stopMotion();this.elapsed=0;this.window=null;this.collision=null;
+      if(this.case!=='fixed'){
+        const direction=this.case==='compression'?-1:1;
+        const travel=Math.min(2,direction<0?this.sim.width-3:18-this.sim.width);
+        this.sim.setMotion({targetWidth:this.sim.width+direction*travel,duration:12});
+      }
+      this.phase='collision';this.tour=new root.CollisionTour(this.sim,{kind:this.case==='fixed'?'pressure':'work',speed:this.speed,reducedMotion:this.reducedMotion});
+    }
+    get zoom(){return this.phase==='collision'?this.tour.zoom:this.phase==='between'?1-ease(this.elapsed/1.4):this.window?.zoom??0;}
+    get rate(){return this.paused?0:this.phase==='prepare'?this.speed:this.phase==='collision'?(this.tour.rate??0):this.phase==='measure'?this.window.rate:0;}
+    get progress(){const p=this.phase==='collision'?.2:this.phase==='measure'?.45+.4*this.window.elapsed/this.window.duration:.95;return this.phase==='prepare'?0:this.phase==='done'?1:(this.index+p)/3;}
+    tick(seconds,sim,advance){
+      if(this.paused||this.phase==='done'||this.phase==='unavailable')return;
+      if(this.phase==='prepare'){
+        advanceTime(seconds*this.speed,advance);if(!sim.motion)this.beginCase();return;
+      }
+      if(this.phase==='collision'){
+        this.tour.tick(seconds,advance,this.planningBudget);
+        if(!this.tour.finished)return;
+        if(this.tour.phase!=='done'){this.message=this.tour.message;this.phase='unavailable';sim.stopMotion();return;}
+        this.collision=this.tour.events.at(-1);this.tour=null;
+        this.window=new WorkWindow(sim,{cinematic:true,speed:this.speed});this.phase='measure';return;
+      }
+      if(this.phase==='measure'){
+        this.window.tick(seconds,sim,advance,this.speed);
+        if(this.window.phase==='done'){
+          this.results.push({case:this.case,collision:{...this.collision},...this.window.summary});
+          sim.stopMotion();this.elapsed=0;this.phase=this.index===2?'done':'hold';
+        }
+        return;
+      }
+      this.elapsed+=seconds;
+      if(this.phase==='hold'&&this.elapsed>=3){this.phase='between';this.elapsed=0;}
+      else if(this.phase==='between'&&this.elapsed>=1.4){this.index++;this.beginCase();}
+    }
+    get summary(){return {kind:this.kind,phase:this.phase,case:this.case,index:this.index,zoom:this.zoom,rate:this.rate,progress:this.progress,collision:this.tour?.event??this.collision,collisionPhase:this.tour?.phase??null,window:this.window?.summary??null,results:this.results.map(r=>({...r})),message:this.message??''};}
   }
   class TemperatureSnapshot {
     constructor(sim){
@@ -121,6 +200,48 @@
     if(t>=2)text(c,t<5?'Toutes les vitesses de la zone encadrée':t<8?'On déplace et oriente les dessins, sans changer les normes':t<15?'Même masse : Ec = ½ m |v|² pour chaque marqueur':'La même méthode s’applique aux 1 000 particules',18,h-7,'#687f8a',10);
     c.globalAlpha=1;
   }
+  function workChamber(canvas,sim,story,options={}){
+    const G=root.LabGraphics,zoom=options.zoom??story.zoom;
+    if(story.tour){G.chamber(canvas,sim,{...options,tour:{...story.tour.view,zoom}});return;}
+    const m=story.window;
+    if(!m){G.chamber(canvas,sim,options);return;}
+    // The camera is anchored in the laboratory, never attached to the moving piston.
+    G.chamber(canvas,sim,{...options,region:{x:m.width,y:sim.height/2,y0:sim.height*.25,y1:sim.height*.75,zoom,events:m.events,opacity:options.opacity??1,work:{startWidth:['overview','zoom'].includes(m.phase)?sim.width:m.startWidth,deltaVolume:m.deltaVolume,work:m.work,velocity:m.velocity}}});
+  }
+  function workGraph(canvas,story){
+    const surf=root.LabGraphics.setup(canvas);if(!surf)return;const{ctx:c,w,h}=surf,m=story.window,e=story.tour?.event??story.collision;
+    const color=story.case==='compression'?'#c77e2f':story.case==='expansion'?'#337fba':'#268b80';
+    if(!m){
+      text(c,'Une poussée, avec ou sans déplacement.',22,28,'#294b5b',13);
+      text(c,'Travail reçu par le gaz lors du choc :',22,70);
+      text(c,'δW = −u × J',22,106,color,22);
+      text(c,e?'J = '+U.text('momentum',e.impulse,5)+' ; u = '+U.text('velocity',e.wallVelocity):'J : impulsion transmise au piston ; u : sa vitesse.',22,143,'#687f8a',11);
+      text(c,e?'δW = '+U.text('energy',e.work,4):'Suivez une particule jusqu’au contact.',22,177,color,18);
+      text(c,story.case==='fixed'?'u = 0 : rebond, mais aucune énergie échangée.':story.case==='compression'?'Le piston avance : la particule gagne de l’énergie.':'Le piston recule : la particule cède de l’énergie.',22,220,'#687f8a',11);
+      return;
+    }
+    const bins=m.bins,volume=m.startWidth*m.height,span=Math.max(.8,Math.abs(m.velocity*m.duration*m.height));
+    const vEnd=volume+m.velocity*m.duration*m.height,vMin=Math.min(volume,vEnd)-.25*span,vMax=Math.max(volume,vEnd)+.25*span;
+    const pMax=Math.max(1,...bins.map(b=>b.pressure))*1.22;
+    const left=54,right=w-22,top=36,bottom=h-62,X=v=>left+(v-vMin)/(vMax-vMin)*(right-left),Y=p=>bottom-p/pMax*(bottom-top);
+    text(c,'P (bar) · moyenne des chocs par intervalle',left,18,'#687f8a',11);
+    line(c,left,top,left,bottom,'#9fb4be');line(c,left,bottom,right,bottom,'#9fb4be');
+    for(let i=0;i<=3;i++){
+      const p=i*pMax/3,y=Y(p);text(c,f(p*U.scales.pressure/1e5,2),5,y+4,'#687f8a',10);
+      const v=vMin+(vMax-vMin)*i/3; text(c,f(v*U.scales.volume*1000,3),X(v)-15,bottom+18,'#687f8a',10);
+    }
+    if(Math.abs(m.velocity)<1e-10){
+      const p=m.pressure??0;line(c,X(volume),bottom,X(volume),Y(p),color,3);
+      text(c,'ΔV = 0 : aucune aire, W = 0',left+12,top+22,color,13);
+    }else for(const b of bins){
+      const x=Math.min(X(b.v0),X(b.v1)),bw=Math.abs(X(b.v1)-X(b.v0));
+      c.globalAlpha=.25;c.fillStyle=color;c.fillRect(x,Y(b.pressure),bw,bottom-Y(b.pressure));c.globalAlpha=1;
+      line(c,X(b.v0),Y(b.pressure),X(b.v1),Y(b.pressure),color,2);
+    }
+    if(m.elapsed>0&&m.velocity!==0)arrow(c,X(volume),bottom-8,X(volume+m.deltaVolume)-X(volume),0,color);
+    text(c,'V (L)',right-28,bottom+38,'#687f8a',11);
+    text(c,'W reçu = −Σ Pᵢ ΔVᵢ = '+U.text('energy',m.work,3),left,h-5,color,14);
+  }
   function pressureGraph(canvas,s){
     const surf=root.LabGraphics.setup(canvas);if(!surf)return;const{ctx:c,w,h}=surf;const left=35,right=w-18,X=t=>left+(t-s.start)/s.duration*(right-left),max=Math.max(1,...s.events.map(e=>e.impulse));
     text(c,'Les poussées s’additionnent sur Δt',left,18);line(c,left,90,right,90,'#b9cbd0');
@@ -153,5 +274,5 @@
       text(c,'T = E totale / (nR) = '+f(s.temperature)+' K',25,241,'#248b7c',16);
     }else text(c,'Puis on fait la même somme sur tout le gaz.',25,165,'#687f8a');
   }
-  root.GasLessons={PressureWindow,TemperatureSnapshot,TemperatureLesson,SimulationReturn,pressureChamber,temperatureChamber,pressureGraph,temperatureGraph};
+  root.GasLessons={PressureWindow,WorkWindow,WorkJourney,workChamber,workGraph,TemperatureSnapshot,TemperatureLesson,SimulationReturn,pressureChamber,temperatureChamber,pressureGraph,temperatureGraph};
 })(typeof globalThis!=='undefined'?globalThis:window);

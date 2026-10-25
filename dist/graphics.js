@@ -159,6 +159,14 @@
     }
     if(region){
       ctx.save();ctx.globalAlpha=region.opacity??1;
+      if(region.work){
+        const m=region.work,origin=X(m.startWidth),color=m.velocity<0?'#c77e2f':m.velocity>0?'#337fba':'#268b80';
+        ctx.globalAlpha=.18*(region.opacity??1);ctx.fillStyle=color;ctx.fillRect(Math.min(origin,right),Math.max(0,top),Math.abs(right-origin),Math.min(h,bottom)-Math.max(0,top));
+        ctx.globalAlpha=region.opacity??1;ctx.setLineDash([4,4]);line(ctx,origin,40,origin,h-46,color,1.5);ctx.setLineDash([]);
+        arrow(ctx,origin,h-56,right-origin,0,color,3);
+        ctx.font='11px system-ui';ctx.textAlign='left';ctx.fillStyle=color;
+        ctx.fillText('u = '+U.text('velocity',m.velocity)+' · ΔV = '+U.text('volume',m.deltaVolume,3),14,36);
+      }
       line(ctx,right,Y(region.y0),right,Y(region.y1),'#d18b35',6);
       for(const e of region.events){
         const age=sim.time-e.time;if(age<0||age>.2)continue;
@@ -168,8 +176,8 @@
         ctx.beginPath();ctx.arc(right,Y(e.y),3+age*200,0,2*Math.PI);ctx.strokeStyle='#d18b35';ctx.stroke();ctx.restore();
       }
       ctx.globalAlpha=region.opacity??1;ctx.textAlign='left';ctx.font='10px system-ui';ctx.fillStyle='#617b8d';
-      ctx.fillText('MÊME SIMULATION · SURFACE S EN ORANGE',14,19);
-      if(q>.5)ctx.fillText('Couleur = vitesse · chocs réellement reçus sur cette surface',14,h-12);
+      ctx.fillText(region.work?'ZOOM CENTRAL · CALCUL SUR TOUT LE PISTON':'MÊME SIMULATION · SURFACE S EN ORANGE',14,19);
+      if(q>.5)ctx.fillText(region.work?'Travail reçu par le gaz : '+U.text('energy',region.work.work,3):'Couleur = vitesse · chocs réellement reçus sur cette surface',14,h-12);
       ctx.restore();return;
     }
     if (!hit || q < .2) return;

@@ -2,7 +2,7 @@
 
 **[Ouvrir le démonstrateur](https://fmath92.github.io/gaz-2d/)** · [Code source](https://github.com/fmath92/gaz-2d)
 
-Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.15.0 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
+Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.16.0 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
 
 ## La visite
 
@@ -11,7 +11,7 @@ Un laboratoire de thermodynamique pour relier les collisions microscopiques à l
 | 01 | Pression | Un choc à venir, sa poussée sur le piston immobile et sa contribution à la pression. |
 | 02 | Température | Instant figé, zoom local, vitesses alignées, énergies puis moyenne globale. |
 | 03 | Joule–Gay–Lussac | Ouverture vers le vide (doublement du volume par défaut), énergie et température conservées en mode isolé. |
-| 04 | Détente et compression adiabatiques | Choix du sens du mouvement ; zoom sur un choc au piston mobile et sur le travail reçu ou fourni. |
+| 04 | Détente et compression adiabatiques | Parcours repos → compression → détente ; chocs, travail reçu et aire signée P–V. Transformations manuelles également disponibles. |
 | 05 | Cycles P–V | Allers-retours isolés du piston, branches compression/détente et échauffement éventuel. |
 | 06 | Rayon & loi des gaz | Une simulation de disques durs à rayon réglable ; relevés de PV/(nRT) à n, V et T initiale identiques. |
 
@@ -34,14 +34,14 @@ La lecture peut être ralentie jusqu’à ×0,05, accélérée jusqu’à ×4, m
 
 ## Les collisions à la loupe
 
-Dans les expériences de pression, de chaleur et de travail, le bouton d’illustration lance une **séquence automatique dans la cavité elle-même** :
+Dans les expériences de pression et de travail, le bouton d’illustration lance une **séquence automatique dans la cavité elle-même** :
 
 1. Repérage d’une collision à venir, sans avancer le gaz affiché.
 2. Ralentissement et rapprochement progressif de la caméra du point de contact ; la particule suivie est entourée.
 3. Collision réelle et rebond continu, sans arrêt sur image. Une onde visuelle se propage dans le piston pendant que la particule repart.
-4. Éloignement de la particule, recul de la caméra et reprise automatique à la vitesse de lecture choisie avant la séquence.
+4. Éloignement de la particule, recul de la caméra, puis mesure collective des chocs. Le retour final reste déclenché par le bouton Retour à la simulation.
 
-Le parcours thermique effectue ces étapes deux fois : **δQ > 0 puis δQ < 0**, avec deux particules qui peuvent être différentes. Cela n’impose aucun échange : une paroi chaude peut recevoir de l’énergie lors d’un choc individuel. Pour le travail, le bouton lance le trajet choisi s’il n’a pas encore commencé, ou suit le piston déjà en mouvement. Le signe reste celui du **travail reçu par le gaz** : positif en compression, négatif en détente.
+Le parcours de travail montre successivement le repos, la compression et la détente. Il utilise des déplacements pédagogiques modérés ; les transformations manuelles conservent leurs propres réglages. Le signe reste celui du **travail reçu par le gaz** : nul au repos, positif en compression, négatif en détente.
 
 L’impulsion J est affichée en **kg·m/s**, unité équivalente à N·s : p = mv, J reçu par le piston = m(v avant − v après), composante normale à la paroi. La flèche orange emploie exactement la même échelle que les deux flèches de quantité de mouvement ; pour un choc frontal sur une paroi fixe, elle vaut deux fois la flèche entrante. La masse est celle du marqueur représentatif.
 
@@ -49,11 +49,11 @@ Les flèches `p avant` et `p après` sont des quantités de mouvement dans le **
 
 Pour le travail, la caméra se rapproche d’une **position fixe dans le laboratoire** et ne suit jamais la largeur courante du gaz. Une ligne marque la position initiale du piston ; une graduation fixe, sa vitesse et son déplacement permettent de voir le mouvement dès l’approche. Le cadrage tient compte du trajet avant le contact pour garder le piston visible.
 
-La trajectoire violette en pointillés représente un **rebond hypothétique sur un piston immobile**, au même point et avec la même vitesse incidente. À droite : v′x = 2u − vx pour le piston mobile, contre v′x = −vx pour le piston immobile, avec vy inchangée. Les deux vitesses sortantes sont affichées, et les flèches utilisent une échelle commune. Juste avant le dézoom, un arrêt sur image de 2,5 secondes met en évidence les deux vitesses sortantes dans la cavité et dans le panneau de mesures. Le rebond reste continu ; seule cette comparaison finale est figée, puis la reprise est automatique. Le cercle violet prolonge seulement le vol libre après ce rebond hypothétique : ce n’est pas une seconde simulation du gaz. Les chocs guidés sont sélectionnés avec vx incident positif, afin que la particule puisse aussi heurter un piston immobile. Un piston qui rattrape une particule s’éloignant de lui est signalé séparément dans les mesures ordinaires.
+La trajectoire violette en pointillés représente un **rebond hypothétique sur un piston immobile**, au même point et avec la même vitesse incidente. À droite : v′x = 2u − vx pour le piston mobile, contre v′x = −vx pour le piston immobile, avec vy inchangée. Les deux vitesses sortantes sont affichées, et les flèches utilisent une échelle commune. Juste avant le dézoom, un arrêt sur image de 2,5 secondes met en évidence les deux vitesses sortantes dans la cavité. Le rebond reste continu ; seule cette comparaison est figée, puis le parcours passe automatiquement à la mesure collective. Le cercle violet prolonge seulement le vol libre après ce rebond hypothétique : ce n’est pas une seconde simulation du gaz. Les chocs guidés sont sélectionnés avec vx incident positif, afin que la particule puisse aussi heurter un piston immobile. Un piston qui rattrape une particule s’éloignant de lui est signalé séparément dans les mesures ordinaires.
 
 Le repérage emploie une copie indépendante du moteur, comprenant l’état du générateur aléatoire thermique, les positions, les vitesses, le mouvement du piston et les conditions aux limites. La copie cherche un événement suffisamment éloigné dans le futur pour laisser le temps de zoomer, hors des coins. Le moteur affiché emploie ensuite les mêmes pas physiques et confirme l’identifiant, la date et les échanges de la collision prévue. La recherche ne consomme aucun tirage du gaz affiché et ne modifie pas ses mesures. Le budget de calcul par image reste borné.
 
-Les paramètres physiques sont verrouillés pendant le parcours. **Quitter le zoom**, Pause, un changement d’onglet ou une remise à zéro l’interrompent sans revenir en arrière dans le temps. La vitesse antérieure est conservée. Une préférence système de réduction des animations supprime la transition progressive de caméra. Si aucun choc adapté n’existe dans l’horizon de recherche (8 u.t., ou la fin du trajet pour le travail), l’interface le signale ; elle ne fabrique aucun choc. Le bouton thermique est désactivé pour une paroi isolée ou une accommodation nulle.
+Les paramètres physiques sont verrouillés pendant le parcours. **Retour à la simulation** quitte l’illustration progressivement ; Pause la suspend, un changement d’onglet suspend le gaz affiché, et Recommencer réinitialise l’expérience. La vitesse de lecture choisie est conservée. Une préférence système de réduction des animations supprime les transitions de caméra du choc individuel. Si aucun choc adapté n’existe dans l’horizon de recherche (8 unités internes, ou la fin du trajet pour le travail), l’interface le signale ; elle ne fabrique aucun choc.
 
 Dans le dernier onglet, **Isoler un choc mutuel** présente uniquement le vrai choc entre deux disques, avec les flèches avant/après. Le réglage de rayon est une préparation d’expérience : « Appliquer le rayon et recommencer » reconstruit les positions sans recouvrement et réinitialise les mesures à n, V et T initiale identiques. Il ne gonfle pas des particules en pleine simulation et n’invente pas un travail associé. Les relevés (jusqu’à 10 000, sans éviction des anciens) survivent à cette réinitialisation et sont effaçables. Un relevé devient possible après quatre unités internes (≈ 0,46 ms) ; cette durée ne garantit pas à elle seule l’équilibre, les fluctuations restent visibles. Les relevés donnent le rayon, PV/(nRT), T, t et le capteur utilisé. L’export CSV porte sur l’historique du rayon courant.
 
@@ -189,7 +189,7 @@ Les cycles utilisent des trajets sinusoïdaux progressifs entre V0 et 0,7 V0. Le
 
 ## Illustrer les mesures (0.13.0)
 
-Le premier onglet enchaîne l’illustration d’un choc puis l’addition des poussées. La simulation avance au ralenti pendant une fenêtre de 2 unités internes (≈ 0,230 ms). Seuls les impacts sur la moitié centrale du piston sont retenus, sur (t0, t0 + Δt]. Chaque impact est identifié, y compris lorsque plusieurs chocs surviennent dans le même pas ou au même instant. La position de contact et l’identifiant sont ajoutés au journal physique sans changer les collisions. Le diagramme présente les impulsions individuelles et leur somme cumulée ; P = ΣJ/(SΔt), avec la surface équivalente de cette bande, et F moyenne = ΣJ/Δt. La jauge locale peut différer de celle du piston entier. À la fin, la scène est arrêtée pour permettre sa lecture ; Le bouton de lancement devient « Retour à la simulation » : il déclenche le dézoom puis la reprise progressive du temps.
+Le premier onglet enchaîne l’illustration d’un choc puis l’addition des poussées. La simulation avance au ralenti pendant une fenêtre de 2 unités internes (≈ 0,230 ms). Seuls les impacts sur la moitié centrale du piston sont retenus, sur (t0, t0 + Δt]. Chaque impact est identifié, y compris lorsque plusieurs chocs surviennent dans le même pas ou au même instant. La position de contact et l’identifiant sont ajoutés au journal physique sans changer les collisions. Le diagramme présente les impulsions individuelles et leur somme cumulée ; P = ΣJ/(SΔt), avec la surface équivalente de cette bande, et F moyenne = ΣJ/Δt. La jauge locale peut différer de celle du piston entier. À la fin, la scène est arrêtée pour permettre sa lecture. Le bouton de lancement devient « Retour à la simulation » : il déclenche le dézoom puis la reprise progressive du temps.
 
 L’onglet Température ralentit le gaz en vue générale pendant 1,6 s, puis capture un instant immuable. Un rectangle est tracé pendant 1 s autour d’une zone centrale, qui est ensuite agrandie ; toutes ses particules sont montrées (au moins 12, sans sélection par vitesse). Les flèches sont translatées et orientées à l’écran à longueur conservée, puis transformées en barres proportionnelles à Ec = m|v|²/2. Les énergies locales s’ajoutent successivement. La dernière étape reste zoomée et présente E et E/N calculés sur les 1 000 particules, puis T = E/(nR), convention du modèle 2D. L’estimation locale est explicitement distinguée de la température globale. Les masses et énergies affichées sont celles des marqueurs représentatifs.
 
@@ -202,3 +202,12 @@ Après le ralentissement et le tracé du cadre, l’animation dure 18 secondes s
 Le second plan utilise désormais exactement le rendu de la cavité principale : mêmes particules, rayons, palette de vitesses, parois et repères. Aucune trajectoire n’est générée pour l’illustration. La caméra interpole depuis les coordonnées de la vue d’ensemble ; chaque flèche de poussée correspond à un événement du journal physique. Le test de continuité compare le gaz animé à un témoin avancé avec les mêmes pas, sans réinitialisation entre les séquences.
 
 Le deuxième bouton de lancement a été retiré. À la fin, le résultat reste lisible en pause ; Le bouton de lancement est remplacé par « Retour à la simulation », disponible dès le premier zoom. Il annule la suite éventuelle, dézoome progressivement puis relance le temps. Aucun retour automatique ne ferme la mesure finale.
+
+
+## Les trois cas du travail (0.16.0)
+
+« Comprendre le travail : les trois cas » enchaîne sur le même gaz un piston au repos, une compression, puis une détente. Chaque étape suit un choc réellement prévu et reçu, revient à la vue générale, puis zoome sur le cumul des chocs et le volume balayé par le piston. Le repère de caméra est fixe dans le laboratoire : le piston reste visiblement mobile. La comparaison des vitesses sortantes avec et sans mouvement est conservée.
+
+La convention est toujours celle du **travail reçu par le gaz** : W = 0 au repos, W > 0 en compression, W < 0 en détente. Pour un choc, δW = −uJ. La mesure collective retient **tous les chocs sur le piston**, y compris hors du zoom central, sur une fenêtre de 1,5 unité interne ouverte après le zoom. P = ΣJ/(SΔt) et ΔV = SΔx, avec les échelles physiques habituelles. À vitesse constante, le travail des collisions satisfait W = −P moyenne × ΔV ; le diagramme P–V décompose cette fenêtre en 12 intervalles et représente l’aire signée −ΣPᵢΔVᵢ. La variation d’énergie sur la même fenêtre est affichée ; les parois restent isolées, donc ΔE = W. Les valeurs des trois cartes portent sur ces fenêtres, et non sur les trajets de transition.
+
+Les mouvements pédagogiques sont linéaires et modérés, indépendants des réglages de transformation manuelle. Au voisinage du volume minimal (largeur < 5), une préparation explicitement annoncée ramène d’abord le piston vers 1 L par un mouvement réel, sans replacer les particules. Aucun gaz n’est réinitialisé dans le parcours. Une fois les trois résultats obtenus, la lecture reste figée. Pause est disponible pendant le parcours ; le bouton de lancement devient Retour et déclenche à tout moment un dézoom puis une reprise progressive à piston arrêté. Les réglages manuels sont retrouvés après ce retour.

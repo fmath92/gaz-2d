@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#f4f7f8">
   <meta name="description" content="Visite guidée d’un laboratoire de thermodynamique : des collisions aux mesures de pression, de travail et de chaleur.">
   <title>Gaz 2D — Visite guidée du laboratoire</title>
-  <link rel="stylesheet" href="styles.css?v=0.15.0">
-  <script defer src="physics.js?v=0.15.0"></script>
-  <script defer src="analysis.js?v=0.15.0"></script>
-  <script defer src="units.js?v=0.15.0"></script>
-  <script defer src="graphics.js?v=0.15.0"></script>
-  <script defer src="tour.js?v=0.15.0"></script>
-  <script defer src="lessons.js?v=0.15.0"></script>
-  <script defer src="app.js?v=0.15.0"></script>
+  <link rel="stylesheet" href="styles.css?v=0.16.0">
+  <script defer src="physics.js?v=0.16.0"></script>
+  <script defer src="analysis.js?v=0.16.0"></script>
+  <script defer src="units.js?v=0.16.0"></script>
+  <script defer src="graphics.js?v=0.16.0"></script>
+  <script defer src="tour.js?v=0.16.0"></script>
+  <script defer src="lessons.js?v=0.16.0"></script>
+  <script defer src="app.js?v=0.16.0"></script>
 </head>
 <body>
   <header class="masthead">
@@ -70,6 +70,7 @@
           <div class="panel-heading"><h2 id="measureTitle">Ce que l’on mesure</h2><div id="mainChartSwitch" class="chart-switch" role="group" aria-label="Tracé principal"><button id="chart-time" data-chart="time" aria-pressed="true">Évolution P, V, T</button><button id="chart-ratio" data-chart="ratio" aria-pressed="false">PV / (nRT)</button></div></div>
           <div id="measurementStory" hidden>
             <p id="storyTitle" class="prediction-text"></p><p id="storyText" class="lesson-note"></p>
+            <div id="workCases" class="work-cases" hidden aria-label="Les trois cas du travail reçu par le gaz"></div>
             <canvas id="lessonCanvas" aria-label="Étapes du calcul à partir des particules"></canvas>
             <div id="storyGauge" class="pressure-gauge"><div id="storyGaugeFill"></div></div>
             <p id="storyFormula" class="calculation"></p><p id="storyDetails" class="field-help"></p>
@@ -172,7 +173,7 @@
         <div class="panel distributions"><div><h2>Norme des vitesses</h2><canvas id="speedHistogram" aria-label="Distribution de la norme des vitesses"></canvas></div><div><h2>Énergie cinétique par marqueur</h2><canvas id="energyHistogram" aria-label="Distribution de l’énergie cinétique des particules"></canvas></div><p id="distributionLegend">État actuel et état initial, densités normalisées.</p></div>
       </details>
     </section>
-    <footer><span>Gaz 2D · version 0.15.0</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
+    <footer><span>Gaz 2D · version 0.16.0</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
   </main>
 </body>
 </html>

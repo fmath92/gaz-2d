@@ -111,3 +111,51 @@ test('area camera starts and ends at the actual full piston view at desktop and 
   const zoom=G.chamberCamera(w,h,sim,{area:{...area,zoom:1}});assert.ok(Math.abs(zoom.X(area.cx)-w/2)<1e-9);assert.ok(zoom.scale>full.scale);
  }
 });
+
+require('../dist/tour.js');
+test('work windows sum actual full-piston collisions and recover the signed P–V area in all three cases',()=>{
+ const {WorkWindow}=globalThis.GasLessons;
+ for(const u of [0,-.16,.16]){
+  const sim=new GasSimulation({count:1000,width:11,temperature:1.5,particleModel:'hard-disks',particleRadius:.04,observeCollisions:true});
+  if(u)sim.setMotion({targetWidth:11+u*10,duration:10});
+  const control=sim.fork(),l=new WorkWindow(sim);
+  while(l.phase!=='done')l.tick(1/60,sim,h=>{sim.step(h);control.step(h);});
+  const area=l.bins.reduce((sum,b)=>sum-b.pressure*(b.v1-b.v0),0);
+  assert.ok(l.events.length>20);assert.ok(l.pressure>0);
+  assert.ok(Math.abs(l.work+u*l.impulse)<1e-9);
+  assert.ok(Math.abs(l.work-l.pressureWork)<1e-8);
+  assert.ok(Math.abs(l.work-area)<1e-8);
+  assert.ok(Math.abs(l.work-l.deltaEnergy)<1e-8);
+  assert.ok(u===0?l.work===0&&l.deltaVolume===0:u<0?l.work>0&&l.deltaVolume<0:l.work<0&&l.deltaVolume>0);
+  assert.deepEqual(sim.particles,control.particles);
+ }
+});
+
+test('the work journey chains rest, compression and expansion on the same gas, then holds its result',()=>{
+ const {WorkJourney}=globalThis.GasLessons;
+ const sim=new GasSimulation({count:1000,width:11,temperature:1.5,particleModel:'hard-disks',particleRadius:.04,observeCollisions:true});
+ const particles=sim.particles,l=new WorkJourney(sim,{planningBudget:Infinity}),seen=[];
+ for(let i=0;i<7000&&l.phase!=='done'&&l.phase!=='unavailable';i++){
+  if(seen.at(-1)!==l.case)seen.push(l.case);
+  l.tick(1/60,sim,h=>{sim.step(h);return h;});
+ }
+ assert.equal(l.phase,'done',l.message);assert.deepEqual(seen,['fixed','compression','expansion']);
+ assert.equal(sim.particles,particles);assert.equal(l.results.length,3);assert.equal(l.zoom,1);assert.equal(l.rate,0);assert.equal(sim.motion,null);
+ for(const [i,r] of l.results.entries()){
+  assert.ok(r.events.length>20);assert.ok(r.collision.impulse>0);
+  assert.ok(Math.abs(r.work-r.pressureWork)<1e-7);assert.ok(Math.abs(r.work-r.deltaEnergy)<1e-7);
+  assert.ok(i===0?r.work===0&&r.collision.work===0:i===1?r.work>0&&r.collision.work>0:r.work<0&&r.collision.work<0);
+  assert.ok(i===0?r.velocity===0:i===1?r.velocity<0:r.velocity>0);
+ }
+ const frozen=JSON.stringify(sim.particles),time=sim.time;l.tick(20,sim,h=>sim.step(h));assert.equal(sim.time,time);assert.equal(JSON.stringify(sim.particles),frozen);
+ assert.ok(Math.abs(sim.metrics.balanceError)<1e-7);assert.equal(sim.metrics.heat,0);
+});
+
+test('work preparation makes room at the compression limit using real motion, without resetting the gas',()=>{
+ const {WorkJourney}=globalThis.GasLessons;
+ const sim=new GasSimulation({count:100,width:3,temperature:1.5,particleModel:'hard-disks',particleRadius:.04,observeCollisions:true});
+ const particles=sim.particles,l=new WorkJourney(sim,{speed:4,planningBudget:Infinity});assert.equal(l.phase,'prepare');
+ l.paused=true;l.tick(1,sim,h=>sim.step(h));assert.equal(sim.width,3);l.paused=false;
+ for(let i=0;i<500&&l.phase==='prepare';i++)l.tick(1/60,sim,h=>{sim.step(h);return h;});
+ assert.equal(l.phase,'collision');assert.equal(l.case,'fixed');assert.equal(sim.width,11);assert.equal(sim.particles,particles);assert.equal(sim.motion,null);
+});
