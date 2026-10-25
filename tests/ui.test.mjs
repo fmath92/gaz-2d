@@ -15,7 +15,7 @@ const app = readFileSync(new URL('../dist/app.js', import.meta.url), 'utf8');
 // animation loop and physics engine run unchanged, including all button handlers.
 function laboratory({welcome=false}={}) {
   const nodes = new Map();
-  const documentListeners=new Map(),textWrites=new Map();
+  const documentListeners=new Map(),textWrites=new Map(),scrollCalls=[];
   let pendingFrame, timestamp = 1000;
   const downloads = [], blobs = new Map(), histogramCalls = [];
   const context2d = new Proxy({}, { get: (o, key) => o[key] ?? (() => {}), set: (o, key, value) => (o[key] = value, true) });
@@ -80,7 +80,7 @@ function laboratory({welcome=false}={}) {
     addEventListener(type,listener) { if(!documentListeners.has(type))documentListeners.set(type,[]);documentListeners.get(type).push(listener); }
   };
   const window = { devicePixelRatio: 1, addEventListener() {} };
-  const scope = vm.createContext({ document, window, console, Blob, performance: { now: () => 0 },
+  const scope = vm.createContext({ document, window, console, Blob, scrollY:0, scrollTo(options){scrollCalls.push(options);}, performance: { now: () => 0 },
     URL: { createObjectURL(blob) { const key = 'blob:test-measures-' + blobs.size; blobs.set(key, blob); return key; }, revokeObjectURL() {} },
     setTimeout() {},
     requestAnimationFrame(callback) { pendingFrame = callback; }
@@ -104,7 +104,7 @@ function laboratory({welcome=false}={}) {
   function frame() { const callback = pendingFrame; pendingFrame = null; callback(timestamp); timestamp += 1000 / 60; }
   frame();
   return {
-    nodes, charts, freeOption, downloads, histogramCalls,textWrites,
+    nodes, charts, freeOption, downloads, histogramCalls,textWrites,scrollCalls,
     documentEvent(type,event) { for(const listener of documentListeners.get(type)??[])listener({preventDefault(){},...event}); },
     get metrics() { return window.gaz2D.metrics; },
     get comparisonMetrics() { return window.gaz2D.comparisonMetrics; },
@@ -494,16 +494,13 @@ test('welcome is optional, freezes the film, and can be reopened without resetti
 
 test('interactive guide recognises actual actions and supports chapter jumps and exit',()=>{
  const lab=laboratory({welcome:true});lab.click('tutorialStart');assert.equal(lab.analysis.tutorial.index,0);lab.click('tutorialNext');
- assert.equal(lab.analysis.tutorial.target,'timeScale');assert.equal(lab.nodes.get('tutorialNext').disabled,false);assert.equal(lab.analysis.tutorial.ready,false);
- lab.input('timeScale',.25);assert.equal(lab.analysis.tutorial.ready,true);lab.click('tutorialNext');lab.click('pause');lab.advance(.15);assert.equal(lab.analysis.tutorial.ready,true);
- lab.click('tutorialNext');lab.click('pause');lab.advance(.15);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,4);
- lab.nodes.get('tutorialChapter').value='9';lab.nodes.get('tutorialChapter').dispatch('change');assert.equal(lab.analysis.tutorial.target,'tab-free');
- lab.click('tab-free');lab.advance(.15);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,10);
- lab.click('reset');lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,11);assert.equal(lab.analysis.tutorial.ready,false);
+ assert.equal(lab.analysis.tutorial.target,'illustrate');assert.equal(lab.analysis.tutorial.index,1);
+ lab.nodes.get('tutorialChapter').value='6';lab.nodes.get('tutorialChapter').dispatch('change');assert.equal(lab.analysis.tutorial.target,'tab-free');
+ lab.click('tab-free');lab.advance(.15);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,7);assert.equal(lab.analysis.tutorial.ready,false);
  lab.click('start');lab.advance(.2);assert.equal(lab.analysis.tutorial.ready,false);lab.input('timeScale',4);lab.advance(2.1);assert.equal(lab.analysis.tutorial.ready,true);
  lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.target,'retryFreeRatio');lab.click('retryFreeRatio');assert.equal(lab.analysis.tutorial.ready,true);assert.equal(lab.analysis.chartType,'ratio');
  lab.click('tutorialNext');lab.click('start');lab.advance(.2);assert.equal(lab.analysis.tutorial.ready,false);lab.input('timeScale',4);lab.advance(2.1);assert.equal(lab.analysis.tutorial.ready,true);
- lab.click('tutorialNext');lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,15);
+ lab.click('tutorialNext');lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,11);
  // Skipping all remaining stages never invents measurements or changes the experiment.
  const width=lab.metrics.width;while(lab.analysis.tutorial.active)lab.click('tutorialNext');assert.equal(lab.metrics.width,width);
  assert.equal(lab.nodes.get('tutorialSpotlight').hidden,true);assert.equal(lab.nodes.get('tutorialCard').hidden,true);
@@ -512,7 +509,7 @@ test('interactive guide recognises actual actions and supports chapter jumps and
 
 test('Continue always advances once, even before an action or on another experiment',()=>{
  const lab=laboratory({welcome:true});lab.click('tutorialStart');
- for(let index=0;index<38;index++){
+ for(let index=0;index<34;index++){
   assert.equal(lab.analysis.tutorial.index,index);assert.equal(lab.nodes.get('tutorialNext').disabled,false);
   lab.advance(.12);lab.click('tutorialNext');
  }
@@ -524,8 +521,7 @@ test('the guide clears the veil for actions and waits for slider release before 
  const lab=laboratory({welcome:true}),spot=lab.nodes.get('tutorialSpotlight');lab.click('tutorialStart');
  assert.equal(spot.classList.contains('interaction'),false);lab.click('tutorialNext');
  assert.equal(spot.classList.contains('interaction'),true);
- lab.input('timeScale',.25);assert.equal(lab.analysis.tutorial.ready,true);assert.equal(spot.classList.contains('interaction'),false);
- lab.nodes.get('tutorialChapter').value='24';lab.nodes.get('tutorialChapter').dispatch('change');
+ lab.nodes.get('tutorialChapter').value='20';lab.nodes.get('tutorialChapter').dispatch('change');
  lab.click('tab-comparison');lab.advance(.15);lab.click('tutorialNext');
  const target=lab.nodes.get('particleRadius');
  lab.documentEvent('pointerdown',{target,pointerId:1});lab.input('particleRadius',.6);
@@ -545,7 +541,7 @@ test('the enabled Continue button keeps its text node stable during simulation r
  const writes=lab.textWrites.get('tutorialNext');
  lab.advance(.5);assert.equal(lab.textWrites.get('tutorialNext'),writes);
  lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,1);
- lab.input('timeScale',.25);lab.advance(.5);assert.equal(lab.textWrites.get('tutorialNext'),writes);
+ lab.advance(.5);assert.equal(lab.textWrites.get('tutorialNext'),writes);
  lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,2);
 });
 
@@ -562,12 +558,28 @@ test('Joule–Gay–Lussac has reference ticks and offers a fresh ratio replay a
 });
 
 test('the tutorial follows a paused temperature animation through its real final result',()=>{
- const lab=laboratory({welcome:true});lab.click('tutorialStart');lab.nodes.get('tutorialChapter').value='6';lab.nodes.get('tutorialChapter').dispatch('change');
- lab.click('tab-temperature');lab.advance(.15);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,7);
+ const lab=laboratory({welcome:true});lab.click('tutorialStart');lab.nodes.get('tutorialChapter').value='3';lab.nodes.get('tutorialChapter').dispatch('change');
+ lab.click('tab-temperature');lab.advance(.15);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,4);
  lab.click('illustrateTemperature');lab.advance(5);assert.equal(lab.analysis.tutorial.ready,false);
  lab.click('pause');lab.advance(.15);assert.equal(lab.analysis.tutorial.target,'nextTemperatureStage');
  for(let i=0;i<6&&lab.analysis.lesson.phase!=='done';i++)lab.click('nextTemperatureStage');
- lab.advance(.15);assert.equal(lab.analysis.tutorial.ready,true);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,8);
+ lab.advance(.15);assert.equal(lab.analysis.tutorial.ready,true);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,5);
  lab.click('illustrateTemperature');lab.advance(4.5);assert.equal(lab.analysis.lesson,null);assert.equal(lab.analysis.tutorial.ready,true);
  lab.click('tutorialQuit');assert.equal(lab.analysis.tutorial.active,false);
+});
+
+
+test('tutorial keeps the page top for visible targets and only reveals lower controls',()=>{
+ const lab=laboratory({welcome:true});lab.click('tutorialStart');
+ assert.equal(lab.analysis.tutorial.total,34);assert.equal(lab.scrollCalls.length,0);
+ lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.title,'D’où vient la pression ?');assert.equal(lab.scrollCalls.length,0);
+ lab.nodes.get('tutorialChapter').value='6';lab.nodes.get('tutorialChapter').dispatch('change');
+ lab.click('tab-free');lab.advance(.15);lab.click('tutorialNext');
+ assert.equal(lab.analysis.tutorial.title,'Ouvrir et suivre P, V et T');
+ lab.nodes.get('retryFreeRatio').getBoundingClientRect=()=>({left:640,top:900,width:220,height:40});
+ lab.click('start');lab.input('timeScale',4);lab.advance(2.1);lab.click('tutorialNext');
+ assert.equal(lab.analysis.tutorial.title,'Refaire avec un autre regard');
+ assert.equal(lab.nodes.get('tutorialCard').classList.contains('scene-guide'),true);
+ assert.equal(lab.scrollCalls.at(-1).top,544); // bottom 940 - space above the 380px test card (800 - 380 - 24).
+ lab.click('retryFreeRatio');lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.title,'La même détente, avec PV/(nRT)');
 });

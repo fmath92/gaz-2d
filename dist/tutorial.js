@@ -6,18 +6,14 @@
   const relaxed=s=>s.run?.free&&s.time-s.run.start>=8;
   const steps=[
     {title:'Votre laboratoire, à votre rythme',target:'chamber',text:'Les points sont 1 000 disques qui se déplacent et se heurtent. Leur couleur indique leur rapidité. Les cartes au-dessus affichent les grandeurs mesurées. Le cadre lumineux vous indiquera où agir.'},
-    {title:'Ralentir pour observer',target:'timeScale',event:'timeScale:input',text:'Changez la vitesse de lecture, par exemple ×0,25. Vous ralentissez le film, sans changer les vitesses physiques des particules.'},
-    {title:'Arrêter le film',target:'pause',event:'pause:click',done:s=>!s.playing,text:'Cliquez sur Pause. Vous pouvez prendre le temps de regarder les particules et les mesures.'},
-    {title:'Reprendre la lecture',target:'pause',event:'pause:click',done:s=>s.playing,text:'Reprenez la lecture. Les expériences gardent leurs réglages et leur état lorsque vous changez d’onglet.'},
     {experiment:'pressure',scene:true,waiting:s=>!!(s.tour||s.lesson&&!s.lesson.paused),title:'D’où vient la pression ?',target:s=>s.lesson?.paused?'pause':s.lesson?'lessonCanvas':s.tour?'chamber':'illustrate',done:s=>s.lesson?.kind==='pressure'&&s.lesson.phase==='done',text:s=>s.lesson?'Regardez les impulsions s’additionner : la pression est leur somme divisée par la surface et la durée de mesure. Attendez le bilan.':s.tour?'Suivez la poussée d’une particule. Le parcours montrera ensuite plusieurs chocs sur une même surface.':'Cliquez sur « Comprendre la pression ». Vous suivrez un choc, puis une assemblée de chocs du même gaz.'},
     {experiment:'pressure',title:'Revenir au gaz',target:'illustrate',done:idle,text:'Cliquez sur « Retour à la simulation ». La caméra recule et le temps reprend progressivement.'},
     {title:'Passer à la température',target:'tab-temperature',done:s=>s.experiment==='temperature',text:'Ouvrez l’onglet Température. Nous allons relier l’agitation des particules à une grandeur mesurable.'},
     {experiment:'temperature',scene:true,waiting:s=>!!s.lesson&&!s.lesson.paused,title:'Des vitesses à la température',target:s=>s.lesson?.paused&&s.lesson.phase!=='done'?'nextTemperatureStage':s.lesson?'chamber':'illustrateTemperature',done:s=>s.lesson?.kind==='temperature'&&s.lesson.phase==='done',text:s=>s.lesson?'Le temps se fige ; les vecteurs sont rassemblés, puis leurs normes donnent les énergies cinétiques. Même masse : Ec = ½mv². En 2D, l’énergie totale donne T = E/(nR). Attendez le bilan ; « Étape suivante » permet aussi d’avancer.':'Lancez « Des vitesses à la température ». L’animation part d’un véritable instant du gaz.'},
     {experiment:'temperature',title:'Quitter l’instant figé',target:'illustrateTemperature',done:idle,text:'Utilisez le même bouton pour retrouver la simulation et la lecture normale.'},
     {title:'Une détente sans travail',target:'tab-free',done:s=>s.experiment==='free',text:'Ouvrez Joule–Gay–Lussac : le gaz va disposer de plus d’espace en s’étendant dans le vide.'},
-    {experiment:'free',title:'Préparer une nouvelle détente',target:'reset',event:'reset:click',text:'Cliquez sur Recommencer. Cela réinitialise cette expérience ; le rayon commun est conservé. Le volume final vaut deux fois le volume initial par défaut.'},
     {experiment:'free',scene:true,waiting:s=>s.run?.free&&s.playing,title:'Ouvrir et suivre P, V et T',target:s=>s.chart!=='time'?'chart-time':s.run?.free?'chart':'start',done:s=>s.chart==='time'&&relaxed(s),text:s=>s.run?.free?'V/V₀ atteint 2, T/T₀ reste à 1. Pour un gaz dilué revenu à l’équilibre, P/P₀ est proche de 0,5. Laissez passer le transitoire : la pression est mesurée sur une fenêtre de temps.':'Choisissez « Évolution P, V, T », puis « Ouvrir vers le vide ». Aucun piston mobile ne travaille ici : W = Q = 0.'},
-    {experiment:'free',title:'Refaire avec un autre regard',event:'retryFreeRatio:click',target:s=>relaxed(s)?'retryFreeRatio':s.run?.free?'chart':'start',done:s=>s.chart==='ratio'&&!s.run,text:'Cliquez sur « Recommencer avec PV/(nRT) » sous le diagramme. Le gaz est préparé à nouveau, et le graphique change.'},
+    {experiment:'free',scene:true,title:'Refaire avec un autre regard',event:'retryFreeRatio:click',target:s=>relaxed(s)?'retryFreeRatio':s.run?.free?'chart':'start',done:s=>s.chart==='ratio'&&!s.run,text:'Cliquez sur « Recommencer avec PV/(nRT) » sous le diagramme. Le gaz est préparé à nouveau, et le graphique change.'},
     {experiment:'free',scene:true,waiting:s=>s.run?.free&&s.playing,title:'La même détente, avec PV/(nRT)',target:s=>s.run?.free?'chart':'start',done:s=>s.chart==='ratio'&&relaxed(s),text:'Ouvrez à nouveau vers le vide. Après le transitoire, le rapport revient-il près de 1 ? La référence idéale ne décrit pas nécessairement chaque instant hors équilibre.'},
     {experiment:'free',scene:true,title:'Ce qu’il faut retenir',target:'chart',text:'L’ouverture ne change aucune vitesse au départ. La température cinétique reste constante ; la pression évolue lorsque le gaz remplit la cavité. Avec des disques moins dilués, le rapport PV/(nRT) peut s’écarter de 1.'},
     {title:'Quand le piston se déplace',target:'tab-adiabatic',done:s=>s.experiment==='adiabatic',text:'Ouvrez Détente & compression pour voir comment un piston mobile échange de l’énergie avec le gaz.'},
@@ -57,7 +53,7 @@
       if(index>=steps.length){finish();return;}
       guide.index=index;guide.completed=false;guide.baseline={...counts};guide.target=null;guide.active=true;modal(false);
       $('tutorialCard').hidden=false;document.body?.classList.toggle('tutorial-running',true);
-      $('tutorialChapter').value=String([0,4,6,9,15,20,24,32].filter(i=>i<=index).at(-1));
+      $('tutorialChapter').value=String([0,1,3,6,11,16,20,28].filter(i=>i<=index).at(-1));
       setText('tutorialTitle',steps[index].title);$('tutorialTitle').focus({preventScroll:true});update();
     }
     function ready(state){if(guide.completed)return true;const step=steps[guide.index];return !!((!step.experiment||state.experiment===step.experiment)&&(!step.event||(counts[step.event]??0)>(guide.baseline[step.event]??0))&&(!step.done||step.done(state)));}
@@ -82,14 +78,19 @@
       setText('tutorialNext',guide.index===steps.length-1?'Terminer la visite ✓':'Continuer →');
       const message=ok?(step.done||step.event?'Étape réalisée ✓ · prenez le temps de lire.':'À observer · continuez quand vous le souhaitez.'):step.waiting?.(s)?'Observation en cours… « Continuer » reste disponible à votre rythme.':'À vous de jouer dans la zone encadrée. « Continuer » reste disponible à votre rythme.';
       setText('tutorialStatus',message);
-      if(guide.target!==id){
-        guide.target=id;
-        // Keep both the cavity and its diagram visible during a desktop scene,
-        // even when the highlighted control is near the bottom of the cavity.
-        const scrollTarget=step.scene&&!wrong&&(root.innerWidth??1280)>=760?$('chamber'):el;
-        scrollTarget.scrollIntoView?.({block:step.scene||(root.innerWidth??1280)<760?'start':'center',behavior:root.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
-      }
+      const targetChanged=guide.target!==id;
+      guide.target=id;
       position(el);
+      if(targetChanged){
+        // Prefer the top of the document. Scroll only as far as necessary to
+        // reveal the target, including the space occupied by a bottom guide.
+        const rect=el.getBoundingClientRect(),scrollY=root.scrollY??0;
+        const vh=root.innerHeight??800,bottomGuide=step.scene||(root.innerWidth??1280)<760;
+        const available=vh-(bottomGuide?$('tutorialCard').getBoundingClientRect().height+24:16);
+        const bottom=rect.top+rect.height+scrollY;
+        const top=Math.max(0,Math.min(bottom-available,rect.top+scrollY-16));
+        if(Math.abs(scrollY-top)>1)root.scrollTo?.({top,behavior:root.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
+      }
     }
     function position(el){
       const rect=el.getBoundingClientRect(),vw=root.innerWidth??1280,vh=root.innerHeight??800;

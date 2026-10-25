@@ -1,3 +1,9 @@
+## 0.20.3 — Une visite plus directe
+
+- Suppression des étapes de lecture ralentie, pause/reprise et préparation de la première détente : 34 étapes.
+- « Refaire avec un autre regard » rejoint le bandeau inférieur.
+- Le défilement privilégie le haut de page et descend seulement si la cible ne serait pas visible, sans la coller au bord supérieur.
+
 ## 0.20.2 — Observer la détente sans obstacle
 
 - Le guide des deux détentes de Joule–Gay–Lussac et de leur bilan se place en bandeau compact en bas de l’écran, en laissant la cavité dégagée.
