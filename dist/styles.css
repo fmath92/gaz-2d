@@ -1794,3 +1794,44 @@ input[aria-invalid="true"] {
 @media(max-width:480px) { .work-motion-ribbon { flex-wrap:wrap; } #workbench[data-experience="adiabatic"]:has(#workCases:not([hidden])) #chamber { height:450px; } }
 
 .speed-work-sign { display:block; padding:9px 12px; margin:8px 0; border-left:4px solid #168077; border-radius:6px; background:#e8f5f1; color:#155c55; font-size:15px; line-height:1.4; font-weight:750; }
+
+/* The optional tour surrounds real controls; only the invitation is modal. */
+.tutorial-welcome { position:fixed; inset:0; z-index:100; display:grid; place-items:center; padding:20px; background:#153a4c80; backdrop-filter:blur(5px); }
+.welcome-card { width:min(560px,100%); max-height:90vh; overflow:auto; padding:32px; border:1px solid #c8dfdc; border-radius:22px; background:#fff; box-shadow:0 20px 70px #12334440; }
+.welcome-card h2 { font-size:28px; line-height:1.15; margin:10px 0 16px; }
+.welcome-card p { line-height:1.6; color:#4b6570; }
+.welcome-card small { display:block; margin-top:20px; color:#657c85; line-height:1.5; }
+.welcome-route { background:#edf7f3; color:#22675c; padding:15px; margin:22px 0; border-radius:12px; font-size:13px; line-height:1.8; }
+.welcome-card .text-button { display:block; margin-top:14px; }
+.tutorial-spotlight { position:fixed; z-index:80; pointer-events:none; border:3px solid #21b19c; border-radius:12px; box-shadow:0 0 0 9999px #12364866,0 0 0 7px #78dccb66; transition:left .3s,top .3s,width .3s,height .3s; }
+.tutorial-spotlight::after { content:'↓'; position:absolute; top:-35px; left:12px; background:#137b70; color:white; width:30px; height:30px; text-align:center; line-height:30px; border-radius:50%; font-size:21px; animation:tutorial-beacon 1.4s ease-in-out infinite; }
+.tutorial-card { position:fixed; z-index:90; padding:18px; border:1px solid #bfdbd5; border-radius:16px; background:#fff; box-shadow:0 8px 40px #16394f30; max-height:calc(100vh - 24px); overflow:auto; box-sizing:border-box; }
+.tutorial-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+#tutorialProgress { font-size:10px; letter-spacing:.08em; font-weight:750; color:#227a6e; }
+.tutorial-heading button { padding:0; font-size:11px; }
+.tutorial-track { height:4px; background:#e7f1ef; border-radius:3px; margin:12px 0; overflow:hidden; }
+#tutorialFill { display:block; height:100%; background:#20a08b; transition:width .3s; }
+.tutorial-card h2 { font-size:19px; margin:13px 0 10px; line-height:1.3; }
+#tutorialText { font-size:13px; line-height:1.55; color:#3b5968; margin:0 0 12px; }
+#tutorialStatus { font-size:11px; line-height:1.5; color:#247469; background:#eef8f4; padding:9px; border-radius:8px; }
+.tutorial-actions { display:flex; justify-content:space-between; align-items:center; gap:8px; margin:12px 0; }
+.tutorial-actions button { font-size:12px; padding:9px 10px; }
+.tutorial-chapter-label { display:block; font-size:10px; color:#718690; margin-bottom:4px; }
+#tutorialChapter { width:100%; font-size:12px; padding:6px; border:1px solid #d2e3df; border-radius:7px; }
+.tutorial-running { padding-bottom:330px; }
+.tutorial-running #chamber { scroll-margin-top:16px; }
+.free-retry { margin:14px 0 0; }
+.free-retry p { font-size:12px; line-height:1.5; }
+@keyframes tutorial-beacon { 50% { transform:translateY(5px); } }
+@media(prefers-reduced-motion:reduce) { .tutorial-spotlight,#tutorialFill { transition:none; } .tutorial-spotlight::after { animation:none; } }
+@media(max-width:759px) { .tutorial-card { padding:12px; } .tutorial-card h2 { font-size:16px; margin:8px 0; } #tutorialText { font-size:12px; } .tutorial-running { padding-bottom:420px; } .welcome-card { padding:23px; } }
+
+#tutorialTitle:focus { outline:none; }
+
+.tutorial-card.scene-guide { padding:12px 18px; max-height:35vh; }
+.scene-guide .tutorial-track,.scene-guide .tutorial-chapter-label { display:none; }
+.scene-guide h2 { font-size:16px; margin:6px 0; }
+.scene-guide #tutorialText { margin:5px 0; font-size:12px; }
+.scene-guide #tutorialStatus { display:inline-block; margin:5px 12px 0 0; padding:5px 8px; }
+.scene-guide .tutorial-actions { display:inline-flex; margin:5px 8px 0 0; }
+.scene-guide #tutorialChapter { width:150px; margin-top:5px; }

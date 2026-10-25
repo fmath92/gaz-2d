@@ -13,6 +13,7 @@
     comparison: { index: '06', label: 'LE RAYON DES PARTICULES', title: 'La taille des particules change-t-elle PV = nRT ?', description: 'Faites varier le rayon des disques, à quantité de gaz, volume et température initiale identiques. Comparez PV/(nRT) à 1.', width: 11, action: 'fixed', source: 'mean', chart: 'ratio', zoom: false, speed: 1 }
   };
   const sessions = new Map();
+  let guide=null;
   let sharedRadius = .0005 / U.scales.length; // Default physical radius: 0.50 mm.
   let active = 'pressure', previousFrame = 0, accumulator = 0, lastUI = 0;
   const session = () => sessions.get(active);
@@ -264,7 +265,7 @@
     }
     let feedback='Choisissez un signe pour expliquer le choc.';
     if(a&&!a.correct)feedback='Essayez encore. Indice : comparez les deux valeurs en m/s. La norme mesure la rapidité, quel que soit le sens de la flèche.';
-    if(a?.correct)feedback='Oui. '+(a.relation==='='?'Les vitesses sont égales : la particule a poussé sur le piston et contribue à la pression, mais son énergie cinétique n’a pas changé.':a.relation==='>'?'La vitesse sortante est plus grande : la particule a poussé sur le piston et contribue à la pression, mais le piston lui a fourni de l’énergie.':'La vitesse sortante est plus petite : la particule a poussé sur le piston et contribue à la pression. Elle a cédé de l’énergie au piston.');
+    if(a?.correct)feedback='Oui. '+(a.relation==='='?'Les vitesses sont égales : la particule a poussé sur le piston et contribue à la pression, mais son énergie cinétique n’a pas changé.':a.relation==='>'?'La vitesse sortante est plus grande : la particule a poussé sur le piston et contribue à la pression, mais le piston lui a fourni de l’énergie.':'La vitesse sortante est plus petite : la particule contribue à la pression en poussant sur le piston. C’est parce que le piston reculait pendant le choc qu’elle lui a cédé de l’énergie.');
     $('speedWorkSign').hidden=!a?.correct;
     $('speedWorkSign').textContent=a?.correct?(a.relation==='='?'Le travail reçu par le gaz est nul : W = 0.':a.relation==='>'?'Le travail reçu par le gaz est positif : W > 0.':'Le travail reçu par le gaz est négatif : W < 0.') : '';
     if($('speedFeedback').textContent!==feedback)$('speedFeedback').textContent=feedback;
@@ -523,6 +524,12 @@
     }
     if(active==='cycles'&&s.chart==='pv')legend='<span style="--color:#ce8033">Compression</span><span style="--color:#287db4">Détente</span>';
     yRange = G.dataRange(series.flatMap(line => line.points.map(p => p.y)), s.chart === 'ratio' ? [.8,1.2] : [0,1.5], s.chart !== 'log');
+    let yTicks;
+    if(active==='free'&&s.chart==='time'){
+      const observedMax=Math.max(0,...series.flatMap(line=>line.points.map(p=>Number.isFinite(p.y)?p.y:0)));
+      yRange=[0,Math.max(2.2,Math.ceil(observedMax*2)/2+.1)];
+      yTicks=Array.from({length:Math.floor(yRange[1]*2)+1},(_,i)=>i/2);
+    }
     let fx = x => x, fy = y => y;
     if (s.chart === 'time' || s.chart === 'ratio') {
       fx = x => U.value('time', x); xLabel = 't (ms)';
@@ -539,7 +546,7 @@
     }
     series = series.map(line => ({...line, points:line.points.map(p => ({...p,x:fx(p.x),y:fy(p.y)}))}));
     xRange = xRange.map(fx); yRange = yRange.map(fy);
-    return { series, xRange, yRange, xLabel, yLabel, legend, hint };
+    return { series, xRange, yRange, yTicks, xLabel, yLabel, legend, hint };
   }
   function nextRecordTime(s) {
     return Math.max(2*s.sim.measurementWindow, s.lastRecordTime == null ? 0 : s.lastRecordTime+s.sim.measurementWindow);
@@ -640,6 +647,7 @@
   }
   function drawChart() {
     const data = chartData(); G.plot($('chart'), data);
+    $('freeRetry').hidden=active!=='free'||session().chart!=='time'||!session().run?.free||session().sim.time-session().run.start<8;
     if(active==='temperature'||session().lesson)updateMeasurementStory();
     $('graphLegend').innerHTML = data.legend; $('chartHint').textContent = (session().sim.time < 2 ? 'Première fenêtre encore partielle (' + U.text('time', session().sim.time) + '/0,23 ms). ' : '') + data.hint;
     $('chart').setAttribute('aria-label', data.yLabel + ' en fonction de ' + data.xLabel);
@@ -729,7 +737,9 @@
   function frame(timestamp) {
     const s = session(); if (!previousFrame) previousFrame = timestamp;
     const elapsed = Math.min(.06, Math.max(0,(timestamp - previousFrame) / 1000)); previousFrame = timestamp;
-    if(!document.hidden&&s.returning){
+    if(guide?.welcoming){
+      // The invitation pauses the film without changing the chosen play state.
+    } else if(!document.hidden&&s.returning){
       const r=s.returning,phase=r.phase;r.tick(elapsed,h=>advance(s,h));
       if(phase!=='resume'&&r.phase==='resume'&&s.lesson?.kind==='work')s.sim.stopMotion();
       if(r.phase==='done')finishReturn();else if(phase!==r.phase)updateControls();
@@ -760,7 +770,7 @@
     if (active === 'comparison' && s.batch && s.playing) tickTemperatureSeries(s);
     if (active === 'comparison' && !s.batch && s===session() && s.autoRecords && s.playing && s.sim.time >= nextRecordTime(s)) recordRadius();
     draw();
-    if (timestamp - lastUI > 100) { readings(); drawChart(); lastUI = timestamp; }
+    if (timestamp - lastUI > 100) { readings(); drawChart(); guide?.update(); lastUI = timestamp; }
     requestAnimationFrame(frame);
   }
   const tabs = Array.from(document.querySelectorAll('[data-experiment]'));
@@ -843,6 +853,10 @@
   $('applyInitial').addEventListener('click', () => { session().initialTemperature = +$('initialTemperature').value / 200; reset(); });
   $('pressureSource').addEventListener('input', () => { session().source = $('pressureSource').value; render(); });
   document.querySelectorAll('[data-chart]').forEach(button => button.addEventListener('click', () => changeChart(button.dataset.chart)));
+  $('retryFreeRatio').addEventListener('click',()=>{
+    if(active!=='free')return;reset();changeChart('ratio');
+    notify('Nouvel état préparé : ouvrez de nouveau vers le vide et observez maintenant PV/(nRT).');
+  });
   $('extraChart').addEventListener('input', () => changeChart($('extraChart').value));
   $('gamma').addEventListener('input', () => { const value = Number($('gamma').value), valid = value >= .1 && value <= 5; $('gamma').setAttribute('aria-invalid',String(!valid)); if (valid) { session().gamma = value; drawChart(); } });
   $('advanced').addEventListener('toggle',drawChart);
@@ -856,9 +870,11 @@
     notify('Mesures exportées pour cette expérience'+(s.other ? ', avec une ligne par gaz et par instant.' : '.'));
   });
   window.addEventListener('resize',render); document.addEventListener('visibilitychange',()=>{previousFrame=0;accumulator=0;});
-  selectExperiment('pressure'); requestAnimationFrame(frame);
+  selectExperiment('pressure');
+  guide=GasTutorial.create({getState:()=>{const s=session();return {experiment:active,playing:s.playing,time:s.sim.time,run:s.run,chart:s.chart,lesson:s.lesson,tour:s.tour,returning:s.returning,cycle:s.cycle,batch:s.batch,recordY:s.recordY,seriesFinished:s.batchMessage.startsWith('Série terminée')};}});
+  requestAnimationFrame(frame);
   Object.defineProperty(window,'gaz2D',{value:{
     get metrics(){return {...session().sim.metrics};}, get comparisonMetrics(){return session().other ? {...session().other.metrics} : null;},
-    get paused(){return !session().playing;}, get analysis(){const s=session();return {experiment:active,chartType:s.chart,pressureSource:s.source,count:N,history:s.history.map(r=>({...r})),collision:s.focus,plot:chartData(),recordPlot:recordPlotData(),alpha:s.alpha,autoRecords:s.autoRecords,radiusRecords:s.radiusRecords.map(r=>({...r,correctedRatio:recordFields.correctedRatio.value(r)})),run:s.run,returning:s.returning?{phase:s.returning.phase,zoom:s.returning.zoom,rate:s.returning.rate}:null,lesson:s.lesson?lessonSummary(s.lesson):null,lastLesson:s.lastLesson,batch:s.batch?{...s.batch}:null,cycle:s.cycle?{...s.cycle}:null,seek:!!s.seek,tour:s.tour?.view ?? null,lastTour:s.lastTour};}
+    get paused(){return !session().playing;}, get analysis(){const s=session();return {tutorial:guide?.snapshot??null,experiment:active,chartType:s.chart,pressureSource:s.source,count:N,history:s.history.map(r=>({...r})),collision:s.focus,plot:chartData(),recordPlot:recordPlotData(),alpha:s.alpha,autoRecords:s.autoRecords,radiusRecords:s.radiusRecords.map(r=>({...r,correctedRatio:recordFields.correctedRatio.value(r)})),run:s.run,returning:s.returning?{phase:s.returning.phase,zoom:s.returning.zoom,rate:s.returning.rate}:null,lesson:s.lesson?lessonSummary(s.lesson):null,lastLesson:s.lastLesson,batch:s.batch?{...s.batch}:null,cycle:s.cycle?{...s.cycle}:null,seek:!!s.seek,tour:s.tour?.view ?? null,lastTour:s.lastTour};}
   },writable:false});
 })();

@@ -6,18 +6,20 @@
   <meta name="theme-color" content="#f4f7f8">
   <meta name="description" content="Visite guidée d’un laboratoire de thermodynamique : des collisions aux mesures de pression, de travail et de chaleur.">
   <title>Gaz 2D — Visite guidée du laboratoire</title>
-  <link rel="stylesheet" href="styles.css?v=0.19.0">
-  <script defer src="physics.js?v=0.19.0"></script>
-  <script defer src="analysis.js?v=0.19.0"></script>
-  <script defer src="units.js?v=0.19.0"></script>
-  <script defer src="graphics.js?v=0.19.0"></script>
-  <script defer src="tour.js?v=0.19.0"></script>
-  <script defer src="lessons.js?v=0.19.0"></script>
-  <script defer src="app.js?v=0.19.0"></script>
+  <link rel="stylesheet" href="styles.css?v=0.20.0">
+  <script defer src="physics.js?v=0.20.0"></script>
+  <script defer src="analysis.js?v=0.20.0"></script>
+  <script defer src="units.js?v=0.20.0"></script>
+  <script defer src="graphics.js?v=0.20.0"></script>
+  <script defer src="tour.js?v=0.20.0"></script>
+  <script defer src="lessons.js?v=0.20.0"></script>
+  <script defer src="tutorial.js?v=0.20.0"></script>
+  <script defer src="app.js?v=0.20.0"></script>
 </head>
 <body>
-  <header class="masthead">
+  <header id="appHeader" class="masthead">
     <a id="brandHome" class="brand" href="#workbench"><span class="brand-mark" aria-hidden="true">g·</span><strong>Gaz<span>2D</span></strong><span class="brand-note">Une visite guidée du labo</span></a>
+    <button id="openTutorial" class="text-button">Visite guidée</button>
     <div class="playback">
       <span id="time" class="time">t = 0,00 ms</span>
       <label for="timeScale">Lecture <select id="timeScale"><option value="0.05">×0,05 · très lent</option><option value="0.1">×0,1 · ralenti</option><option value="0.25">×0,25</option><option value="1" selected>×1</option><option value="2">×2</option><option value="4">×4</option></select></label>
@@ -26,7 +28,7 @@
       <button id="reset" class="button icon-button" aria-label="Recommencer cette expérience" title="Recommencer cette expérience">↺</button>
     </div>
   </header>
-  <main>
+  <main id="appMain">
     <nav class="experiment-tabs" role="tablist" aria-label="Étapes de la visite guidée">
       <button id="tab-pressure" data-experiment="pressure" role="tab" aria-controls="workbench" aria-selected="true" tabindex="0"><span>01</span> Pression</button>
       <button id="tab-temperature" data-experiment="temperature" role="tab" aria-controls="workbench" aria-selected="false" tabindex="-1"><span>02</span> Température</button>
@@ -99,7 +101,7 @@
           </div>
           <div id="graphLegend" class="graph-legend"></div>
           <canvas id="chart" aria-label="Évolution temporelle de la pression, du volume et de la température"></canvas>
-          <p id="chartHint" class="chart-hint"></p>
+          <p id="chartHint" class="chart-hint"></p><div id="freeRetry" class="lesson free-retry" hidden><strong>Et si vous changiez de point de vue ?</strong><p>Refaites la même détente en suivant PV/(nRT). Après le transitoire, se rapproche-t-il de 1 ? Comparez au cas idéal, puis essayez des disques plus grands.</p><button id="retryFreeRatio" class="button secondary">Recommencer avec PV/(nRT) →</button></div>
           <div id="pressureLesson" class="lesson">
             <div class="lesson-title"><strong>Des impulsions à la pression</strong><span id="pressureWindow">Fenêtre 0,23 ms</span></div>
             <div class="pressure-gauge" title="Échelle de la jauge : de 0 à quatre fois la pression idéale initiale"><div id="pressureGaugeFill"></div></div>
@@ -166,7 +168,7 @@
       </section>
         <div id="comparisonReturn" class="lesson" hidden><strong>Retour au laboratoire : les résultats résistent-ils à des disques plus grands ?</strong><p>Après avoir comparé gaz dilué et gaz moins dilué, augmentez le rayon puis reprenez les expériences précédentes. La pression suit-elle encore la prédiction idéale ? Lors de la détente de Joule–Gay–Lussac, la température reste-t-elle constante ? Lors d’une transformation adiabatique lente, PV² reste-t-il constant ? Comparez aux observations obtenues avec de petits disques. Le rayon choisi est commun à toutes les expériences.</p><button id="revisitPressure" class="text-button">Revoir la pression →</button><button id="revisitFree" class="text-button">Revoir Joule–Gay–Lussac →</button><button id="revisitAdiabatic" class="text-button">Revoir les adiabatiques →</button></div>
       <details id="advanced" class="advanced">
-        <summary>Approfondir : autres diagrammes, distributions, réglages et explications</summary>
+        <summary id="advancedToggle">Approfondir : autres diagrammes, distributions, réglages et explications</summary>
         <div class="advanced-grid">
           <div class="panel advanced-controls"><h2>Mesures et modèle</h2>
             <label for="pressureSource">Pression tracée</label><select id="pressureSource"><option value="piston">Au piston</option><option value="mean">Moyenne de toutes les parois</option></select>
@@ -194,7 +196,27 @@
         <div class="panel distributions"><div><h2>Norme des vitesses</h2><canvas id="speedHistogram" aria-label="Distribution de la norme des vitesses"></canvas></div><div><h2>Énergie cinétique par marqueur</h2><canvas id="energyHistogram" aria-label="Distribution de l’énergie cinétique des particules"></canvas></div><p id="distributionLegend">État actuel et état initial, densités normalisées.</p></div>
       </details>
     </section>
-    <footer><span>Gaz 2D · version 0.19.0</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
+    <footer><span>Gaz 2D · version 0.20.0</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
   </main>
+  <div id="tutorialWelcome" class="tutorial-welcome" hidden>
+    <section role="dialog" aria-modal="true" aria-labelledby="welcomeTitle" aria-describedby="welcomeDescription" class="welcome-card">
+      <p class="eyebrow">BIENVENUE AU LABORATOIRE</p><h2 id="welcomeTitle">Découvrir la thermodynamique en manipulant.</h2>
+      <p id="welcomeDescription">Laissez-vous guider : les commandes s’éclairent, vous réalisez les expériences et vous prenez le temps de comprendre. Six expériences, à votre rythme.</p>
+      <div class="welcome-route" aria-label="Le parcours">Chocs → température → détente → travail → cycles → loi des gaz</div>
+      <button id="tutorialStart" class="button primary">Commencer la visite guidée</button>
+      <button id="tutorialDismiss" class="text-button">Explorer librement</button>
+      <small>Vous pouvez passer une étape ou quitter à tout moment. Le bouton « Visite guidée » permet de revenir.</small>
+    </section>
+  </div>
+  <div id="tutorialSpotlight" class="tutorial-spotlight" hidden aria-hidden="true"></div>
+  <aside id="tutorialCard" class="tutorial-card" hidden aria-labelledby="tutorialTitle">
+    <div class="tutorial-heading"><span id="tutorialProgress"></span><button id="tutorialQuit" class="text-button" aria-label="Quitter le tutoriel">Quitter ×</button></div>
+    <div class="tutorial-track"><span id="tutorialFill"></span></div>
+    <h2 id="tutorialTitle" tabindex="-1"></h2><p id="tutorialText"></p>
+    <p id="tutorialStatus" role="status" aria-live="polite"></p>
+    <div class="tutorial-actions"><button id="tutorialSkip" class="text-button">Passer cette étape</button><button id="tutorialNext" class="button primary">Continuer →</button></div>
+    <label class="tutorial-chapter-label" for="tutorialChapter">Aller à une expérience</label>
+    <select id="tutorialChapter" aria-label="Aller à une expérience"><option value="0">Prendre en main</option><option value="4">Pression</option><option value="6">Température</option><option value="9">Joule–Gay–Lussac</option><option value="15">Travail</option><option value="20">Cycles</option><option value="24">Rayon & loi des gaz</option><option value="32">Pour aller plus loin</option></select>
+  </aside>
 </body>
 </html>

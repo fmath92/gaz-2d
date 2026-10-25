@@ -13,7 +13,7 @@ const app = readFileSync(new URL('../dist/app.js', import.meta.url), 'utf8');
 
 // Only DOM and drawing primitives are replaced. The production application,
 // animation loop and physics engine run unchanged, including all button handlers.
-function laboratory() {
+function laboratory({welcome=false}={}) {
   const nodes = new Map();
   let pendingFrame, timestamp = 1000;
   const downloads = [], blobs = new Map(), histogramCalls = [];
@@ -94,7 +94,9 @@ function laboratory() {
   };
   vm.runInContext(tour, scope, { filename: 'tour.js' });
   vm.runInContext(readFileSync(new URL('../dist/lessons.js',import.meta.url),'utf8'),scope);
+  vm.runInContext(readFileSync(new URL('../dist/tutorial.js',import.meta.url),'utf8'),scope);
   vm.runInContext(app, scope, { filename: 'app.js' });
+  if(!welcome)nodes.get('tutorialDismiss').click();
   function frame() { const callback = pendingFrame; pendingFrame = null; callback(timestamp); timestamp += 1000 / 60; }
   frame();
   return {
@@ -475,4 +477,53 @@ test('the default radius is exactly 0.50 mm across experiments and survives appl
   lab.click('tab-'+key);assert.equal(lab.metrics.particleRadius,DEFAULT_RADIUS);assert.equal(lab.nodes.get('radiusValue').value,'0,50 mm');
  }
  lab.click('applyRadius');assert.equal(lab.metrics.particleRadius,DEFAULT_RADIUS);lab.click('reset');assert.equal(lab.metrics.particleRadius,DEFAULT_RADIUS);
+});
+
+test('welcome is optional, freezes the film, and can be reopened without resetting the gas',()=>{
+ const lab=laboratory({welcome:true});assert.equal(lab.analysis.tutorial.welcoming,true);assert.equal(lab.nodes.get('appMain').inert,true);
+ const time=lab.metrics.time;lab.advance(2);assert.equal(lab.metrics.time,time);
+ lab.click('tutorialDismiss');assert.equal(lab.nodes.get('appMain').inert,false);lab.advance(.3);assert.ok(lab.metrics.time>time);
+ const before=lab.metrics;lab.click('openTutorial');lab.advance(2);assert.equal(lab.metrics.time,before.time);assert.equal(lab.metrics.energy,before.energy);
+ lab.click('tutorialDismiss');assert.equal(lab.analysis.tutorial.active,false);
+});
+
+test('interactive guide gates actual actions, supports chapter jumps, skips and exit',()=>{
+ const lab=laboratory({welcome:true});lab.click('tutorialStart');assert.equal(lab.analysis.tutorial.index,0);lab.click('tutorialNext');
+ assert.equal(lab.analysis.tutorial.target,'timeScale');assert.equal(lab.nodes.get('tutorialNext').disabled,true);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,1);
+ lab.input('timeScale',.25);assert.equal(lab.analysis.tutorial.ready,true);lab.click('tutorialNext');lab.click('pause');lab.advance(.15);assert.equal(lab.analysis.tutorial.ready,true);
+ lab.click('tutorialNext');lab.click('pause');lab.advance(.15);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,4);
+ lab.nodes.get('tutorialChapter').value='9';lab.nodes.get('tutorialChapter').dispatch('change');assert.equal(lab.analysis.tutorial.target,'tab-free');
+ lab.click('tab-free');lab.advance(.15);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,10);
+ lab.click('reset');lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,11);assert.equal(lab.analysis.tutorial.ready,false);
+ lab.click('start');lab.advance(.2);assert.equal(lab.analysis.tutorial.ready,false);lab.input('timeScale',4);lab.advance(2.1);assert.equal(lab.analysis.tutorial.ready,true);
+ lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.target,'retryFreeRatio');lab.click('retryFreeRatio');assert.equal(lab.analysis.tutorial.ready,true);assert.equal(lab.analysis.chartType,'ratio');
+ lab.click('tutorialNext');lab.click('start');lab.advance(.2);assert.equal(lab.analysis.tutorial.ready,false);lab.input('timeScale',4);lab.advance(2.1);assert.equal(lab.analysis.tutorial.ready,true);
+ lab.click('tutorialNext');lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,15);
+ // Skipping all remaining stages never invents measurements or changes the experiment.
+ const width=lab.metrics.width;while(lab.analysis.tutorial.active)lab.click('tutorialSkip');assert.equal(lab.metrics.width,width);
+ assert.equal(lab.nodes.get('tutorialSpotlight').hidden,true);assert.equal(lab.nodes.get('tutorialCard').hidden,true);
+ lab.click('openTutorial');lab.click('tutorialStart');lab.click('tutorialQuit');assert.equal(lab.analysis.tutorial.active,false);
+});
+
+test('Joule–Gay–Lussac has reference ticks and offers a fresh ratio replay after observation',()=>{
+ const lab=laboratory();lab.click('tab-free');
+ for(const y of [.5,1,2])assert.ok(lab.analysis.plot.yTicks.includes(y));
+ assert.equal(lab.analysis.plot.yRange[1],2.2);assert.equal(lab.nodes.get('freeRetry').hidden,true);
+ lab.click('start');lab.advance(.4);assert.equal(lab.nodes.get('freeRetry').hidden,true);
+ lab.input('timeScale',4);lab.advance(2);assert.equal(lab.nodes.get('freeRetry').hidden,false);
+ const radius=lab.metrics.particleRadius,temperature=lab.metrics.temperature;
+ lab.click('retryFreeRatio');assert.equal(lab.analysis.chartType,'ratio');assert.equal(lab.analysis.run,null);assert.equal(lab.metrics.time,0);assert.equal(lab.metrics.width,9);
+ assert.equal(lab.metrics.particleRadius,radius);assert.ok(Math.abs(lab.metrics.temperature-temperature)<1e-8);
+ lab.click('start');assert.equal(lab.metrics.width,18);assert.equal(lab.analysis.chartType,'ratio');
+});
+
+test('the tutorial follows a paused temperature animation through its real final result',()=>{
+ const lab=laboratory({welcome:true});lab.click('tutorialStart');lab.nodes.get('tutorialChapter').value='6';lab.nodes.get('tutorialChapter').dispatch('change');
+ lab.click('tab-temperature');lab.advance(.15);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,7);
+ lab.click('illustrateTemperature');lab.advance(5);assert.equal(lab.analysis.tutorial.ready,false);
+ lab.click('pause');lab.advance(.15);assert.equal(lab.analysis.tutorial.target,'nextTemperatureStage');
+ for(let i=0;i<6&&lab.analysis.lesson.phase!=='done';i++)lab.click('nextTemperatureStage');
+ lab.advance(.15);assert.equal(lab.analysis.tutorial.ready,true);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,8);
+ lab.click('illustrateTemperature');lab.advance(4.5);assert.equal(lab.analysis.lesson,null);assert.equal(lab.analysis.tutorial.ready,true);
+ lab.click('tutorialQuit');assert.equal(lab.analysis.tutorial.active,false);
 });

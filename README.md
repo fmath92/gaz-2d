@@ -2,7 +2,7 @@
 
 **[Ouvrir le démonstrateur](https://fmath92.github.io/gaz-2d/)** · [Code source](https://github.com/fmath92/gaz-2d)
 
-Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.19.0 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
+Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.20.0 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
 
 ## La visite
 
@@ -19,12 +19,22 @@ Toutes les expériences utilisent **1 000 disques durs** avec collisions élasti
 
 Chaque onglet garde son état, ses réglages, sa pause et ses mesures jusqu’au rechargement de la page. Seule l’expérience affichée évolue. « Recommencer » efface les données de l’expérience courante. L’onglet Cycles P–V propose 1, 3 ou 5 allers-retours progressifs, entre le volume de départ et 70 % de ce volume.
 
+## Tutoriel interactif facultatif
+
+À chaque chargement, une invitation propose **Commencer la visite guidée** ou **Explorer librement**. Le film est suspendu tant que cette invitation est ouverte, sans modifier le réglage de lecture. Le bouton **Visite guidée**, dans l’en-tête, permet de la relancer.
+
+Le parcours comporte 38 étapes, avec une zone mise en lumière et des transitions animées. Il utilise les véritables contrôles du simulateur : ralentir et mettre en pause, regarder les séquences de pression et de température, réaliser deux détentes de Joule–Gay–Lussac, répondre aux comparaisons de vitesse, déplacer le piston, lancer des cycles, changer le rayon, enregistrer des mesures, réaliser la série de températures, régler α, lire les distributions et découvrir les exports. Les étapes d’action attendent une vraie interaction ou le résultat de la simulation ; elles n’imposent pas une durée arbitraire de lecture. Une fois une étape réalisée, elle reste validée.
+
+Chaque étape peut être passée, les chapitres sont accessibles directement, et **Quitter** ou Échap ferme le tutoriel. Les expériences et les réglages restent conservés. Les réinitialisations et les exports ne se font que lorsque l’utilisateur clique sur les commandes correspondantes. La navigation au clavier est disponible ; l’invitation retient le focus, et la préférence de réduction des animations supprime les transitions décoratives. Le tutoriel ne modifie pas les trajectoires physiques.
+
 ## Observer et mesurer
 
 La cavité et les tracés restent côte à côte sur ordinateur. Sur écran étroit, les panneaux s’empilent. Le commutateur principal passe entre :
 
 - **Évolution P, V, T** : rapports P/P₀, V/V₀ et T/T₀, sur une même échelle. P₀ = nRT₀/V₀ est la référence idéale initiale, indépendante de la pression mesurée. V est tracé en pointillés pour rester identifiable lorsque V/V₀ et T/T₀ se superposent.
 - **PV/(nRT) au cours du temps** : pression réellement mesurée × volume / nRT, avec la référence idéale 1. Dans le dernier onglet, on compare les mesures à la référence idéale 1.
+
+Dans Joule–Gay–Lussac, les graduations horizontales comprennent toujours **0,5, 1 et 2**, avec un pas de 0,5 ; l’axe est agrandi si les mesures dépassent le cadre usuel. Après au moins huit unités internes de temps depuis l’ouverture (≈ 0,92 ms), une invitation propose de **recommencer avec PV/(nRT)**. Ce délai laisse observer le transitoire, sans certifier l’équilibre. Le bouton prépare un nouveau gaz au même rayon et à la même température initiale, sélectionne le diagramme du rapport et laisse l’utilisateur déclencher l’ouverture.
 
 Les cartes au-dessus donnent les valeurs instantanées. La pression est calculée sur une fenêtre glissante de 0,23 ms. La première fenêtre est partielle ; pendant une transformation, la pression garde aussi la mémoire des instants précédents. Un écart à PV/(nRT) = 1 peut donc venir des fluctuations, du retard de mesure, de l’anisotropie ou, pour les disques durs, de leur taille finie.
 
@@ -206,7 +216,7 @@ Le deuxième bouton de lancement a été retiré. À la fin, le résultat reste 
 
 ## Le travail : du choc au trajet du piston (0.18.0)
 
-« Comprendre le travail : les trois cas » enchaîne **compression → détente → repos**, sur le même gaz. Pour chaque cas, un choc réel est suivi dans le référentiel du laboratoire. Le bandeau de comparaison fige les vitesses sortante et entrante : il faut choisir `<`, `=` ou `>` dans cet ordre. Un choix incorrect devient rouge et donne un indice pour réessayer. Seule une bonne réponse active **Continuer**, sur le même bandeau. Le commentaire explique l’énergie gagnée ou cédée et le rôle de la poussée. Aucune réponse ne modifie les trajectoires physiques.
+« Comprendre le travail : les trois cas » enchaîne **compression → détente → repos**, sur le même gaz. Pour chaque cas, un choc réel est suivi dans le référentiel du laboratoire. Le bandeau de comparaison fige les vitesses sortante et entrante : il faut choisir `<`, `=` ou `>` dans cet ordre. Un choix incorrect devient rouge et donne un indice pour réessayer. Seule une bonne réponse active **Continuer**, sur le même bandeau. Le commentaire explique l’énergie gagnée ou cédée et le rôle de la poussée. En détente, il précise que la particule cède de l’énergie **parce que le piston reculait pendant le choc**, et non du seul fait qu’elle le pousse. Aucune réponse ne modifie les trajectoires physiques.
 
 Après le choc individuel, la caméra dézoome, puis cadre plus étroitement une bande orange du piston. Les repères A et B restent fixes dans le laboratoire. Pour la compression et la détente, l’étudiant **glisse la poignée orange de A vers B** : le mouvement inverse est bloqué. Le déplacement atteint trois unités internes (environ 0,27 L), sauf limite de la cavité. Le piston se relaxe vers la position demandée avec un léger retard (temps de relaxation interne 0,18), en conservant sa vitesse maximale de 0,55. Il ralentit quand il se rapproche de la souris, ce qui évite les arrêts entre deux événements de pointeur. Les reprises dans un même sens conservent une seule branche continue. Les particules ne sont jamais déplacées instantanément. On peut aussi utiliser les flèches gauche/droite, Début et Fin au clavier. La pression est mesurée à partir de tous les chocs sur le piston, y compris ceux qui sont hors du cadrage.
 

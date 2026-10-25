@@ -9,14 +9,14 @@
     const span = max - min || Math.max(Math.abs(max) * 0.2, 0.2);
     return [zero ? 0 : min - span * 0.08, max + span * 0.08];
   }
-  function plotAxes(ctx, w, h, xr, yr, xLabel, yLabel) {
+  function plotAxes(ctx, w, h, xr, yr, xLabel, yLabel, yTicks) {
     const left = 49, right = w - 20, top = 22, bottom = h - 29;
     const X = x => left + (x - xr[0]) / (xr[1] - xr[0]) * (right - left);
     const Y = y => bottom - (y - yr[0]) / (yr[1] - yr[0]) * (bottom - top);
     const tick = (value, span) => Math.abs(value) >= 10000 ? value.toExponential(1) : format(value, span < 1 ? Math.min(6, Math.max(2, Math.ceil(-Math.log10(span)) + 1)) : span < 8 ? 1 : 0);
     ctx.font = '9px system-ui, sans-serif';
-    for (let i = 0; i <= 4; i++) {
-      const value = yr[0] + (yr[1] - yr[0]) * i / 4;
+    for (const value of yTicks??Array.from({length:5},(_,i)=>yr[0]+(yr[1]-yr[0])*i/4)) {
+      if(value<yr[0]||value>yr[1])continue;
       line(ctx, left, Y(value), right, Y(value), '#eaf0f2');
       ctx.textAlign = 'right'; ctx.fillStyle = '#82949f'; ctx.fillText(tick(value, yr[1] - yr[0]), left - 7, Y(value) + 3);
     }
@@ -323,10 +323,10 @@
       if (event.wallVelocity) arrow(ctx, wallX, 20, Math.sign(event.wallVelocity) * 30, 0, '#6f98ac', 1.5);
     }
   }
-  function plot(canvas, { series, xRange, yRange, xLabel, yLabel }) {
+  function plot(canvas, { series, xRange, yRange, xLabel, yLabel, yTicks }) {
     const surface = setup(canvas); if (!surface) return;
     const { ctx, w, h } = surface;
-    const axes = plotAxes(ctx, w, h, xRange, yRange, xLabel, yLabel);
+    const axes = plotAxes(ctx, w, h, xRange, yRange, xLabel, yLabel, yTicks);
     ctx.save(); ctx.beginPath(); ctx.rect(axes.left, axes.top, axes.right - axes.left, axes.bottom - axes.top); ctx.clip();
     for (const s of series) plotLine(ctx, axes, s.points, s.color, s);
     ctx.restore();

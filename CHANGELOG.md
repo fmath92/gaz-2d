@@ -1,3 +1,11 @@
+## 0.20.0 — Une visite guidée du laboratoire
+
+- Invitation facultative à l’arrivée ; parcours interactif de 38 étapes sur les vraies commandes, avec mise en lumière, progression, chapitres, étapes passables et sortie à tout moment.
+- Les étapes attendent les actions et les résultats des simulations ; aucune mesure ni trajectoire n’est inventée par le tutoriel.
+- Joule–Gay–Lussac : graduations et grille à 0,5, 1 et 2 ; invitation à recommencer avec PV/(nRT) après observation du transitoire.
+- Explication du travail en détente : l’énergie est cédée parce que le piston recule pendant le choc.
+- Tests des graduations, de la fenêtre d’accueil, des actions attendues, des changements de chapitre et de la nouvelle détente avec le rapport.
+
 ## 0.19.0 — Comparer et déplacer sans à-coups
 
 - Comparaison dans l’ordre vitesse sortante / vitesse entrante : > en compression, = au repos, < en détente.
