@@ -194,7 +194,7 @@
       if(this.case!=='fixed'){
         const direction=this.case==='compression'?-1:1;
         const travel=Math.min(2,direction<0?this.sim.width-3:18-this.sim.width);
-        this.sim.setMotion({targetWidth:this.sim.width+direction*travel,duration:12});
+        this.sim.setMotion({targetWidth:this.sim.width+direction*travel,duration:travel/.5});
       }
       this.phase='collision';this.tour=new root.CollisionTour(this.sim,{kind:this.case==='fixed'?'pressure':'work',speed:this.speed,reducedMotion:this.reducedMotion,manualComparison:true});
     }
@@ -339,7 +339,7 @@
       text(c,'δW = −u × J',22,106,color,22);
       text(c,e?'J = '+U.text('momentum',e.impulse,5)+' ; u = '+U.text('velocity',e.wallVelocity):'J : impulsion transmise au piston ; u : sa vitesse.',22,143,'#687f8a',11);
       text(c,e?'δW = '+U.text('energy',e.work,4):'Suivez une particule jusqu’au contact.',22,177,color,18);
-      text(c,story.case==='fixed'?'u = 0 : rebond, mais aucune énergie échangée.':story.case==='compression'?'Le piston avance : la particule gagne de l’énergie.':'Le piston recule : la particule cède de l’énergie.',22,220,'#687f8a',11);
+      text(c,story.case==='fixed'?'u = 0 : rebond, mais aucune énergie échangée.':story.case==='compression'?'Le piston avance : il fournit de l’énergie.':'Le piston recule : il absorbe de l’énergie.',22,220,'#687f8a',11);
       return;
     }
     const all=m.strokes.flatMap(s=>s.points),volume=m.startWidth*m.height;

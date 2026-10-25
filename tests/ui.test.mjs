@@ -163,6 +163,7 @@ test('work illustration requires a correct retry, then manual piston travel, wit
   const l=lab.analysis.lesson;
   if(l.collisionPhase==='compare'){
    seen.push(l.case);const time=lab.metrics.time;
+   assert.match(lab.nodes.get('speedQuestionTitle').textContent,l.case==='compression'?/s’approche/:l.case==='expansion'?/s’éloigne/:/immobile/);
    assert.equal(lab.nodes.get('continueSpeed').disabled,true);assert.equal(lab.nodes.get('nextWorkCase').hidden,true);
    const wrong=l.case==='fixed'?'speedLess':'speedEqual';lab.click(wrong);
    assert.match(lab.nodes.get('speedFeedback').textContent,/Essayez encore.*Indice/);
@@ -172,6 +173,8 @@ test('work illustration requires a correct retry, then manual piston travel, wit
    assert.equal(lab.metrics.time,time);assert.equal(lab.analysis.lesson.collisionPhase,'compare');
    lab.click(l.case==='fixed'?'speedEqual':l.case==='compression'?'speedGreater':'speedLess');
    assert.equal(lab.nodes.get(wrong).getAttribute('aria-invalid'),'false');assert.equal(lab.nodes.get('continueSpeed').disabled,false);
+   assert.match(lab.nodes.get('speedFeedback').textContent,/raquette/);
+   assert.match(lab.nodes.get('speedFeedback').textContent,l.case==='compression'?/fourni de l’énergie/:l.case==='expansion'?/absorbé une partie/:/simplement rebondi/);
    assert.equal(lab.nodes.get('speedWorkSign').hidden,false);assert.match(lab.nodes.get('speedWorkSign').textContent,l.case==='fixed'?/nul.*W = 0/:l.case==='compression'?/positif.*W > 0/:/négatif.*W < 0/);
    lab.click('continueSpeed');assert.equal(lab.nodes.get('workSpeedQuestion').hidden,true);
   }
@@ -498,7 +501,7 @@ test('quiet guidance requires the actual action and automatically advances to th
  lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,1);
  lab.nodes.get('tutorialChapter').value='6';lab.nodes.get('tutorialChapter').dispatch('change');
  assert.equal(lab.analysis.tutorial.quiet,true);lab.click('tab-free');lab.advance(.15);
- assert.equal(lab.analysis.tutorial.index,7);assert.equal(lab.analysis.tutorial.quiet,false);
+ assert.equal(lab.analysis.tutorial.index,7);assert.equal(lab.analysis.tutorial.quiet,true);
  lab.click('start');lab.input('timeScale',4);lab.advance(2.1);lab.click('tutorialNext');
  assert.equal(lab.analysis.tutorial.index,8);assert.equal(lab.analysis.tutorial.quiet,true);
  lab.click('retryFreeRatio');assert.equal(lab.analysis.tutorial.index,9);assert.equal(lab.analysis.chartType,'ratio');
@@ -508,8 +511,9 @@ test('quiet guidance requires the actual action and automatically advances to th
 test('Continue stays available on explanations while quiet actions cannot be bypassed',()=>{
  const lab=laboratory({welcome:true});lab.click('tutorialStart');lab.nodes.get('tutorialChapter').value='6';lab.nodes.get('tutorialChapter').dispatch('change');
  lab.click('tab-free');lab.advance(.15);assert.equal(lab.analysis.tutorial.index,7);
- assert.equal(lab.nodes.get('tutorialNext').disabled,false);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,8);
- lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,8);assert.equal(lab.analysis.run,null);
+ assert.equal(lab.nodes.get('tutorialNext').disabled,false);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,7);
+ lab.click('start');lab.input('timeScale',4);lab.advance(2.1);assert.equal(lab.analysis.tutorial.index,8);
+ lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,8);assert.ok(lab.analysis.run);
  lab.click('openTutorial');assert.equal(lab.analysis.tutorial.active,false);assert.equal(lab.analysis.tutorial.welcoming,false);
 });
 
@@ -588,7 +592,7 @@ test('an ongoing animation stays clear even on an explanatory step already marke
 });
 
 
-test('the cycles guide goes straight to launch and shows a clear bottom panel after launch',()=>{
+test('the cycles guide stays quiet before and during the cycle',()=>{
  const lab=laboratory({welcome:true});lab.click('tutorialStart');
  lab.nodes.get('tutorialChapter').value='16';lab.nodes.get('tutorialChapter').dispatch('change');
  lab.click('tab-cycles');lab.advance(.15);
@@ -596,7 +600,7 @@ test('the cycles guide goes straight to launch and shows a clear bottom panel af
  assert.equal(lab.analysis.tutorial.target,'start');assert.equal(lab.analysis.tutorial.quiet,true);
  const count=lab.nodes.get('cycleCount').value,duration=lab.nodes.get('duration').value;
  lab.click('start');lab.advance(.2);
- assert.equal(lab.analysis.tutorial.quiet,false);assert.equal(lab.nodes.get('tutorialCard').classList.contains('scene-guide'),true);
+ assert.equal(lab.analysis.tutorial.quiet,true);assert.equal(lab.nodes.get('tutorialCard').hidden,true);
  assert.equal(lab.analysis.tutorial.interacting,true);
  assert.equal(lab.nodes.get('cycleCount').value,count);assert.equal(lab.nodes.get('duration').value,duration);
 });
@@ -606,14 +610,14 @@ test('radius guide collects five distinct new manual readings before comparing t
  const lab=laboratory({welcome:true});lab.click('tutorialStart');
  lab.nodes.get('tutorialChapter').value='18';lab.nodes.get('tutorialChapter').dispatch('change');lab.click('tab-comparison');lab.advance(.15);
  for(let i=0;i<5;i++){
-  assert.equal(lab.analysis.tutorial.title,'Choisir le rayon '+(i+1)+' / 5');
+  assert.equal(lab.analysis.tutorial.title,'Choisir le rayon '+(i+1)+' / 5');assert.equal(lab.analysis.tutorial.quiet,i>0);
   if(i>0){lab.input('particleRadius',10);assert.equal(lab.analysis.tutorial.title,'Choisir le rayon '+(i+1)+' / 5');assert.equal(lab.analysis.tutorial.ready,false);}
   lab.input('particleRadius',10+i*12);assert.equal(lab.metrics.particleRadius,(10+i*12)/1000);
   assert.equal(lab.analysis.tutorial.title,'Relever le rayon '+(i+1)+' / 5');
   assert.equal(lab.nodes.get('recordRadius').disabled,true);lab.click('recordRadius');assert.equal(lab.analysis.radiusRecords.length,i);
   lab.input('timeScale',4);lab.advance(1.1);lab.click('recordRadius');assert.equal(lab.analysis.radiusRecords.length,i+1);
  }
- assert.equal(lab.analysis.tutorial.title,'Comparer les cinq rayons');assert.equal(lab.analysis.recordPlot.points.length,5);
+ assert.equal(lab.analysis.tutorial.title,'Revenir avec des disques plus grands');assert.equal(lab.analysis.tutorial.quiet,true);assert.equal(lab.analysis.recordPlot.points.length,5);
  assert.equal(lab.nodes.get('recordY').value,'ratio');
  lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.title,'Revenir avec des disques plus grands');
 });

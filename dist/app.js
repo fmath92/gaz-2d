@@ -258,6 +258,7 @@
     $('workSpeedQuestion').hidden=!show;if(!show)return;
     $('quizIncoming').textContent=U.text('velocity',Math.hypot(e.before.vx,e.before.vy));
     $('quizOutgoing').textContent=U.text('velocity',Math.hypot(e.after.vx,e.after.vy));
+    $('speedQuestionTitle').textContent='Comparez les normes des vitesses lorsque le piston '+(l.case==='compression'?'s’approche de la particule':l.case==='expansion'?'s’éloigne de la particule':'est immobile');
     const a=l.answer;
     for(const [id,choice] of [['speedLess','<'],['speedEqual','='],['speedGreater','>']]){
       $(id).setAttribute('aria-pressed',String(a?.choice===choice));
@@ -265,7 +266,7 @@
     }
     let feedback='Choisissez un signe pour expliquer le choc.';
     if(a&&!a.correct)feedback='Essayez encore. Indice : comparez les deux valeurs en m/s. La norme mesure la rapidité, quel que soit le sens de la flèche.';
-    if(a?.correct)feedback='Oui. '+(a.relation==='='?'Les vitesses sont égales : la particule a poussé sur le piston et contribue à la pression, mais celui-ci était immobile. La particule a simplement rebondi dessus et son énergie cinétique n’a pas changé.':a.relation==='>'?'La vitesse sortante est plus grande : la particule a poussé sur le piston et contribue à la pression, mais le piston, qui avançait face à elle lors de la collision, lui a fourni de l’énergie.':'La vitesse sortante est plus petite : la particule contribue à la pression en poussant sur le piston. C’est parce que le piston reculait pendant le choc qu’elle lui a cédé de l’énergie.');
+    if(a?.correct)feedback='Oui. '+(a.relation==='='?'Les vitesses sont égales : la particule a poussé sur le piston et contribue à la pression, mais celui-ci était immobile. La particule a simplement rebondi dessus, comme une balle sur une raquette immobile dans un rebond élastique : son énergie cinétique n’a pas changé.':a.relation==='>'?'La vitesse sortante est plus grande : la particule a poussé sur le piston et contribue à la pression, mais le piston, qui avançait face à elle lors de la collision, lui a fourni de l’énergie, comme une raquette qui avance vers une balle.':'La vitesse sortante est plus petite : la particule contribue à la pression en poussant sur le piston. Le piston, qui reculait pendant le choc, a absorbé une partie de son énergie, comme une raquette qui recule pour amortir une balle.');
     $('speedWorkSign').hidden=!a?.correct;
     $('speedWorkSign').textContent=a?.correct?(a.relation==='='?'Le travail reçu par le gaz est nul : W = 0.':a.relation==='>'?'Le travail reçu par le gaz est positif : W > 0.':'Le travail reçu par le gaz est négatif : W < 0.') : '';
     if($('speedFeedback').textContent!==feedback)$('speedFeedback').textContent=feedback;
@@ -327,7 +328,7 @@
     $('storyTitle').textContent=l.phase==='free'?'À vous de jouer : choisissez le parcours':(l.index+1)+'/3 · '+situation;
     $('storyText').textContent=l.phase==='collision'?'Suivez un choc réel. Le repère reste fixe pour voir le déplacement du piston.':l.phase==='hold'?'Lisez le résultat, puis passez au cas suivant sur le bandeau de l’animation.':l.phase==='between'?'Retour à la vue d’ensemble avant le cas suivant.':m&&['overview','zoom'].includes(m.phase)?'On élargit l’observation à une assemblée de collisions.':'Déplacez le piston : la pression mesurée dessine la courbe P(V). L’aire est comptée positivement en compression, négativement en détente.';
     $('storyFormula').textContent=m?'W reçu ≈ −∫ P dV = '+U.text('energy',m.area,2)+' ; ΔEc du gaz = '+U.text('energy',m.deltaEnergy,2):'δW reçu = Ec après − Ec avant';
-    $('storyDetails').textContent=m?'ΔV = '+U.text('volume',m.deltaVolume,3)+' · '+m.events.length+' chocs sur le piston · travail des chocs = '+U.text('energy',m.work,2)+'. La courbe lisse les pressions mesurées ; son aire est une approximation. Parois isolées : Q = 0.':'La particule pousse toujours le piston. Comparez sa rapidité avant et après le choc pour déterminer si elle reçoit ou cède de l’énergie.';
+    $('storyDetails').textContent=m?'ΔV = '+U.text('volume',m.deltaVolume,3)+' · '+m.events.length+' chocs sur le piston · travail des chocs = '+U.text('energy',m.work,2)+'. La courbe lisse les pressions mesurées ; son aire est une approximation. Parois isolées : Q = 0.':'La particule pousse toujours le piston. Comparez sa rapidité avant et après le choc : le piston lui fournit-il de l’énergie, en absorbe-t-il, ou la particule rebondit-elle simplement ?';
     if(l.tour?.phase==='compare'){
       $('storyTitle').textContent=(l.index+1)+'/3 · Comparer avant de continuer';
       $('storyText').textContent='Le temps est figé. Choisissez <, = ou > entre la vitesse sortante et la vitesse entrante. Vous pouvez réessayer ; la bonne réponse débloque Continuer.';

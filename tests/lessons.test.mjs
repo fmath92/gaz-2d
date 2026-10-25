@@ -146,6 +146,7 @@ test('work journey gates the quiz, guides compression and expansion, shows rest 
  assert.equal(sim.particles,particles);assert.equal(l.results.length,3);assert.equal(sim.motion,null);
  for(const [i,r] of l.results.entries()){
   assert.ok(r.events.length>20);assert.ok(r.collision.impulse>0);
+  assert.ok(Math.abs(r.collision.wallVelocity-(i===0?-.5:i===1?.5:0))<1e-10);
   assert.ok(Math.abs(r.work-r.pressureWork)<1e-7);assert.ok(Math.abs(r.work-r.deltaEnergy)<1e-7);
   assert.ok(i===2?r.work===0&&r.collision.work===0:i===0?r.work>0&&r.collision.work>0:r.work<0&&r.collision.work<0);
   assert.ok(i===2?r.deltaVolume===0:i===0?r.deltaVolume<0:r.deltaVolume>0);

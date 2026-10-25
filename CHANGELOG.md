@@ -1,3 +1,14 @@
+## 0.20.9 — Une visite guidée discrète
+
+- Les explications déjà présentes dans les expériences ne sont plus répétées dans les popups.
+- Les étapes physiques et les animations avancent par surlignage et observation des actions réelles, sans validation supplémentaire.
+- Seules les indications d’interface sont conservées : introduction, première collecte des cinq rayons, menu des diagrammes, export et fin de visite.
+
+## 0.20.8 — Un piston plus expressif
+
+- Vitesse du piston triplée dans les collisions guidées du travail, avec comparaison explicitement située dans chaque mouvement.
+- Explications harmonisées : le piston fournit ou absorbe de l’énergie, ou la particule rebondit simplement ; analogie avec une balle et une raquette.
+
 ## 0.20.7 — Le calcul de température dans son encadré
 
 - Suppression du popup de bilan « Des vitesses à la température » ; le tutoriel surligne directement le retour à la simulation.
