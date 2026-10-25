@@ -195,8 +195,8 @@
       const phase = motion.type === 'oscillate' ? q : Math.min(1, q);
       return motion.startWidth + (motion.targetWidth - motion.startWidth) * (1 - Math.cos(Math.PI * phase)) / 2;
     }
-    _record(wall, impulse, time, work = 0, heat = 0) {
-      this._events.push({ wall, impulse, time, work, heat });
+    _record(wall, impulse, time, work = 0, heat = 0, y = null) {
+      this._events.push({ id: this._collisions + 1, wall, impulse, time, work, heat, y });
       this._collisions++;
     }
     _reflect(p, wall, time, pistonVelocity = 0, allowThermal = true) {
@@ -246,7 +246,7 @@
         this.heatByWall[wall] += heat;
       }
       this.pressureWork += pressureWork;
-      this._record(wall, impulse, time, pressureWork, heat);
+      this._record(wall, impulse, time, pressureWork, heat, p.y);
       if (this.observeCollisions) {
         const event = { kind: 'wall', sequence: ++this.observations.sequence, time, wall, particleId: p.id,
           x: p.x, y: p.y, radius: this.radius, before: { vx: oldVx, vy: oldVy }, after: { vx: p.vx, vy: p.vy },

@@ -6,13 +6,14 @@
   <meta name="theme-color" content="#f4f7f8">
   <meta name="description" content="Visite guidée d’un laboratoire de thermodynamique : des collisions aux mesures de pression, de travail et de chaleur.">
   <title>Gaz 2D — Visite guidée du laboratoire</title>
-  <link rel="stylesheet" href="styles.css?v=0.12.0">
-  <script defer src="physics.js?v=0.12.0"></script>
-  <script defer src="analysis.js?v=0.12.0"></script>
-  <script defer src="units.js?v=0.12.0"></script>
-  <script defer src="graphics.js?v=0.12.0"></script>
-  <script defer src="tour.js?v=0.12.0"></script>
-  <script defer src="app.js?v=0.12.0"></script>
+  <link rel="stylesheet" href="styles.css?v=0.13.0">
+  <script defer src="physics.js?v=0.13.0"></script>
+  <script defer src="analysis.js?v=0.13.0"></script>
+  <script defer src="units.js?v=0.13.0"></script>
+  <script defer src="graphics.js?v=0.13.0"></script>
+  <script defer src="tour.js?v=0.13.0"></script>
+  <script defer src="lessons.js?v=0.13.0"></script>
+  <script defer src="app.js?v=0.13.0"></script>
 </head>
 <body>
   <header class="masthead">
@@ -28,10 +29,11 @@
   <main>
     <nav class="experiment-tabs" role="tablist" aria-label="Étapes de la visite guidée">
       <button id="tab-pressure" data-experiment="pressure" role="tab" aria-controls="workbench" aria-selected="true" tabindex="0"><span>01</span> Pression</button>
-      <button id="tab-free" data-experiment="free" role="tab" aria-controls="workbench" aria-selected="false" tabindex="-1"><span>02</span> Joule–Gay–Lussac</button>
-      <button id="tab-adiabatic" data-experiment="adiabatic" role="tab" aria-controls="workbench" aria-selected="false" tabindex="-1"><span>03</span> Détente &amp; compression</button>
-      <button id="tab-cycles" data-experiment="cycles" role="tab" aria-controls="workbench" aria-selected="false" tabindex="-1"><span>04</span> Cycles P–V</button>
-      <button id="tab-comparison" data-experiment="comparison" role="tab" aria-controls="workbench" aria-selected="false" tabindex="-1"><span>05</span> Rayon & loi des gaz</button>
+      <button id="tab-temperature" data-experiment="temperature" role="tab" aria-controls="workbench" aria-selected="false" tabindex="-1"><span>02</span> Température</button>
+      <button id="tab-free" data-experiment="free" role="tab" aria-controls="workbench" aria-selected="false" tabindex="-1"><span>03</span> Joule–Gay–Lussac</button>
+      <button id="tab-adiabatic" data-experiment="adiabatic" role="tab" aria-controls="workbench" aria-selected="false" tabindex="-1"><span>04</span> Détente &amp; compression</button>
+      <button id="tab-cycles" data-experiment="cycles" role="tab" aria-controls="workbench" aria-selected="false" tabindex="-1"><span>05</span> Cycles P–V</button>
+      <button id="tab-comparison" data-experiment="comparison" role="tab" aria-controls="workbench" aria-selected="false" tabindex="-1"><span>06</span> Rayon & loi des gaz</button>
     </nav>
     <section id="workbench" role="tabpanel" aria-labelledby="tab-pressure">
       <div class="experiment-intro"><div><p id="stepLabel" class="eyebrow">01 / LES CHOCS FONT LA PRESSION</p><h1 id="experimentTitle">Des chocs microscopiques à la pression.</h1><p id="experimentDescription">Suivez une particule jusqu’au piston et observez la poussée au moment du choc.</p></div><span class="fixed-count">1 000 marqueurs <small>≈ 0,0401 mol par gaz</small></span></div>
@@ -48,6 +50,7 @@
           <div id="comparisonChambers" class="comparison-chambers" hidden><div><span class="model-name ideal">Disques durs</span><canvas id="idealChamber" aria-label="Gaz de disques durs"></canvas></div><div><span class="model-name disks">Disques durs</span><canvas id="diskChamber" aria-label="Gaz avec collisions élastiques entre disques"></canvas></div></div>
           <div class="micro-toolbar"><span><i class="speed-ramp"></i> Couleur = vitesse</span><label><input id="vectors" type="checkbox"> Vitesses</label><label id="staticZoomControl"><input id="zoomEnabled" type="checkbox" checked> Zoom</label><button id="capture" class="text-button" hidden>Isoler un choc mutuel</button></div>
           <div class="illustration-controls" id="illustrationControls"><button id="illustrate" class="button primary">▶ Illustrer une poussée</button><button id="endIllustration" class="text-button" hidden>Quitter le zoom</button></div>
+          <div id="measurementActions" class="illustration-controls"><button id="illustratePressureSum" class="button secondary">▶ Additionner les poussées</button><button id="illustrateTemperature" class="button primary" hidden>▶ Des vitesses à la température</button><button id="nextTemperatureStage" class="text-button" hidden>Étape suivante →</button><button id="finishMeasurementStory" class="text-button" hidden>Retour à la simulation</button></div>
           <div id="tourStatus" class="tour-status" hidden><div><span id="tourStage" class="tour-stage"></span><span id="tourSpeed"></span></div><p id="tourCaption" role="status" aria-live="polite"></p><div class="tour-track"><span id="tourProgress"></span></div></div>
           <div id="zoomPanel" class="zoom-panel">
             <div class="zoom-heading"><span id="zoomTitle">Zoom · un choc sur le piston</span><span id="collisionTime">En attente d’un choc</span></div>
@@ -64,7 +67,14 @@
           <div id="microObservation" class="micro-observation" hidden><strong>À observer</strong><p id="microHint">Suivez les particules dans le volume nouvellement ouvert.</p></div>
         </article>
         <article class="panel measurements">
-          <div class="panel-heading"><h2>Ce que l’on mesure</h2><div id="mainChartSwitch" class="chart-switch" role="group" aria-label="Tracé principal"><button id="chart-time" data-chart="time" aria-pressed="true">Évolution P, V, T</button><button id="chart-ratio" data-chart="ratio" aria-pressed="false">PV / (nRT)</button></div></div>
+          <div class="panel-heading"><h2 id="measureTitle">Ce que l’on mesure</h2><div id="mainChartSwitch" class="chart-switch" role="group" aria-label="Tracé principal"><button id="chart-time" data-chart="time" aria-pressed="true">Évolution P, V, T</button><button id="chart-ratio" data-chart="ratio" aria-pressed="false">PV / (nRT)</button></div></div>
+          <div id="measurementStory" hidden>
+            <p id="storyTitle" class="prediction-text"></p><p id="storyText" class="lesson-note"></p>
+            <canvas id="lessonCanvas" aria-label="Étapes du calcul à partir des particules"></canvas>
+            <div id="storyGauge" class="pressure-gauge"><div id="storyGaugeFill"></div></div>
+            <p id="storyFormula" class="calculation"></p><p id="storyDetails" class="field-help"></p>
+            <div class="tour-track"><span id="storyProgress"></span></div>
+          </div>
           <div id="graphLegend" class="graph-legend"></div>
           <canvas id="chart" aria-label="Évolution temporelle de la pression, du volume et de la température"></canvas>
           <p id="chartHint" class="chart-hint"></p>
@@ -162,7 +172,7 @@
         <div class="panel distributions"><div><h2>Norme des vitesses</h2><canvas id="speedHistogram" aria-label="Distribution de la norme des vitesses"></canvas></div><div><h2>Énergie cinétique par marqueur</h2><canvas id="energyHistogram" aria-label="Distribution de l’énergie cinétique des particules"></canvas></div><p id="distributionLegend">État actuel et état initial, densités normalisées.</p></div>
       </details>
     </section>
-    <footer><span>Gaz 2D · version 0.12.0</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
+    <footer><span>Gaz 2D · version 0.13.0</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
   </main>
 </body>
 </html>

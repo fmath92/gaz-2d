@@ -1,3 +1,10 @@
+## 0.13.0 — Comprendre les mesures de pression et de température
+
+- Accumulation réelle des impulsions sur une surface du piston pendant une fenêtre définie, avec somme, force moyenne et pression locale.
+- Nouvel onglet Température : zoom figé, vecteurs vitesse, alignement à norme conservée, énergies, somme et moyenne globale.
+- Lecture automatique ou pas à pas, pause et retour à la simulation ; distinction entre zone observée et système entier.
+- Journal des collisions enrichi en position et identifiant, sans changement de dynamique.
+
 ## 0.12.0 — Parcours guidé, séries de températures et cycles
 
 - Onglet Rayon recentré sur deux graphiques pédagogiques, simulation et tracé côte à côte.

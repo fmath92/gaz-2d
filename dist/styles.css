@@ -1754,3 +1754,14 @@ input[aria-invalid="true"] {
  #workbench[data-experience="comparison"] { display:block; }
  #workbench[data-experience="comparison"] #recordAnalysis { margin:16px 0; }
 }
+/* Measuring pressure and temperature from actual microscopic data. */
+#lessonCanvas { display:block; width:100%; height:285px; margin:10px 0; }
+#storyGaugeFill { height:100%; width:0; background:linear-gradient(90deg,#29897e,#d08b3b); transition:width .1s; }
+#measurementActions { flex-wrap:wrap; }
+#measurementStory { padding:4px 0 12px; }
+#measurementStory .prediction-text { margin:8px 0; }
+#measurementStory .lesson-note { min-height:48px; }
+#workbench[data-experience="temperature"] #chamber { height:390px; }
+#workbench[data-experience="temperature"] .micro-toolbar { display:none; }
+#workbench[data-experience="temperature"] .bench-grid { align-items:start; }
+#workbench[data-experience="temperature"] #microObservation { display:none; }
