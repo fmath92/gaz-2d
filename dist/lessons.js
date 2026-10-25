@@ -99,7 +99,7 @@
     get area(){return this.strokes.reduce((sum,stroke)=>sum+stroke.points.slice(1).reduce((a,p,i)=>a-(p.v-stroke.points[i].v)*(p.p+stroke.points[i].p)/2,0),0);}
     flush(){
       const b=this.pending;if(!b||b.dt<1e-10)return;
-      const sample={v0:b.v0,v1:this.currentWidth*this.height,pressure:b.impulse/(this.height*b.dt),dt:b.dt};
+      const sample={v0:b.v0,v1:this.currentWidth*this.height,pressure:b.integral/(this.currentWidth*this.height-b.v0),dt:b.dt};
       this.samples.push(sample);
       const stroke=this.strokes.at(-1);
       if(stroke){
@@ -120,15 +120,22 @@
         if(h<1e-10){sim.stopMotion();continue;}
         const v0=sim.width*this.height,u=sim.motion?(sim.motion.targetWidth-sim.motion.startWidth)/sim.motion.duration:0;
         const dir=Math.sign(u);
-        if(dir!==this.direction){this.closeStroke();this.direction=dir;if(dir)this.strokes.push({direction:dir,points:[],bins:[],complete:false});}
+        if(dir!==this.direction){
+          this.closeStroke();this.direction=dir;
+          if(dir){
+            const last=this.strokes.at(-1);
+            if(last?.direction===dir)last.complete=false;
+            else this.strokes.push({direction:dir,points:[],bins:[],complete:false});
+          }
+        }
         advance(h);remaining-=h;this.elapsed+=h;this.currentWidth=sim.width;this.currentEnergy=sim.metrics.energy;
         const fresh=sim._events.filter(e=>e.id>this.lastId&&e.wall==='right');this.lastId=sim._collisions;
         let impulse=0;
         for(const e of fresh){this.events.push({...e});impulse+=e.impulse;this.work+=e.work;}
         this.impulse+=impulse;
         if(dir){
-          if(!this.pending)this.pending={v0,dt:0,impulse:0};
-          this.pending.dt+=h;this.pending.impulse+=impulse;
+          if(!this.pending)this.pending={v0,dt:0,impulse:0,integral:0};
+          this.pending.dt+=h;this.pending.impulse+=impulse;this.pending.integral+=impulse*u;
           if(this.pending.dt>=.25-1e-10||!sim.motion)this.flush();
         }
       }
@@ -146,14 +153,17 @@
       if(this.phase==='shade'){this.shade=clamp(this.shade+seconds/1.3);if(this.shade===1)this.phase='done';return;}
       if(this.phase==='draw'){
         const distance=this.requestedWidth-sim.width;
-        if(Math.abs(distance)>1e-6){
-          if(!sim.motion||Math.abs(sim.motion.targetWidth-this.requestedWidth)>1e-8){sim.setMotion({targetWidth:this.requestedWidth,duration:Math.abs(distance)/.55});}
+        if(Math.abs(distance)>1e-10){
+          // Relax toward the pointer. Recompute the speed as the gap shrinks,
+          // keeping the existing cap; the physics engine advances every segment.
+          const duration=Math.abs(distance)<1e-5?Math.abs(distance)/.55:Math.max(.18,Math.abs(distance)/.55);
+          sim.setMotion({targetWidth:this.requestedWidth,duration});
         }else if(sim.motion)sim.stopMotion();
       }
       this.velocity=sim.metrics.pistonVelocity;
       this.advanceMeasured(seconds*this.rate,sim,advance);this.velocity=sim.metrics.pistonVelocity;
       if(!sim.motion)this.closeStroke();
-      if(this.phase==='fixed'&&this.elapsed>=this.duration || this.phase==='draw'&&this.mode!=='free'&&Math.abs(sim.width-this.endWidth)<1e-6){
+      if(this.phase==='fixed'&&this.elapsed>=this.duration || this.phase==='draw'&&this.mode!=='free'&&Math.abs(sim.width-this.endWidth)<1e-10){
         sim.stopMotion();this.closeStroke();this.phase='shade';
       }
     }
@@ -172,7 +182,7 @@
     answerComparison(choice){
       if(this.phase!=='collision'||this.tour.phase!=='compare'||!['<','=','>'].includes(choice))return;
       const e=this.tour.event,incoming=Math.hypot(e.before.vx,e.before.vy),outgoing=Math.hypot(e.after.vx,e.after.vy);
-      const relation=Math.abs(incoming-outgoing)<=1e-10*Math.max(1,incoming,outgoing)?'=':incoming<outgoing?'<':'>';
+      const relation=Math.abs(incoming-outgoing)<=1e-10*Math.max(1,incoming,outgoing)?'=':outgoing<incoming?'<':'>';
       this.answer={choice,relation,correct:choice===relation,incoming,outgoing};
     }
     continueComparison(){if(this.answer?.correct&&this.phase==='collision'&&this.tour.phase==='compare'){this.tour.continueComparison();this.paused=false;}}
@@ -315,10 +325,10 @@
     const color=story.case==='compression'?'#c77e2f':story.case==='expansion'?'#337fba':'#268b80';
     if(story.tour?.phase==='compare'&&e){
       text(c,'Comparez les vitesses de la même particule',22,28,'#294b5b',13);
-      text(c,'Vitesse entrante',22,65,'#397fbe');
-      text(c,U.text('velocity',Math.hypot(e.before.vx,e.before.vy)),22,95,'#397fbe',24);
-      text(c,'Vitesse sortante',22,133,'#258d79');
-      text(c,U.text('velocity',Math.hypot(e.after.vx,e.after.vy)),22,163,'#258d79',24);
+      text(c,'Vitesse sortante',22,65,'#258d79');
+      text(c,U.text('velocity',Math.hypot(e.after.vx,e.after.vy)),22,95,'#258d79',24);
+      text(c,'Vitesse entrante',22,133,'#397fbe');
+      text(c,U.text('velocity',Math.hypot(e.before.vx,e.before.vy)),22,163,'#397fbe',24);
       text(c,story.answer?.correct?'δW reçu = Ec après − Ec avant = '+U.text('energy',e.work,4):'Même masse : Ec = ½ m |v|²',22,207,color,13);
       text(c,'Choisissez <, = ou > sur le bandeau du zoom.',22,246,'#687f8a',11);
       return;
@@ -362,7 +372,7 @@
         }
         c.beginPath();points.forEach((p,i)=>i?c.lineTo(X(p.v),Y(p.p)):c.moveTo(X(p.v),Y(p.p)));c.strokeStyle=tone;c.lineWidth=2.5;c.stroke();
         const mid=Math.floor(points.length/2),p=points[mid],prev=points[Math.max(0,mid-1)];
-        if(Math.abs(p.v-prev.v)>.001)arrow(c,X(prev.v),Y(prev.p),X(p.v)-X(prev.v),Y(p.p)-Y(prev.p),tone);
+        if(Math.abs(X(p.v)-X(prev.v))>8)arrow(c,X(prev.v),Y(prev.p),X(p.v)-X(prev.v),Y(p.p)-Y(prev.p),tone);
       }
       if(!all.length)text(c,'Déplacez le piston : la courbe se dessine ici.',left+8,top+45,'#687f8a',11);
     }

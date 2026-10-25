@@ -163,8 +163,9 @@ test('work illustration requires a correct retry, then manual piston travel, wit
    assert.equal(lab.nodes.get(wrong).getAttribute('aria-invalid'),'true');
    assert.equal(lab.nodes.get('continueSpeed').disabled,true);lab.click('continueSpeed');lab.advance(2);
    assert.equal(lab.metrics.time,time);assert.equal(lab.analysis.lesson.collisionPhase,'compare');
-   lab.click(l.case==='fixed'?'speedEqual':l.case==='compression'?'speedLess':'speedGreater');
+   lab.click(l.case==='fixed'?'speedEqual':l.case==='compression'?'speedGreater':'speedLess');
    assert.equal(lab.nodes.get(wrong).getAttribute('aria-invalid'),'false');assert.equal(lab.nodes.get('continueSpeed').disabled,false);
+   assert.equal(lab.nodes.get('speedWorkSign').hidden,false);assert.match(lab.nodes.get('speedWorkSign').textContent,l.case==='fixed'?/nul.*W = 0/:l.case==='compression'?/positif.*W > 0/:/négatif.*W < 0/);
    lab.click('continueSpeed');assert.equal(lab.nodes.get('workSpeedQuestion').hidden,true);
   }
   if(l.window?.canDrag){

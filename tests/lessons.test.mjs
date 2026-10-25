@@ -137,7 +137,7 @@ test('work journey gates the quiz, guides compression and expansion, shows rest 
  const particles=sim.particles,l=new WorkJourney(sim,{planningBudget:Infinity}),seen=[],comparisons=[];
  for(let i=0;i<7000&&l.phase!=='free'&&l.phase!=='unavailable';i++){
   if(seen.at(-1)!==l.case)seen.push(l.case);
-  if(l.tour?.phase==='compare'){comparisons.push(l.case);const time=sim.time,particles=JSON.stringify(sim.particles);l.tick(60,sim,h=>{sim.step(h);return h;});assert.equal(sim.time,time);assert.equal(JSON.stringify(sim.particles),particles);assert.equal(l.tour.phase,'compare');l.continueComparison();assert.equal(l.tour.phase,'compare');l.answerComparison('invalid');assert.equal(l.answer,null);const expected=l.case==='fixed'?'=':l.case==='compression'?'<':'>';l.answerComparison(expected==='='?'<':'=');assert.equal(l.answer.correct,false);assert.equal(l.answer.relation,expected);l.continueComparison();assert.equal(l.tour.phase,'compare');assert.equal(JSON.stringify(sim.particles),particles);l.answerComparison(expected);assert.equal(l.answer.correct,true);l.continueComparison();}
+  if(l.tour?.phase==='compare'){comparisons.push(l.case);const time=sim.time,particles=JSON.stringify(sim.particles);l.tick(60,sim,h=>{sim.step(h);return h;});assert.equal(sim.time,time);assert.equal(JSON.stringify(sim.particles),particles);assert.equal(l.tour.phase,'compare');l.continueComparison();assert.equal(l.tour.phase,'compare');l.answerComparison('invalid');assert.equal(l.answer,null);const expected=l.case==='fixed'?'=':l.case==='compression'?'>':'<';l.answerComparison(expected==='='?'<':'=');assert.equal(l.answer.correct,false);assert.equal(l.answer.relation,expected);l.continueComparison();assert.equal(l.tour.phase,'compare');assert.equal(JSON.stringify(sim.particles),particles);l.answerComparison(expected);assert.equal(l.answer.correct,true);l.continueComparison();}
   if(l.window?.canDrag)l.setPistonTarget(l.window.endWidth);
   if(l.phase==='hold'){const time=sim.time,index=l.index;l.tick(60,sim,h=>{sim.step(h);return h;});assert.equal(sim.time,time);assert.equal(l.index,index);assert.equal(l.phase,'hold');l.nextCase();l.nextCase();assert.equal(l.phase,'between');}
   l.tick(1/60,sim,h=>{sim.step(h);return h;});
@@ -201,5 +201,23 @@ test('work camera fits the orange band and keeps both piston endpoints visible',
   assert.ok(cam.X(m.minWidth)>35);assert.ok(cam.X(m.maxWidth)<w-40);
   assert.ok(cam.Y(m.y1)>20);assert.ok(cam.Y(m.y0)<h-65);
   if(w===700)assert.ok(Math.abs(cam.Y(m.y0)-cam.Y(m.y1)-(h-100))<1e-8);
+ }
+});
+
+test('slow intermittent pointer updates relax continuously and keep one pressure curve',()=>{
+ const {WorkPath}=globalThis.GasLessons;
+ for(const mode of ['compression','expansion']){
+  const sim=new GasSimulation({count:200,width:11,temperature:1.5,particleModel:'hard-disks',particleRadius:.022,observeCollisions:true});
+  const l=new WorkPath(sim,{mode});l.phase='draw';const sign=mode==='compression'?-1:1;
+  let previous=sim.width;
+  for(let i=0;i<360;i++){
+   if(i%6===0)l.setTarget(11+sign*.003*(1+i/6));
+   l.tick(1/60,sim,h=>sim.step(h));
+   assert.ok(sign*(sim.width-previous)>0,'No stop between slow pointer updates');
+   assert.ok(Math.abs(l.velocity)<=.55+1e-8);assert.ok(sign*(l.requestedWidth-sim.width)>0,'Piston lags behind pointer');previous=sim.width;
+  }
+  l.closeStroke();assert.equal(l.strokes.length,1);assert.ok(l.strokes[0].points.length>10);
+  assert.ok(Math.abs(l.work-l.deltaEnergy)<1e-8);assert.ok(Math.abs(l.work-l.pressureWork)<1e-8);
+  assert.ok(l.strokes[0].points.every(p=>Number.isFinite(p.p)));
  }
 });

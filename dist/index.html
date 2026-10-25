@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#f4f7f8">
   <meta name="description" content="Visite guidée d’un laboratoire de thermodynamique : des collisions aux mesures de pression, de travail et de chaleur.">
   <title>Gaz 2D — Visite guidée du laboratoire</title>
-  <link rel="stylesheet" href="styles.css?v=0.18.0">
-  <script defer src="physics.js?v=0.18.0"></script>
-  <script defer src="analysis.js?v=0.18.0"></script>
-  <script defer src="units.js?v=0.18.0"></script>
-  <script defer src="graphics.js?v=0.18.0"></script>
-  <script defer src="tour.js?v=0.18.0"></script>
-  <script defer src="lessons.js?v=0.18.0"></script>
-  <script defer src="app.js?v=0.18.0"></script>
+  <link rel="stylesheet" href="styles.css?v=0.19.0">
+  <script defer src="physics.js?v=0.19.0"></script>
+  <script defer src="analysis.js?v=0.19.0"></script>
+  <script defer src="units.js?v=0.19.0"></script>
+  <script defer src="graphics.js?v=0.19.0"></script>
+  <script defer src="tour.js?v=0.19.0"></script>
+  <script defer src="lessons.js?v=0.19.0"></script>
+  <script defer src="app.js?v=0.19.0"></script>
 </head>
 <body>
   <header class="masthead">
@@ -50,15 +50,15 @@
             <section id="workSpeedQuestion" class="work-speed-question" hidden aria-label="Comparer la vitesse entrante et la vitesse sortante">
               <strong>Comparez les normes des vitesses</strong>
               <div class="speed-choice-row">
-                <div>Vitesse entrante<strong id="quizIncoming"></strong></div>
-                <div class="speed-choice-buttons" role="group" aria-label="La vitesse entrante est-elle inférieure, égale ou supérieure à la vitesse sortante ?">
-                  <button id="speedLess" type="button" aria-label="Vitesse entrante inférieure à la vitesse sortante" aria-pressed="false">&lt;</button>
-                  <button id="speedEqual" type="button" aria-label="Vitesses entrante et sortante égales" aria-pressed="false">=</button>
-                  <button id="speedGreater" type="button" aria-label="Vitesse entrante supérieure à la vitesse sortante" aria-pressed="false">&gt;</button>
-                </div>
                 <div>Vitesse sortante<strong id="quizOutgoing"></strong></div>
+                <div class="speed-choice-buttons" role="group" aria-label="La vitesse sortante est-elle inférieure, égale ou supérieure à la vitesse entrante ?">
+                  <button id="speedLess" type="button" aria-label="Vitesse sortante inférieure à la vitesse entrante" aria-pressed="false">&lt;</button>
+                  <button id="speedEqual" type="button" aria-label="Vitesses entrante et sortante égales" aria-pressed="false">=</button>
+                  <button id="speedGreater" type="button" aria-label="Vitesse sortante supérieure à la vitesse entrante" aria-pressed="false">&gt;</button>
+                </div>
+                <div>Vitesse entrante<strong id="quizIncoming"></strong></div>
               </div>
-              <p id="speedFeedback" role="status" aria-live="polite">Choisissez un signe pour expliquer le choc.</p>
+              <div role="status" aria-live="polite"><p id="speedFeedback">Choisissez un signe pour expliquer le choc.</p><strong id="speedWorkSign" class="speed-work-sign" hidden></strong></div>
               <button id="continueSpeed" class="button primary" disabled>Continuer →</button>
             </section>
             <div id="workPistonHandle" class="work-piston-handle" role="slider" tabindex="0" aria-label="Position du piston, flèches gauche et droite pour déplacer" aria-orientation="horizontal" hidden>↔</div>
@@ -194,7 +194,7 @@
         <div class="panel distributions"><div><h2>Norme des vitesses</h2><canvas id="speedHistogram" aria-label="Distribution de la norme des vitesses"></canvas></div><div><h2>Énergie cinétique par marqueur</h2><canvas id="energyHistogram" aria-label="Distribution de l’énergie cinétique des particules"></canvas></div><p id="distributionLegend">État actuel et état initial, densités normalisées.</p></div>
       </details>
     </section>
-    <footer><span>Gaz 2D · version 0.18.0</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
+    <footer><span>Gaz 2D · version 0.19.0</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
   </main>
 </body>
 </html>

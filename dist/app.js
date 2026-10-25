@@ -264,7 +264,9 @@
     }
     let feedback='Choisissez un signe pour expliquer le choc.';
     if(a&&!a.correct)feedback='Essayez encore. Indice : comparez les deux valeurs en m/s. La norme mesure la rapidité, quel que soit le sens de la flèche.';
-    if(a?.correct)feedback='Oui. '+(a.relation==='='?'Les vitesses sont égales : la particule a poussé sur le piston et contribue à la pression, mais son énergie cinétique n’a pas changé. Le travail reçu est nul.':a.relation==='<'?'La vitesse sortante est plus grande : la particule a poussé sur le piston et contribue à la pression. Le piston lui a fourni de l’énergie : le travail reçu par le gaz est positif.':'La vitesse sortante est plus petite : la particule a poussé sur le piston et contribue à la pression. Elle a cédé de l’énergie au piston : le travail reçu par le gaz est négatif.');
+    if(a?.correct)feedback='Oui. '+(a.relation==='='?'Les vitesses sont égales : la particule a poussé sur le piston et contribue à la pression, mais son énergie cinétique n’a pas changé.':a.relation==='>'?'La vitesse sortante est plus grande : la particule a poussé sur le piston et contribue à la pression, mais le piston lui a fourni de l’énergie.':'La vitesse sortante est plus petite : la particule a poussé sur le piston et contribue à la pression. Elle a cédé de l’énergie au piston.');
+    $('speedWorkSign').hidden=!a?.correct;
+    $('speedWorkSign').textContent=a?.correct?(a.relation==='='?'Le travail reçu par le gaz est nul : W = 0.':a.relation==='>'?'Le travail reçu par le gaz est positif : W > 0.':'Le travail reçu par le gaz est négatif : W < 0.') : '';
     if($('speedFeedback').textContent!==feedback)$('speedFeedback').textContent=feedback;
   }
   for(const [id,choice] of [['speedLess','<'],['speedEqual','='],['speedGreater','>']])$(id).addEventListener('click',()=>{
@@ -327,7 +329,7 @@
     $('storyDetails').textContent=m?'ΔV = '+U.text('volume',m.deltaVolume,3)+' · '+m.events.length+' chocs sur le piston · travail des chocs = '+U.text('energy',m.work,2)+'. La courbe lisse les pressions mesurées ; son aire est une approximation. Parois isolées : Q = 0.':'La particule pousse toujours le piston. Comparez sa rapidité avant et après le choc pour déterminer si elle reçoit ou cède de l’énergie.';
     if(l.tour?.phase==='compare'){
       $('storyTitle').textContent=(l.index+1)+'/3 · Comparer avant de continuer';
-      $('storyText').textContent='Le temps est figé. Choisissez <, = ou > entre la vitesse entrante et la vitesse sortante. Vous pouvez réessayer ; la bonne réponse débloque Continuer.';
+      $('storyText').textContent='Le temps est figé. Choisissez <, = ou > entre la vitesse sortante et la vitesse entrante. Vous pouvez réessayer ; la bonne réponse débloque Continuer.';
     }
     if(m?.mode==='fixed'){
       $('storyText').textContent='Les particules poussent encore le piston, mais A et B sont confondus : la largeur sur le diagramme P–V est nulle, donc l’aire et le travail sont nuls.';

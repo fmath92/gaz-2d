@@ -1,3 +1,10 @@
+## 0.19.0 — Comparer et déplacer sans à-coups
+
+- Comparaison dans l’ordre vitesse sortante / vitesse entrante : > en compression, = au repos, < en détente.
+- Conclusion du quiz mise en évidence en gras dans un encadré : travail reçu positif, nul ou négatif.
+- Relaxation du piston vers la souris, vitesse maximale inchangée ; les mouvements lents conservent une courbe continue et les reprises dans le même sens restent reliées.
+- Moyenne de pression pondérée par le déplacement pour conserver le bilan du travail à vitesse variable ; test de régression sur des mouvements de pointeur lents et intermittents.
+
 ## 0.18.0 — Réessayer, déplacer et intégrer
 
 - Quiz : indice après une erreur, choix rouge, réponse correcte obligatoire ; Continuer sur le bandeau de l’animation.
