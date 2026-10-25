@@ -13,7 +13,7 @@
     comparison: { index: '06', label: 'LE RAYON DES PARTICULES', title: 'La taille des particules change-t-elle PV = nRT ?', description: 'Faites varier le rayon des disques, à quantité de gaz, volume et température initiale identiques. Comparez PV/(nRT) à 1.', width: 11, action: 'fixed', source: 'mean', chart: 'ratio', zoom: false, speed: 1 }
   };
   const sessions = new Map();
-  let sharedRadius = .04;
+  let sharedRadius = .0005 / U.scales.length; // Default physical radius: 0.50 mm.
   let active = 'pressure', previousFrame = 0, accumulator = 0, lastUI = 0;
   const session = () => sessions.get(active);
   const states = s => s.other ? [s.sim, s.other] : [s.sim];
@@ -84,7 +84,7 @@
     $('recordAnalysis').hidden = active !== 'comparison';
     $('recordX').value = s.recordX; $('recordY').value = s.recordY;
     $('alpha').value = s.alpha; $('alphaNumber').value = s.alpha; $('alphaNumber').setAttribute('aria-invalid','false'); $('linearFit').checked = s.fitEnabled; $('autoRecords').checked = s.autoRecords;
-    $('particleRadius').value = Math.round(s.radius * 1000);
+    $('particleRadius').value = s.radius * 1000;
     $('radiusValue').value = format(s.radius * U.scales.length * 1000) + ' mm';
     $('microTitle').textContent = s.other ? 'Deux états microscopiques' : active === 'heat' ? 'Le gaz et la paroi gauche' : 'Le gaz et son piston';
     $('zoomTitle').textContent = active === 'comparison' ? 'Zoom · un choc entre deux disques' : active === 'heat' ? 'Zoom · un échange sur la paroi gauche' : 'Zoom · une poussée sur le piston';
@@ -147,7 +147,11 @@
       $('pause').textContent=s.lesson.phase==='done'?'▶ Reprendre':s.lesson.paused?'▶ Reprendre l’animation':'Ⅱ Pause animation';
       $('pause').setAttribute('aria-label',s.lesson.phase==='done'?'Reprendre la simulation':s.lesson.paused?'Reprendre l’animation':'Mettre l’animation en pause');
     }else {$('step').disabled=false;$('extraChart').disabled=false;}
-    $('pause').disabled=!!s.returning;
+    const comparingWork=s.lesson?.kind==='work'&&s.lesson.tour?.phase==='compare';
+    $('pause').disabled=!!s.returning||s.lesson?.phase==='hold'||comparingWork;
+    $('nextWorkCase').hidden=s.lesson?.kind!=='work'||(s.lesson.phase!=='hold'&&!comparingWork)||!!s.returning;
+    $('nextWorkCase').textContent=comparingWork?'Continuer après la comparaison →':'Cas suivant : '+(s.lesson?.index===0?'compression':'détente')+' →';
+    if(s.lesson?.phase==='hold'||comparingWork)$('pause').textContent='Résultat figé';
     if(['pressure','adiabatic'].includes(active)){
       $('illustrate').textContent=s.returning?'Retour en cours…':touring||lesson?'Retour à la simulation':active==='pressure'?'▶ Comprendre la pression':'▶ Comprendre le travail : les trois cas';
       $('illustrate').disabled=!!s.returning;
@@ -252,9 +256,13 @@
     $('storyGauge').hidden=true;GasLessons.workGraph($('lessonCanvas'),l);
     const situation=l.case==='fixed'?'Piston au repos':l.case==='compression'?'Le piston avance · travail reçu':'Le piston recule · travail fourni';
     $('storyTitle').textContent=l.phase==='done'?'Trois cas, une même règle':(l.index+1)+'/3 · '+situation;
-    $('storyText').textContent=l.phase==='collision'?'Suivez un choc réel. Le repère reste fixe dans le laboratoire pour voir le déplacement du piston.':l.phase==='hold'?'Le résultat est figé quelques instants, puis le parcours passe au cas suivant.':l.phase==='between'?'Retour à la vue d’ensemble avant le cas suivant.':m&&['overview','zoom'].includes(m.phase)?'Un choc, puis tous les chocs : la mesure commence après le zoom.':'Le calcul additionne tous les chocs sur le piston, y compris ceux qui sont hors du zoom central.';
+    $('storyText').textContent=l.phase==='collision'?'Suivez un choc réel. Le repère reste fixe dans le laboratoire pour voir le déplacement du piston.':l.phase==='hold'?'Prenez le temps de lire le résultat. Cliquez sur « Cas suivant » pour poursuivre le parcours.':l.phase==='between'?'Retour à la vue d’ensemble avant le cas suivant.':m&&['overview','zoom'].includes(m.phase)?'Un choc, puis tous les chocs : la mesure commence après le zoom.':'Le calcul additionne tous les chocs sur le piston, y compris ceux qui sont hors du zoom central.';
     $('storyFormula').textContent=m?'W reçu = ΣδW = '+U.text('energy',m.work,3)+' ; −ΣPᵢΔVᵢ = '+U.text('energy',m.pressureWork,3):'δW reçu = −uJ'+(e?' = '+U.text('energy',e.work,4):'');
     $('storyDetails').textContent=m?'Fenêtre : '+U.text('time',m.elapsed,3)+' · P moyenne = '+U.text('pressure',m.pressure,3)+' · ΔV = '+U.text('volume',m.deltaVolume,3)+' · '+m.events.length+' chocs · ΔE = '+U.text('energy',m.deltaEnergy,3)+'. Pᵢ est la pression mesurée sur chaque intervalle, sur tout le piston. À vitesse constante, W = −P moyenne × ΔV.':'u est la vitesse du piston vers la droite ; J est l’impulsion qu’il reçoit. W > 0 signifie que le gaz reçoit de l’énergie. Les parois sont isolées : Q = 0.';
+    if(l.tour?.phase==='compare'){
+      $('storyTitle').textContent=(l.index+1)+'/3 · Comparer avant de continuer';
+      $('storyText').textContent='Le temps est figé. Comparez les vitesses entrante et sortante, puis cliquez sur « Continuer après la comparaison ».';
+    }
     if(l.phase==='done'){
       $('storyText').textContent='La pression peut être positive sans travail si le piston reste immobile. En mouvement : dV < 0 donne δW > 0 ; dV > 0 donne δW < 0.';
       $('storyFormula').textContent='δW reçu = −P dV ; W reçu = −∫ P dV';
@@ -264,6 +272,7 @@
     }
     if(l.phase==='unavailable'){$('storyTitle').textContent='Parcours interrompu';$('storyText').textContent=l.message;}
   }
+  $('nextWorkCase').addEventListener('click',()=>{const s=session();if(s.lesson?.kind!=='work'||s.returning)return;if(s.lesson.tour?.phase==='compare')s.lesson.continueComparison();else s.lesson.nextCase();updateControls();render();});
   $('illustrateTemperature').addEventListener('click',()=>session().lesson?returnToSimulation():beginMeasurementStory('temperature'));
   $('nextTemperatureStage').addEventListener('click',()=>{const l=session().lesson;if(l?.kind!=='temperature'||l.entry||session().returning)return;l.elapsed=[2,5,8,11,15,18].find(t=>t>l.elapsed+1e-8)??18;l.paused=true;updateControls();render();});
   function launchCycles() {
@@ -661,9 +670,9 @@
     } else if (!document.hidden && s.lesson) {
       const l=s.lesson;
       if(!l.paused&&l.phase!=='done'){
-        const phase=l.phase;
+        const phase=l.phase,collisionPhase=l.tour?.phase;
         l.tick(elapsed,s.sim,h=>advance(s,h),s.speed);
-        if(phase!==l.phase)updateControls();
+        if(phase!==l.phase||collisionPhase!==l.tour?.phase)updateControls();
       }
       updateMeasurementStory();
     } else if (!document.hidden && s.tour) {

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
+const DEFAULT_RADIUS=.0005/Math.cbrt(1e-3/82.5);
 const html = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8');
 const physics = readFileSync(new URL('../dist/physics.js', import.meta.url), 'utf8');
 const analysis = readFileSync(new URL('../dist/analysis.js', import.meta.url), 'utf8');
@@ -152,7 +153,7 @@ test('work illustration guides all three cases, locks manual motion and returns 
  assert.equal(lab.nodes.get('target').disabled,true);assert.equal(lab.nodes.get('motionAction').disabled,true);assert.equal(lab.nodes.get('start').disabled,true);
  assert.equal(lab.nodes.get('illustrate').textContent,'Retour à la simulation');assert.equal(lab.nodes.get('workLesson').hidden,true);assert.equal(lab.nodes.get('workCases').hidden,false);
  lab.advance(1);lab.click('pause');const time=lab.metrics.time;lab.advance(1);assert.equal(lab.metrics.time,time);lab.click('pause');
- for(let i=0;i<100&&lab.analysis.lesson.phase!=='done'&&lab.analysis.lesson.phase!=='unavailable';i++)lab.advance(1);
+ for(let i=0;i<100&&lab.analysis.lesson.phase!=='done'&&lab.analysis.lesson.phase!=='unavailable';i++){if(lab.analysis.lesson.collisionPhase==='compare'){const time=lab.metrics.time;assert.match(lab.nodes.get('nextWorkCase').textContent,/Continuer/);lab.advance(10);assert.equal(lab.metrics.time,time);assert.equal(lab.analysis.lesson.collisionPhase,'compare');lab.click('nextWorkCase');}if(lab.analysis.lesson.phase==='hold'){const time=lab.metrics.time,index=lab.analysis.lesson.index;assert.equal(lab.nodes.get('nextWorkCase').hidden,false);lab.advance(10);assert.equal(lab.metrics.time,time);assert.equal(lab.analysis.lesson.index,index);lab.click('nextWorkCase');assert.equal(lab.analysis.lesson.phase,'between');assert.equal(lab.nodes.get('nextWorkCase').hidden,true);}lab.advance(1);}
  const l=lab.analysis.lesson;assert.equal(l.phase,'done',l.message);assert.equal(l.results.length,3);
  assert.equal(l.results[0].work,0);assert.ok(l.results[1].work>0);assert.ok(l.results[2].work<0);
  for(const r of l.results)assert.ok(Math.abs(r.work-r.pressureWork)<1e-7);
@@ -194,13 +195,13 @@ test('radius experiment uses one interacting gas, records measurements and share
   assert.equal(lab.comparisonMetrics,null);assert.equal(lab.metrics.particleModel,'hard-disks');
   lab.input('timeScale',4);lab.advance(1.3);assert.ok(lab.metrics.pairCollisions>0);
   lab.click('recordRadius');assert.match(lab.nodes.get('radiusRecords').innerHTML,/PV/);
-  const old=lab.metrics;lab.input('particleRadius',70);assert.equal(lab.metrics.particleRadius,.04);
+  const old=lab.metrics;lab.input('particleRadius',70);assert.equal(lab.metrics.particleRadius,DEFAULT_RADIUS);
   lab.click('applyRadius');assert.equal(lab.metrics.particleRadius,.07);assert.equal(lab.metrics.time,0);
   assert.equal(lab.metrics.volume,old.volume);assert.ok(Math.abs(lab.metrics.temperature-1.5)<1e-9);
   assert.match(lab.nodes.get('radiusRecords').innerHTML,/PV/);assert.equal(lab.nodes.get('recordRadius').disabled,true);
   lab.click('capture');lab.advance(.2);assert.ok(lab.paused);assert.equal(lab.analysis.collision.kind,'pair');
   for (const key of ['pressure','free','adiabatic']) { lab.click('tab-'+key);assert.equal(lab.metrics.particleRadius,.07);lab.click('reset');assert.equal(lab.metrics.particleRadius,.07); }
-  lab.click('tab-comparison');assert.equal(lab.analysis.radiusRecords[0].radius,.04);
+  lab.click('tab-comparison');assert.equal(lab.analysis.radiusRecords[0].radius,DEFAULT_RADIUS);
 });
 test('slow playback changes elapsed simulated time, and single-step is 0.02 without unpausing',()=>{
   const lab=laboratory();lab.input('timeScale',.05);lab.advance(1);assert.ok(lab.metrics.time>=.04&&lab.metrics.time<.06);
@@ -363,7 +364,7 @@ test('automatic temperature series stabilizes five states and keeps a fixed radi
   for(let i=0;i<100&&lab.analysis.batch;i++)lab.advance(1);
   assert.equal(lab.analysis.batch,null);assert.equal(lab.analysis.radiusRecords.length,5);assert.ok(lab.paused);
   for(const [i,r] of lab.analysis.radiusRecords.entries()){
-    assert.equal(r.radius,.04);assert.ok(Math.abs(r.temperature*200-(200+i*100))<1e-8);
+    assert.equal(r.radius,DEFAULT_RADIUS);assert.ok(Math.abs(r.temperature*200-(200+i*100))<1e-8);
     const warmup=Math.max(6,33/Math.sqrt(r.temperature));assert.ok(r.windowStart>=warmup+4-1e-8);
     assert.ok(Math.abs(r.time-r.windowStart-2)<1e-8);
   }
@@ -429,10 +430,19 @@ test('return button also exits early pressure and temperature sequences and surv
 
 test('work journey can return during a moving case, retain its state across tabs and reset cleanly',()=>{
  const lab=laboratory();lab.click('tab-adiabatic');lab.click('illustrate');
- for(let i=0;i<45&&lab.analysis.lesson.case!=='compression';i++)lab.advance(1);
+ for(let i=0;i<45&&lab.analysis.lesson.case!=='compression';i++){if(lab.analysis.lesson.phase==='hold'||lab.analysis.lesson.collisionPhase==='compare')lab.click('nextWorkCase');lab.advance(1);}
  assert.equal(lab.analysis.lesson.case,'compression');lab.advance(2);
  const before=lab.metrics.time;lab.click('tab-pressure');lab.advance(.3);lab.click('tab-adiabatic');assert.equal(lab.metrics.time,before);assert.equal(lab.analysis.lesson.case,'compression');
  lab.click('illustrate');lab.advance(3.2);assert.equal(lab.analysis.lesson,null);assert.equal(lab.analysis.returning,null);
  const width=lab.metrics.width,work=lab.metrics.work;lab.advance(.3);assert.equal(lab.metrics.width,width);assert.equal(lab.metrics.work,work);
  lab.click('illustrate');lab.click('reset');assert.equal(lab.analysis.lesson,null);assert.equal(lab.metrics.time,0);assert.equal(lab.metrics.width,11);
+});
+
+
+test('the default radius is exactly 0.50 mm across experiments and survives applying the unchanged slider',()=>{
+ const lab=laboratory();
+ for(const key of ['pressure','temperature','free','adiabatic','cycles','comparison']){
+  lab.click('tab-'+key);assert.equal(lab.metrics.particleRadius,DEFAULT_RADIUS);assert.equal(lab.nodes.get('radiusValue').value,'0,50 mm');
+ }
+ lab.click('applyRadius');assert.equal(lab.metrics.particleRadius,DEFAULT_RADIUS);lab.click('reset');assert.equal(lab.metrics.particleRadius,DEFAULT_RADIUS);
 });

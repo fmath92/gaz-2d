@@ -226,7 +226,7 @@
       ctx.setLineDash([5,4]);arrow(ctx,cx,cy,fixed.vx*f,-fixed.vy*f,'#9274ad',2);ctx.setLineDash([]);
       const dt=Math.max(0,sim.time-e.time), gx=X(e.x+fixed.vx*dt), gy=Y(e.y+fixed.vy*dt);
       ctx.setLineDash([3,3]);line(ctx,cx,cy,gx,gy,'#9274ad99',1.5);
-      ctx.strokeStyle='#9274ad';ctx.lineWidth=2;ctx.beginPath();ctx.arc(gx,gy,.04*scale+2,0,2*Math.PI);ctx.stroke();ctx.setLineDash([]);
+      ctx.strokeStyle='#9274ad';ctx.lineWidth=2;ctx.beginPath();ctx.arc(gx,gy,(sim.radius||.04)*scale+2,0,2*Math.PI);ctx.stroke();ctx.setLineDash([]);
     }
     ctx.setLineDash([3,3]);arrow(ctx,cx-e.before.vx*f,cy+e.before.vy*f,e.before.vx*f,-e.before.vy*f,'#397fbe',2);ctx.setLineDash([]);
     arrow(ctx,cx,cy,e.after.vx*f,-e.after.vy*f,'#258d79',2.5);

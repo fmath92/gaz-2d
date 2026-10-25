@@ -8,8 +8,8 @@
   const stepSize = (sim, quantum) => sim.motion
     ? Math.min(quantum, Math.max(1e-10, sim.motion.duration - sim.motion.elapsed)) : quantum;
   class CollisionTour {
-    constructor(sim, { kind = 'pressure', speed = 1, reducedMotion = false } = {}) {
-      this.sim = sim; this.kind = kind; this.normalSpeed = speed; this.reducedMotion = reducedMotion;
+    constructor(sim, { kind = 'pressure', speed = 1, reducedMotion = false, manualComparison = false } = {}) {
+      this.manualComparison=manualComparison; this.sim = sim; this.kind = kind; this.normalSpeed = speed; this.reducedMotion = reducedMotion;
       this.stages = kind === 'heat' ? ['heat-in', 'heat-out'] : [kind];
       this.stageIndex = 0; this.events = []; this.zoom = 0; this.finished = false;
       this.message = ''; this.beginSearch();
@@ -56,8 +56,9 @@
         if (performance.now() - started >= budgetMs) break;
       }
     }
+    continueComparison(){if(this.manualComparison&&this.phase==='compare'){this.phase='return';this.elapsed=0;}}
     tick(seconds, advance, budgetMs = 9) {
-      if (this.finished) return;
+      if (this.finished || (this.manualComparison && this.phase==='compare')) return;
       if (this.phase === 'search') { this.plan(budgetMs); return; }
       this.elapsed += seconds;
       if (this.event && this.phase !== 'compare') this.impactAge += seconds;
@@ -72,7 +73,7 @@
       } else if (this.phase === 'departure') {
         this.rate = Math.min(this.normalSpeed / 2, .24 / (2.2 * Math.max(1, Math.hypot(this.event.after.vx, this.event.after.vy))));
         if (this.elapsed >= 2.2) {
-          this.phase = this.kind === 'work' ? 'compare' : 'return'; this.elapsed = 0;
+          this.phase = this.kind === 'work' || this.manualComparison ? 'compare' : 'return'; this.elapsed = 0;
           if (this.phase === 'compare') { this.rate = 0; return; }
         }
       } else if (this.phase === 'compare') {

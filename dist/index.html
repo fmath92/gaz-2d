@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#f4f7f8">
   <meta name="description" content="Visite guidée d’un laboratoire de thermodynamique : des collisions aux mesures de pression, de travail et de chaleur.">
   <title>Gaz 2D — Visite guidée du laboratoire</title>
-  <link rel="stylesheet" href="styles.css?v=0.16.0">
-  <script defer src="physics.js?v=0.16.0"></script>
-  <script defer src="analysis.js?v=0.16.0"></script>
-  <script defer src="units.js?v=0.16.0"></script>
-  <script defer src="graphics.js?v=0.16.0"></script>
-  <script defer src="tour.js?v=0.16.0"></script>
-  <script defer src="lessons.js?v=0.16.0"></script>
-  <script defer src="app.js?v=0.16.0"></script>
+  <link rel="stylesheet" href="styles.css?v=0.16.1-final">
+  <script defer src="physics.js?v=0.16.1-final"></script>
+  <script defer src="analysis.js?v=0.16.1-final"></script>
+  <script defer src="units.js?v=0.16.1-final"></script>
+  <script defer src="graphics.js?v=0.16.1-final"></script>
+  <script defer src="tour.js?v=0.16.1-final"></script>
+  <script defer src="lessons.js?v=0.16.1-final"></script>
+  <script defer src="app.js?v=0.16.1-final"></script>
 </head>
 <body>
   <header class="masthead">
@@ -49,7 +49,7 @@
           <div id="singleChamber"><canvas id="chamber" aria-label="État microscopique du gaz et position du piston">Simulation des particules.</canvas></div>
           <div id="comparisonChambers" class="comparison-chambers" hidden><div><span class="model-name ideal">Disques durs</span><canvas id="idealChamber" aria-label="Gaz de disques durs"></canvas></div><div><span class="model-name disks">Disques durs</span><canvas id="diskChamber" aria-label="Gaz avec collisions élastiques entre disques"></canvas></div></div>
           <div class="micro-toolbar"><span><i class="speed-ramp"></i> Couleur = vitesse</span><label><input id="vectors" type="checkbox"> Vitesses</label><label id="staticZoomControl"><input id="zoomEnabled" type="checkbox" checked> Zoom</label><button id="capture" class="text-button" hidden>Isoler un choc mutuel</button></div>
-          <div class="illustration-controls" id="illustrationControls"><button id="illustrate" class="button primary">▶ Comprendre la pression</button><button id="endIllustration" class="text-button" hidden>Quitter le zoom</button></div>
+          <div class="illustration-controls" id="illustrationControls"><button id="illustrate" class="button primary">▶ Comprendre la pression</button><button id="nextWorkCase" class="button secondary" hidden>Cas suivant →</button><button id="endIllustration" class="text-button" hidden>Quitter le zoom</button></div>
           <div id="measurementActions" class="illustration-controls"><button id="illustrateTemperature" class="button primary" hidden>▶ Des vitesses à la température</button><button id="nextTemperatureStage" class="text-button" hidden>Étape suivante →</button></div>
           <div id="tourStatus" class="tour-status" hidden><div><span id="tourStage" class="tour-stage"></span><span id="tourSpeed"></span></div><p id="tourCaption" role="status" aria-live="polite"></p><div class="tour-track"><span id="tourProgress"></span></div></div>
           <div id="zoomPanel" class="zoom-panel">
@@ -57,7 +57,7 @@
             <canvas id="collisionZoom" aria-label="Schéma agrandi d’une collision réelle, vitesses avant et après et transfert d’énergie"></canvas>
             <div class="zoom-footer"><span id="zoomHint">Bleu : avant · vert : après · orange : poussée sur la paroi.</span><span id="zoomScale">Schéma d’un choc enregistré</span></div>
           </div>
-        <div id="radiusControls" class="control slider-control" hidden><label for="particleRadius">Rayon des disques <output id="radiusValue">0,92 mm</output></label><input id="particleRadius" type="range" min="5" max="70" step="5" value="40"><button id="applyRadius" class="button secondary">Appliquer à toutes les expériences et recommencer</button><small>Même n, V et T initiale · nouveaux chocs et nouvelles mesures</small></div>
+        <div id="radiusControls" class="control slider-control" hidden><label for="particleRadius">Rayon des disques <output id="radiusValue">0,50 mm</output></label><input id="particleRadius" type="range" min="5" max="70" step="any" value="21.7664692279"><button id="applyRadius" class="button secondary">Appliquer à toutes les expériences et recommencer</button><small>Même n, V et T initiale · nouveaux chocs et nouvelles mesures</small></div>
           <div id="comparisonLesson" class="lesson" hidden>
             <div class="lesson-title"><strong>Mesurer ce rayon</strong><span id="packingFraction">Surface occupée : —</span></div>
             <div class="comparison-values" hidden><span class="disks">Rapport mesuré <b id="diskRatio">—</b></span><span hidden>Ratio corrigé <b id="correctedRatio">—</b></span><span hidden>Chocs mutuels <b id="pairCount">0</b></span></div>
@@ -162,7 +162,7 @@
             <p><strong>Une pression mesurée, puis lissée.</strong> Les impulsions sur les parois sont divisées par la surface de paroi intégrée sur la fenêtre de mesure (0,23 ms). Ce retard et les fluctuations expliquent une partie des écarts de PV/(nRT) à 1, surtout pendant une transformation.</p>
             <p><strong>Un choc à la loupe.</strong> Le bouton d’illustration repère un choc à venir, ralentit la simulation et rapproche la caméra de son point de contact. Vous voyez les véritables particules et le piston évoluer. La particule rebondit sans arrêt sur image ; une onde visuelle illustre la transmission de la poussée dans le piston rigide. La caméra recule et la vitesse de lecture précédente est rétablie. Les flèches de quantité de mouvement sont tracées dans le référentiel du laboratoire, avec la même échelle avant et après. Les réglages sont verrouillés pendant la séquence ; « Quitter le zoom » ou Pause permet de l’interrompre.</p>
             <p><strong>Travail et chaleur.</strong> Au piston, δW reçu = −uJ, y compris avec des parois thermiques. La chaleur est la variation d’énergie dans le référentiel de la paroi. À paroi immobile, δW = 0 ; à paroi isolée, δQ = 0. Le bilan complet vaut ΔE = W + Q.</p>
-            <p><strong>Disques durs.</strong> Les disques de rayon équivalent 0,92 mm se heurtent élastiquement : l’énergie et la quantité de mouvement de chaque paire sont conservées. Le rayon dessiné correspond au rayon de collision. Le dernier onglet permet de le faire varier ; le rayon choisi est commun aux autres expériences. Il n’y a pas d’attraction, donc une détente libre isolée conserve T dans ce modèle.</p>
+            <p><strong>Disques durs.</strong> Les disques de rayon initial équivalent 0,50 mm se heurtent élastiquement : l’énergie et la quantité de mouvement de chaque paire sont conservées. Le rayon dessiné correspond au rayon de collision. Le dernier onglet permet de le faire varier ; le rayon choisi est commun aux autres expériences. Il n’y a pas d’attraction, donc une détente libre isolée conserve T dans ce modèle.</p>
             <p><strong>Tester la loi idéale.</strong> Les disques ont des collisions élastiques entre eux. Le dernier onglet change uniquement leur rayon, avec réinitialisation aux mêmes n, V et T initiale. Les relevés manuels sont conservés lors de ce changement. PV/(nRT) est calculé à partir de la pression mesurée, jamais imposé à 1. Le volume utilisé est celui de la cavité entière, pas un volume libre corrigé.</p>
             <p><strong>Adiabatique ne signifie pas toujours quasi statique.</strong> La référence γ = 2 suppose un gaz idéal 2D isotrope. Les chocs entre disques redistribuent les vitesses ; leur taille finie et un déplacement rapide peuvent néanmoins écarter le gaz de cette référence.</p>
             <p id="directionTemperatures"></p><p id="thermalFallbacks" class="field-help"></p>
@@ -173,7 +173,7 @@
         <div class="panel distributions"><div><h2>Norme des vitesses</h2><canvas id="speedHistogram" aria-label="Distribution de la norme des vitesses"></canvas></div><div><h2>Énergie cinétique par marqueur</h2><canvas id="energyHistogram" aria-label="Distribution de l’énergie cinétique des particules"></canvas></div><p id="distributionLegend">État actuel et état initial, densités normalisées.</p></div>
       </details>
     </section>
-    <footer><span>Gaz 2D · version 0.16.0</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
+    <footer><span>Gaz 2D · version 0.16.1</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
   </main>
 </body>
 </html>

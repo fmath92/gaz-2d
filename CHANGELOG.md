@@ -1,3 +1,11 @@
+## 0.16.1 — Lire chaque résultat à son rythme
+
+- Les résultats de repos et de compression attendent un clic sur « Cas suivant » ; aucun passage automatique.
+- Arrêt manuel sur les vitesses entrante et sortante dans chacun des trois cas ; bouton Continuer pour reprendre.
+- Dézoom conservé entre les cas, retour à la simulation toujours disponible.
+- Rayon initial commun fixé à 0,50 mm, avec réglage continu sans arrondi du rayon sélectionné.
+- Tests de l’attente sans évolution du gaz et du passage manuel entre les trois cas.
+
 ## 0.16.0 — Trois cas pour comprendre le travail
 
 - Parcours guidé : piston au repos, compression, puis détente sur le même gaz.

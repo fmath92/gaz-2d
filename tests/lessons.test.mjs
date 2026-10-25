@@ -134,12 +134,14 @@ test('work windows sum actual full-piston collisions and recover the signed P–
 test('the work journey chains rest, compression and expansion on the same gas, then holds its result',()=>{
  const {WorkJourney}=globalThis.GasLessons;
  const sim=new GasSimulation({count:1000,width:11,temperature:1.5,particleModel:'hard-disks',particleRadius:.04,observeCollisions:true});
- const particles=sim.particles,l=new WorkJourney(sim,{planningBudget:Infinity}),seen=[];
+ const particles=sim.particles,l=new WorkJourney(sim,{planningBudget:Infinity}),seen=[],comparisons=[];
  for(let i=0;i<7000&&l.phase!=='done'&&l.phase!=='unavailable';i++){
   if(seen.at(-1)!==l.case)seen.push(l.case);
+  if(l.tour?.phase==='compare'){comparisons.push(l.case);const time=sim.time,particles=JSON.stringify(sim.particles);l.tick(60,sim,h=>{sim.step(h);return h;});assert.equal(sim.time,time);assert.equal(JSON.stringify(sim.particles),particles);assert.equal(l.tour.phase,'compare');l.continueComparison();}
+  if(l.phase==='hold'){const time=sim.time,index=l.index;l.tick(60,sim,h=>{sim.step(h);return h;});assert.equal(sim.time,time);assert.equal(l.index,index);assert.equal(l.phase,'hold');l.nextCase();l.nextCase();assert.equal(l.phase,'between');}
   l.tick(1/60,sim,h=>{sim.step(h);return h;});
  }
- assert.equal(l.phase,'done',l.message);assert.deepEqual(seen,['fixed','compression','expansion']);
+ assert.equal(l.phase,'done',l.message);assert.deepEqual(seen,['fixed','compression','expansion']);assert.deepEqual(comparisons,seen);
  assert.equal(sim.particles,particles);assert.equal(l.results.length,3);assert.equal(l.zoom,1);assert.equal(l.rate,0);assert.equal(sim.motion,null);
  for(const [i,r] of l.results.entries()){
   assert.ok(r.events.length>20);assert.ok(r.collision.impulse>0);
