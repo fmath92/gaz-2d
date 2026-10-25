@@ -492,29 +492,25 @@ test('welcome is optional, freezes the film, and can be reopened without resetti
  lab.click('tutorialDismiss');assert.equal(lab.analysis.tutorial.active,false);
 });
 
-test('interactive guide recognises actual actions and supports chapter jumps and exit',()=>{
- const lab=laboratory({welcome:true});lab.click('tutorialStart');assert.equal(lab.analysis.tutorial.index,0);lab.click('tutorialNext');
- assert.equal(lab.analysis.tutorial.target,'illustrate');assert.equal(lab.analysis.tutorial.index,1);
- lab.nodes.get('tutorialChapter').value='6';lab.nodes.get('tutorialChapter').dispatch('change');assert.equal(lab.analysis.tutorial.target,'tab-free');
- lab.click('tab-free');lab.advance(.15);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,7);assert.equal(lab.analysis.tutorial.ready,false);
- lab.click('start');lab.advance(.2);assert.equal(lab.analysis.tutorial.ready,false);lab.input('timeScale',4);lab.advance(2.1);assert.equal(lab.analysis.tutorial.ready,true);
- lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.target,'retryFreeRatio');lab.click('retryFreeRatio');assert.equal(lab.analysis.tutorial.ready,true);assert.equal(lab.analysis.chartType,'ratio');
- lab.click('tutorialNext');lab.click('start');lab.advance(.2);assert.equal(lab.analysis.tutorial.ready,false);lab.input('timeScale',4);lab.advance(2.1);assert.equal(lab.analysis.tutorial.ready,true);
- lab.click('tutorialNext');lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,11);
- // Skipping all remaining stages never invents measurements or changes the experiment.
- const width=lab.metrics.width;while(lab.analysis.tutorial.active)lab.click('tutorialNext');assert.equal(lab.metrics.width,width);
- assert.equal(lab.nodes.get('tutorialSpotlight').hidden,true);assert.equal(lab.nodes.get('tutorialCard').hidden,true);
- lab.click('openTutorial');lab.click('tutorialStart');lab.click('tutorialQuit');assert.equal(lab.analysis.tutorial.active,false);
+test('quiet guidance requires the actual action and automatically advances to the next instruction',()=>{
+ const lab=laboratory({welcome:true});lab.click('tutorialStart');lab.click('tutorialNext');
+ assert.equal(lab.analysis.tutorial.index,1);assert.equal(lab.analysis.tutorial.quiet,true);
+ lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,1);
+ lab.nodes.get('tutorialChapter').value='6';lab.nodes.get('tutorialChapter').dispatch('change');
+ assert.equal(lab.analysis.tutorial.quiet,true);lab.click('tab-free');lab.advance(.15);
+ assert.equal(lab.analysis.tutorial.index,7);assert.equal(lab.analysis.tutorial.quiet,false);
+ lab.click('start');lab.input('timeScale',4);lab.advance(2.1);lab.click('tutorialNext');
+ assert.equal(lab.analysis.tutorial.index,8);assert.equal(lab.analysis.tutorial.quiet,true);
+ lab.click('retryFreeRatio');assert.equal(lab.analysis.tutorial.index,9);assert.equal(lab.analysis.chartType,'ratio');
+ lab.click('tutorialQuit');assert.equal(lab.analysis.tutorial.active,false);
 });
 
-test('Continue always advances once, even before an action or on another experiment',()=>{
- const lab=laboratory({welcome:true});lab.click('tutorialStart');
- for(let index=0;index<34;index++){
-  assert.equal(lab.analysis.tutorial.index,index);assert.equal(lab.nodes.get('tutorialNext').disabled,false);
-  lab.advance(.12);lab.click('tutorialNext');
- }
- assert.equal(lab.analysis.tutorial.active,false);assert.equal(lab.analysis.experiment,'pressure');
- assert.equal(lab.analysis.lesson,null);assert.equal(lab.analysis.run,null);
+test('Continue stays available on explanations while quiet actions cannot be bypassed',()=>{
+ const lab=laboratory({welcome:true});lab.click('tutorialStart');lab.nodes.get('tutorialChapter').value='6';lab.nodes.get('tutorialChapter').dispatch('change');
+ lab.click('tab-free');lab.advance(.15);assert.equal(lab.analysis.tutorial.index,7);
+ assert.equal(lab.nodes.get('tutorialNext').disabled,false);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,8);
+ lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,8);assert.equal(lab.analysis.run,null);
+ lab.click('openTutorial');assert.equal(lab.analysis.tutorial.active,false);assert.equal(lab.analysis.tutorial.welcoming,false);
 });
 
 test('the guide clears the veil for actions and waits for slider release before dimming',()=>{
@@ -522,7 +518,7 @@ test('the guide clears the veil for actions and waits for slider release before 
  assert.equal(spot.classList.contains('interaction'),false);lab.click('tutorialNext');
  assert.equal(spot.classList.contains('interaction'),true);
  lab.nodes.get('tutorialChapter').value='20';lab.nodes.get('tutorialChapter').dispatch('change');
- lab.click('tab-comparison');lab.advance(.15);lab.click('tutorialNext');
+ lab.click('tab-comparison');lab.advance(.15);
  const target=lab.nodes.get('particleRadius');
  lab.documentEvent('pointerdown',{target,pointerId:1});lab.input('particleRadius',.6);
  assert.equal(lab.analysis.tutorial.ready,true);assert.equal(spot.classList.contains('interaction'),true);
@@ -542,7 +538,7 @@ test('the enabled Continue button keeps its text node stable during simulation r
  lab.advance(.5);assert.equal(lab.textWrites.get('tutorialNext'),writes);
  lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,1);
  lab.advance(.5);assert.equal(lab.textWrites.get('tutorialNext'),writes);
- lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,2);
+ lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,1);
 });
 
 test('Joule–Gay–Lussac has reference ticks and offers a fresh ratio replay after observation',()=>{
@@ -559,12 +555,13 @@ test('Joule–Gay–Lussac has reference ticks and offers a fresh ratio replay a
 
 test('the tutorial follows a paused temperature animation through its real final result',()=>{
  const lab=laboratory({welcome:true});lab.click('tutorialStart');lab.nodes.get('tutorialChapter').value='3';lab.nodes.get('tutorialChapter').dispatch('change');
- lab.click('tab-temperature');lab.advance(.15);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,4);
- lab.click('illustrateTemperature');lab.advance(5);assert.equal(lab.analysis.tutorial.ready,false);
+ lab.click('tab-temperature');lab.advance(.15);assert.equal(lab.analysis.tutorial.index,4);assert.equal(lab.analysis.tutorial.quiet,true);
+ lab.click('illustrateTemperature');lab.advance(5);assert.equal(lab.analysis.tutorial.ready,false);assert.equal(lab.analysis.tutorial.interacting,true);assert.equal(lab.analysis.tutorial.quiet,true);
  lab.click('pause');lab.advance(.15);assert.equal(lab.analysis.tutorial.target,'nextTemperatureStage');
  for(let i=0;i<6&&lab.analysis.lesson.phase!=='done';i++)lab.click('nextTemperatureStage');
- lab.advance(.15);assert.equal(lab.analysis.tutorial.ready,true);lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.index,5);
- lab.click('illustrateTemperature');lab.advance(4.5);assert.equal(lab.analysis.lesson,null);assert.equal(lab.analysis.tutorial.ready,true);
+ lab.advance(.15);assert.equal(lab.analysis.tutorial.ready,true);assert.equal(lab.analysis.tutorial.quiet,false);
+ // The real Return button also advances the visit without an extra Continue click.
+ lab.click('illustrateTemperature');lab.advance(4.5);assert.equal(lab.analysis.lesson,null);assert.equal(lab.analysis.tutorial.index,6);assert.equal(lab.analysis.tutorial.quiet,true);
  lab.click('tutorialQuit');assert.equal(lab.analysis.tutorial.active,false);
 });
 
@@ -574,12 +571,22 @@ test('tutorial keeps the page top for visible targets and only reveals lower con
  assert.equal(lab.analysis.tutorial.total,34);assert.equal(lab.scrollCalls.length,0);
  lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.title,'D’où vient la pression ?');assert.equal(lab.scrollCalls.length,0);
  lab.nodes.get('tutorialChapter').value='6';lab.nodes.get('tutorialChapter').dispatch('change');
- lab.click('tab-free');lab.advance(.15);lab.click('tutorialNext');
+ lab.click('tab-free');lab.advance(.15);
  assert.equal(lab.analysis.tutorial.title,'Ouvrir et suivre P, V et T');
  lab.nodes.get('retryFreeRatio').getBoundingClientRect=()=>({left:640,top:900,width:220,height:40});
  lab.click('start');lab.input('timeScale',4);lab.advance(2.1);lab.click('tutorialNext');
  assert.equal(lab.analysis.tutorial.title,'Refaire avec un autre regard');
  assert.equal(lab.nodes.get('tutorialCard').classList.contains('scene-guide'),true);
- assert.equal(lab.scrollCalls.at(-1).top,544); // bottom 940 - space above the 380px test card (800 - 380 - 24).
- lab.click('retryFreeRatio');lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.title,'La même détente, avec PV/(nRT)');
+ assert.equal(lab.scrollCalls.at(-1).top,156); // No popup: only the viewport margin is reserved (940 - 784).
+ lab.click('retryFreeRatio');assert.equal(lab.analysis.tutorial.title,'La même détente, avec PV/(nRT)');
+});
+
+
+test('an ongoing animation stays clear even on an explanatory step already marked complete',()=>{
+ const lab=laboratory({welcome:true});lab.click('tutorialStart');lab.click('tutorialNext');lab.click('illustrate');lab.advance(.3);
+ assert.equal(lab.analysis.tutorial.quiet,true);assert.equal(lab.nodes.get('tutorialSpotlight').classList.contains('interaction'),true);
+ // An explanatory chapter can be selected without stopping the underlying animation.
+ lab.nodes.get('tutorialChapter').value='0';lab.nodes.get('tutorialChapter').dispatch('change');lab.advance(.2);
+ assert.equal(lab.analysis.tutorial.ready,true);assert.equal(lab.nodes.get('tutorialSpotlight').classList.contains('interaction'),true);
+ lab.click('tutorialQuit');
 });

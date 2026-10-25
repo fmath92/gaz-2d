@@ -1,3 +1,10 @@
+## 0.20.4 — Montrer les commandes sans multiplier les popups
+
+- Navigation, lancement et retour guidés par surlignage ; progression automatique après l’action, sans confirmation supplémentaire.
+- Les animations de pression et de température restent dégagées jusqu’au bilan.
+- Aucune animation en cours n’est grisée, même si l’on avance dans le tutoriel.
+- Sortie du guide toujours accessible dans l’en-tête ou avec Échap.
+
 ## 0.20.3 — Une visite plus directe
 
 - Suppression des étapes de lecture ralentie, pause/reprise et préparation de la première détente : 34 étapes.
