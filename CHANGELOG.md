@@ -1,3 +1,7 @@
+## 0.20.2 — Observer la détente sans obstacle
+
+- Le guide des deux détentes de Joule–Gay–Lussac et de leur bilan se place en bandeau compact en bas de l’écran, en laissant la cavité dégagée.
+
 ## 0.20.1 — Une visite sans blocage
 
 - « Continuer » reste disponible à chaque étape, sans attendre obligatoirement une manipulation ou la fin d’une animation ; il remplace aussi « Passer cette étape ».

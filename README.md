@@ -2,7 +2,7 @@
 
 **[Ouvrir le démonstrateur](https://fmath92.github.io/gaz-2d/)** · [Code source](https://github.com/fmath92/gaz-2d)
 
-Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.20.1 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
+Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.20.2 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
 
 ## La visite
 
