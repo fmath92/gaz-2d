@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#f4f7f8">
   <meta name="description" content="Visite guidée d’un laboratoire de thermodynamique : des collisions aux mesures de pression, de travail et de chaleur.">
   <title>Gaz 2D — Visite guidée du laboratoire</title>
-  <link rel="stylesheet" href="styles.css?v=0.14.0">
-  <script defer src="physics.js?v=0.14.0"></script>
-  <script defer src="analysis.js?v=0.14.0"></script>
-  <script defer src="units.js?v=0.14.0"></script>
-  <script defer src="graphics.js?v=0.14.0"></script>
-  <script defer src="tour.js?v=0.14.0"></script>
-  <script defer src="lessons.js?v=0.14.0"></script>
-  <script defer src="app.js?v=0.14.0"></script>
+  <link rel="stylesheet" href="styles.css?v=0.15.0">
+  <script defer src="physics.js?v=0.15.0"></script>
+  <script defer src="analysis.js?v=0.15.0"></script>
+  <script defer src="units.js?v=0.15.0"></script>
+  <script defer src="graphics.js?v=0.15.0"></script>
+  <script defer src="tour.js?v=0.15.0"></script>
+  <script defer src="lessons.js?v=0.15.0"></script>
+  <script defer src="app.js?v=0.15.0"></script>
 </head>
 <body>
   <header class="masthead">
@@ -50,7 +50,7 @@
           <div id="comparisonChambers" class="comparison-chambers" hidden><div><span class="model-name ideal">Disques durs</span><canvas id="idealChamber" aria-label="Gaz de disques durs"></canvas></div><div><span class="model-name disks">Disques durs</span><canvas id="diskChamber" aria-label="Gaz avec collisions élastiques entre disques"></canvas></div></div>
           <div class="micro-toolbar"><span><i class="speed-ramp"></i> Couleur = vitesse</span><label><input id="vectors" type="checkbox"> Vitesses</label><label id="staticZoomControl"><input id="zoomEnabled" type="checkbox" checked> Zoom</label><button id="capture" class="text-button" hidden>Isoler un choc mutuel</button></div>
           <div class="illustration-controls" id="illustrationControls"><button id="illustrate" class="button primary">▶ Comprendre la pression</button><button id="endIllustration" class="text-button" hidden>Quitter le zoom</button></div>
-          <div id="measurementActions" class="illustration-controls"><button id="illustrateTemperature" class="button primary" hidden>▶ Des vitesses à la température</button><button id="nextTemperatureStage" class="text-button" hidden>Étape suivante →</button><button id="finishMeasurementStory" class="text-button" hidden>Retour à la simulation</button></div>
+          <div id="measurementActions" class="illustration-controls"><button id="illustrateTemperature" class="button primary" hidden>▶ Des vitesses à la température</button><button id="nextTemperatureStage" class="text-button" hidden>Étape suivante →</button></div>
           <div id="tourStatus" class="tour-status" hidden><div><span id="tourStage" class="tour-stage"></span><span id="tourSpeed"></span></div><p id="tourCaption" role="status" aria-live="polite"></p><div class="tour-track"><span id="tourProgress"></span></div></div>
           <div id="zoomPanel" class="zoom-panel">
             <div class="zoom-heading"><span id="zoomTitle">Zoom · un choc sur le piston</span><span id="collisionTime">En attente d’un choc</span></div>
@@ -172,7 +172,7 @@
         <div class="panel distributions"><div><h2>Norme des vitesses</h2><canvas id="speedHistogram" aria-label="Distribution de la norme des vitesses"></canvas></div><div><h2>Énergie cinétique par marqueur</h2><canvas id="energyHistogram" aria-label="Distribution de l’énergie cinétique des particules"></canvas></div><p id="distributionLegend">État actuel et état initial, densités normalisées.</p></div>
       </details>
     </section>
-    <footer><span>Gaz 2D · version 0.14.0</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
+    <footer><span>Gaz 2D · version 0.15.0</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
   </main>
 </body>
 </html>

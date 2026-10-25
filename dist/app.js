@@ -24,7 +24,7 @@
   const snapshots = sim => ({ speeds: sim.particles.map(p => Math.hypot(p.vx, p.vy)), energies: sim.particles.map(p => (p.vx ** 2 + p.vy ** 2) / 2) });
   function createSession(key, previous) {
     const config = experiments[key];
-    const s = { key, model: 'hard-disks', radius: sharedRadius, radiusRecords: previous?.radiusRecords ?? [], recordX: previous?.recordX ?? 'radius', recordY: previous?.recordY ?? 'ratio', lesson:null, lastLesson:null, pressureSequence:null, batch:null, batchMessage:'', cycle:null, lastRecordTime: null, alpha: previous?.alpha ?? 1, fitEnabled: previous?.fitEnabled ?? true, autoRecords: previous?.autoRecords ?? false, recordPage: previous?.recordPage ?? 0, initialTemperature: previous?.initialTemperature || 1.5,
+    const s = { key, model: 'hard-disks', radius: sharedRadius, radiusRecords: previous?.radiusRecords ?? [], recordX: previous?.recordX ?? 'radius', recordY: previous?.recordY ?? 'ratio', lesson:null, returning:null, lastLesson:null, pressureSequence:null, batch:null, batchMessage:'', cycle:null, lastRecordTime: null, alpha: previous?.alpha ?? 1, fitEnabled: previous?.fitEnabled ?? true, autoRecords: previous?.autoRecords ?? false, recordPage: previous?.recordPage ?? 0, initialTemperature: previous?.initialTemperature || 1.5,
       action: previous?.action ?? config.action, duration: 72, ratio: key === 'free' ? 200 : (previous?.action ?? config.action) === 'compression' ? 70 : 140,
       source: config.source, chart: config.chart, zoom: config.zoom, speed: config.speed, playing: true, vectors: false,
       bath: previous?.bath ?? 3, accommodation: previous?.accommodation ?? 1, allWalls: previous?.allWalls ?? false,
@@ -47,7 +47,7 @@
   function notify(message) { $('notice').textContent = message; }
   function selectExperiment(key, focus = false) {
     if (!experiments[key]) return;
-    if (sessions.has(active)) { if (session().tour) cancelIllustration(); session().seek = null; }
+    if (sessions.has(active)) { if (session().tour&&!session().returning) cancelIllustration(); session().seek = null; }
     active = key;
     if (!sessions.has(key)) sessions.set(key, createSession(key));
     accumulator = 0; previousFrame = 0;
@@ -132,36 +132,51 @@
     for (const id of ['timeScale','thermalMode','accommodation','allWalls','particleRadius','applyRadius','initialTemperature','applyInitial']) $(id).disabled = touring || (batching && id !== 'timeScale');
     $('bathTemperature').disabled = touring || s.thermalMode === 'isolated';
     $('illustrate').disabled = touring || (active === 'heat' && (s.thermalMode === 'isolated' || s.accommodation === 0)) || (active === 'adiabatic' && !moving && Math.abs(target(s)-s.sim.width)<1e-3);
-    $('endIllustration').hidden = !touring; $('tourStatus').hidden = !touring;
+    $('endIllustration').hidden = !touring || active==='pressure'; $('tourStatus').hidden = !touring || !!s.returning;
     $('zoomPanel').hidden = !s.zoom || active !== 'comparison'; $('microObservation').hidden = s.zoom || touring || active === 'comparison';
     $('microHint').textContent = active === 'temperature' ? 'L’illustration fige un état réel. Les flèches représentent les vitesses de cet instant ; leur réorganisation graphique ne modifie pas le gaz.' : active === 'cycles' ? 'Suivez les allers-retours du piston sur le diagramme P–V. La vitesse du piston change le travail et l’échauffement du gaz.' : active === 'comparison' ? 'Les chocs mutuels redistribuent les vitesses. Pour chaque rayon, attendez la stabilisation de la mesure ; un écart à 1 peut aussi fluctuer.' : active === 'pressure' ? 'Un seul parcours : un choc à la loupe, retour au gaz, puis zoom sur une surface pour additionner les poussées.' : active === 'heat' ? 'Le parcours montre deux échanges successifs : de la paroi vers le gaz, puis du gaz vers la paroi. Le flux moyen peut avoir un autre signe que celui d’un choc.' : active === 'adiabatic' ? 'Le bouton d’illustration lance le trajet choisi si nécessaire. La paroi mobile et la particule échangent de l’énergie au moment du choc.' : 'L’espace vide se remplit sans travail du piston. Attendez le retour à un état homogène pour interpréter PV/(nRT).';
     $('pause').textContent = s.playing ? 'Ⅱ Pause' : '▶ Reprendre'; $('pause').setAttribute('aria-label', s.playing ? 'Mettre en pause' : 'Reprendre la simulation');
     $('capture').disabled = !!s.seek || batching;
     const lesson=!!s.lesson;
-    $('measurementActions').hidden=active!=='temperature'&&!lesson;
+    $('measurementActions').hidden=active!=='temperature';
     $('illustrateTemperature').hidden=active!=='temperature';
-    $('finishMeasurementStory').hidden=!lesson;
-    $('nextTemperatureStage').hidden=!lesson||s.lesson.kind!=='temperature'; $('nextTemperatureStage').disabled=s.lesson?.phase==='done';
-    $('illustrateTemperature').disabled=lesson||touring;
+    $('nextTemperatureStage').hidden=!lesson||s.lesson.kind!=='temperature'; $('nextTemperatureStage').disabled=s.lesson?.phase==='done'||!!s.lesson?.entry||!!s.returning;
     $('illustrate').disabled=$('illustrate').disabled||lesson;
     if(lesson){
       for(const id of ['step','timeScale','applyInitial','initialTemperature','pressureSource','extraChart']) $(id).disabled=true;
       $('pause').textContent=s.lesson.phase==='done'?'▶ Reprendre':s.lesson.paused?'▶ Reprendre l’animation':'Ⅱ Pause animation';
       $('pause').setAttribute('aria-label',s.lesson.phase==='done'?'Reprendre la simulation':s.lesson.paused?'Reprendre l’animation':'Mettre l’animation en pause');
     }else {$('step').disabled=false;$('extraChart').disabled=false;}
+    $('pause').disabled=!!s.returning;
+    if(active==='pressure'){
+      $('illustrate').textContent=s.returning?'Retour en cours…':touring||lesson?'Retour à la simulation':'▶ Comprendre la pression';
+      $('illustrate').disabled=!!s.returning;
+    }
+    $('illustrateTemperature').textContent=s.returning?'Retour en cours…':lesson?'Retour à la simulation':'▶ Des vitesses à la température';
+    $('illustrateTemperature').disabled=!!s.returning;
+    if(s.returning)for(const id of ['step','timeScale','applyInitial','initialTemperature','pressureSource','extraChart'])$(id).disabled=true;
     updateMeasurementStory();
     document.querySelectorAll('input[type="range"]').forEach(input => input.style.setProperty('--fill', ((+input.value - +input.min) / (+input.max - +input.min) * 100) + '%'));
   }
-  function lessonSummary(l){return l.kind==='pressure'?{kind:l.kind,phase:l.phase,start:l.start,elapsed:l.elapsed,zoom:l.zoom,events:l.events.map(e=>({...e})),impulse:l.impulse,pressure:l.pressure,surface:l.surface,y0:l.y0,y1:l.y1}:{kind:l.kind,phase:l.phase,time:l.time,elapsed:l.elapsed,count:l.particles.length,localCount:l.local.length,energy:l.energy,localEnergy:l.localEnergy,temperature:l.temperature,localTemperature:l.localTemperature};}
+  function lessonSummary(l){return l.kind==='pressure'?{kind:l.kind,phase:l.phase,start:l.start,elapsed:l.elapsed,zoom:l.zoom,events:l.events.map(e=>({...e})),impulse:l.impulse,pressure:l.pressure,surface:l.surface,y0:l.y0,y1:l.y1}:{kind:l.kind,phase:l.phase,time:l.time,elapsed:l.elapsed,zoom:l.visual.zoom,rate:l.rate,selection:l.visual.selection,count:l.particles.length,localCount:l.local.length,energy:l.energy,localEnergy:l.localEnergy,temperature:l.temperature,localTemperature:l.localTemperature};}
   function beginMeasurementStory(kind,options={}){
     const s=session();if(s.tour||s.lesson)return;
-    s.lesson=kind==='pressure'?new GasLessons.PressureWindow(s.sim,options):new GasLessons.TemperatureSnapshot(s.sim);
+    s.lesson=kind==='pressure'?new GasLessons.PressureWindow(s.sim,{speed:s.speed,...options}):new GasLessons.TemperatureLesson(s.sim,{speed:s.speed,playing:s.playing});
     if(kind==='temperature'&&window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)s.lesson.paused=true;
     s.lesson.wasPlaying=options.wasPlaying??s.playing;s.playing=false;s.seek=null;accumulator=0;updateControls();render();
   }
-  function endMeasurementStory(resume){
-    const s=session();if(!s.lesson)return;
-    s.lastLesson=lessonSummary(s.lesson);s.playing=resume??s.lesson.wasPlaying;s.lesson=null;accumulator=0;updateControls();render();
+  function returnToSimulation(){
+    const s=session();if(s.returning||(!s.lesson&&!s.tour))return;
+    const l=s.lesson,v=s.tour?.view;
+    s.returning=new GasLessons.SimulationReturn({zoom:l?.kind==='temperature'?l.visual.zoom:l?.zoom??v.zoom,
+      rate:l?l.rate??0:v.rate,speed:s.speed,visual:l?.kind==='temperature'?l.visual:null});
+    s.returning.tourView=v;s.pressureSequence=null;s.playing=false;accumulator=0;updateControls();render();
+  }
+  function finishReturn(){
+    const s=session();if(s.lesson)s.lastLesson=lessonSummary(s.lesson);
+    if(s.tour)s.lastTour={kind:s.tour.kind,events:s.tour.events.map(e=>({...e})),phase:'cancelled'};
+    s.lesson=null;s.tour=null;s.returning=null;s.focus=null;s.playing=true;accumulator=0;sample(s);updateControls();render();
+    notify('Vue d’ensemble et vitesse de lecture choisie rétablies.');
   }
   function updateMeasurementStory(){
     const s=session(),l=s.lesson,show=!!l||active==='temperature';
@@ -175,7 +190,7 @@
     $('storyProgress').style.setProperty('width',!l?'0%':(100*(l.kind==='pressure'?l.elapsed/l.duration:l.elapsed/18))+'%');
     if(!l){
       $('storyTitle').textContent='La température mesure l’agitation, pas une direction.';
-      $('storyText').textContent='L’animation part d’un instant figé : zoom → vecteurs vitesse → normes → énergies → moyenne.';
+      $('storyText').textContent='Le gaz ralentit, une zone est encadrée, puis agrandie : vecteurs vitesse → normes → énergies → moyenne.';
       $('storyFormula').textContent='Ec,i = ½ m |vi|² ; E = Σ Ec,i ; T = E/(nR)';
       $('storyDetails').textContent='Dans ce modèle 2D, T est proportionnelle à la moyenne des carrés des vitesses, et non au carré de la vitesse moyenne. La masse est celle d’un marqueur représentatif.';
       return;
@@ -191,17 +206,29 @@
       $('storyGaugeFill').style.setProperty('width',100*Math.min(1,(l.pressure??0)/(4*s.initial.pressureIdeal))+'%');
       $('storyGaugeFill').setAttribute('aria-label','Pression locale : '+U.text('pressure',l.pressure));
     }else{
+      $('lessonCanvas').hidden=!!l.entry;
+      if(l.entry){
+        $('storyTitle').textContent=l.phase==='slowdown'?'Ralentir jusqu’à l’arrêt':'Choisir une zone à observer';
+        $('storyText').textContent=l.phase==='slowdown'?'Gardez le piston entier sous les yeux : le temps ralentit progressivement, jusqu’à figer le gaz.':'Le rectangle délimite les particules que nous allons agrandir. Le gaz reste figé.';
+        $('storyFormula').textContent='Ec,i = ½ m |vi|² ; E = Σ Ec,i ; T = E/(nR)';
+        $('storyDetails').textContent=l.phase==='slowdown'?'Seule la vitesse de lecture change. Les vitesses physiques et les collisions restent les mêmes.':'Instant figé : '+U.text('time',l.time,3)+' · '+l.local.length+' particules dans la zone.';
+      }else{
       GasLessons.temperatureGraph($('lessonCanvas'),l);
-      const titles={zoom:'1 · Figer et agrandir une zone',vectors:'2 · Observer tous les vecteurs vitesse de la zone',align:'3 · Collecter et aligner les vecteurs',energy:'4 · Passer de la norme à l’énergie cinétique',sum:'5 · Additionner les énergies',global:'6 · Faire la moyenne sur tout le système',done:'La température de cet instant est calculée.'};
+      const titles={zoom:'1 · Agrandir la zone encadrée',vectors:'2 · Observer tous les vecteurs vitesse de la zone',align:'3 · Collecter et aligner les vecteurs',energy:'4 · Passer de la norme à l’énergie cinétique',sum:'5 · Additionner les énergies',global:'6 · Faire la moyenne sur tout le système',done:'La température de cet instant est calculée.'};
       $('storyTitle').textContent=titles[l.phase];
       $('storyText').textContent=l.elapsed<5?'Les positions et les vitesses sont celles de l’instant figé. Chaque flèche conserve la direction et la norme de sa vitesse.':l.elapsed<8?'On réorganise les flèches à l’écran en conservant leur longueur. Le sens ne joue plus de rôle dans |v|². Les vitesses physiques restent inchangées.':l.elapsed<11?'Les normes donnent Ec,i = ½ m |vi|². Une vitesse doublée donne une énergie quadruplée.':l.elapsed<15?'Chaque énergie apporte une contribution positive à la somme. On ne somme pas les vecteurs vitesse.':'La zone sert à comprendre. La température du simulateur utilise la somme sur les 1 000 particules.';
       $('storyFormula').textContent=l.elapsed<15?'Ezone = Σ Ec,i ; ⟨Ec⟩zone = Ezone / '+l.local.length:'⟨Ec⟩ = '+U.text('energy',l.energy/l.particles.length,3)+' ; T = E/(nR) = '+format(l.temperature)+' K';
       $('storyDetails').textContent='Instant figé : '+U.text('time',l.time,3)+' · '+l.local.length+' particules dans la zone. '+(l.elapsed>=15?'Estimation locale : '+format(l.localTemperature)+' K ; système entier : '+format(l.temperature)+' K. Le petit échantillon fluctue. Échelles de marqueurs : m = '+(U.scales.energy/U.scales.velocity**2).toExponential(3)+' kg.':'La somme sur la zone est un exemple ; elle ne remplace pas la mesure globale.');
+      }
     }
+    if(s.returning){
+      const phase=s.returning.phase;
+      $('storyTitle').textContent=phase==='restore'?'Retrouver les particules':phase==='zoomOut'?'Revenir au piston entier':'Relancer progressivement le temps';
+      $('storyText').textContent=phase==='restore'?'Les dessins retrouvent leur position dans l’instant figé.':phase==='zoomOut'?'La caméra recule jusqu’à la vue d’ensemble.':'Le gaz retrouve progressivement la vitesse de lecture choisie.';
+    }else if(l.phase==='done')$('storyText').textContent+=' Utilisez « Retour à la simulation » pour dézoomer puis relancer le temps.';
   }
-  $('illustrateTemperature').addEventListener('click',()=>beginMeasurementStory('temperature'));
-  $('nextTemperatureStage').addEventListener('click',()=>{const l=session().lesson;if(l?.kind!=='temperature')return;l.elapsed=[2,5,8,11,15,18].find(t=>t>l.elapsed+1e-8)??18;l.paused=true;updateControls();render();});
-  $('finishMeasurementStory').addEventListener('click',()=>endMeasurementStory());
+  $('illustrateTemperature').addEventListener('click',()=>session().lesson?returnToSimulation():beginMeasurementStory('temperature'));
+  $('nextTemperatureStage').addEventListener('click',()=>{const l=session().lesson;if(l?.kind!=='temperature'||l.entry||session().returning)return;l.elapsed=[2,5,8,11,15,18].find(t=>t>l.elapsed+1e-8)??18;l.paused=true;updateControls();render();});
   function launchCycles() {
     const s=session();
     s.cycle={running:true,leg:0,count:+$('cycleCount').value,wide:s.sim.width,narrow:s.sim.width*.7,legDuration:duration(s)};
@@ -296,7 +323,7 @@
     updateControls(); render(); notify('Les conditions thermiques s’appliquent aux prochains chocs. Les échanges passés restent dans le cumul Q.');
   }
   function illustrate() {
-    const s = session(); if (s.tour||s.lesson) return;
+    const s = session(); if(active==='pressure'&&(s.tour||s.lesson)){returnToSimulation();return;}if(s.tour||s.lesson||s.returning)return;
     if(active==='pressure')s.pressureSequence={wasPlaying:s.playing};
     if (active === 'adiabatic' && !s.sim.motion) {
       if (Math.abs(target(s)-s.sim.width)<1e-3) { notify('Choisissez un autre volume cible pour remettre le piston en mouvement.'); return; }
@@ -484,11 +511,14 @@
   }
   function draw() {
     const s = session(), opts = { initialTemperature: s.initialTemperature, vectors: s.vectors, focus: s.zoom ? s.focus : null, target: s.action === 'fixed' ? null : target(s), tour: s.tour?.view ?? null };
+    const r=s.returning;
+    if(r?.phase==='resume'){G.chamber($('chamber'),s.sim,{...opts,tour:null,focus:null});return;}
     if(s.lesson){
-      if(s.lesson.kind==='temperature')GasLessons.temperatureChamber($('chamber'),s.lesson);
-      else GasLessons.pressureChamber($('chamber'),s.sim,s.lesson,{initialTemperature:s.initialTemperature,vectors:s.vectors});
+      if(s.lesson.kind==='temperature')GasLessons.temperatureChamber($('chamber'),s.sim,s.lesson,{initialTemperature:s.initialTemperature,visual:r?.visual??s.lesson.visual});
+      else GasLessons.pressureChamber($('chamber'),s.sim,s.lesson,{initialTemperature:s.initialTemperature,vectors:s.vectors,zoom:r?.zoom,opacity:r?1-r.progress:1});
       return;
     }
+    if(r){G.chamber($('chamber'),s.sim,{...opts,tour:{...r.tourView,zoom:r.zoom}});return;}
     if (s.other) {
       const maxWidth = Math.max(12, s.sim.width, s.other.width, s.action === 'fixed' ? 0 : target(s));
       G.chamber($('idealChamber'), s.sim, { ...opts, focus: null, maxWidth });
@@ -587,12 +617,15 @@
   function frame(timestamp) {
     const s = session(); if (!previousFrame) previousFrame = timestamp;
     const elapsed = Math.min(.06, Math.max(0,(timestamp - previousFrame) / 1000)); previousFrame = timestamp;
-    if (!document.hidden && s.lesson) {
+    if(!document.hidden&&s.returning){
+      const r=s.returning,phase=r.phase;r.tick(elapsed,h=>advance(s,h));
+      if(r.phase==='done')finishReturn();else if(phase!==r.phase)updateControls();
+      updateMeasurementStory();
+    } else if (!document.hidden && s.lesson) {
       const l=s.lesson;
       if(!l.paused&&l.phase!=='done'){
         const phase=l.phase;
-        if(l.kind==='temperature')l.tick(elapsed);
-        else l.tick(elapsed,s.sim,h=>advance(s,h),s.speed);
+        l.tick(elapsed,s.sim,h=>advance(s,h),s.speed);
         if(phase!==l.phase)updateControls();
       }
       updateMeasurementStory();
@@ -632,7 +665,7 @@
   });
   $('brandHome').addEventListener('click', e => { e.preventDefault(); selectExperiment('pressure',true); });
   $('nextExperience').addEventListener('click', () => { const keys = Object.keys(experiments); selectExperiment(keys[(keys.indexOf(active)+1)%keys.length],true); });
-  $('pause').addEventListener('click', () => { if(session().lesson){if(session().lesson.phase==='done')endMeasurementStory(true);else{session().lesson.paused=!session().lesson.paused;updateControls();}return;} if (session().tour) { cancelIllustration(true); return; } session().playing = !session().playing; session().seek = null; if (!session().playing) sample(session()); accumulator = 0; updateControls(); render(); });
+  $('pause').addEventListener('click', () => { if(session().lesson){if(session().lesson.phase==='done')returnToSimulation();else{session().lesson.paused=!session().lesson.paused;updateControls();}return;} if (session().tour) { cancelIllustration(true); return; } session().playing = !session().playing; session().seek = null; if (!session().playing) sample(session()); accumulator = 0; updateControls(); render(); });
   $('step').addEventListener('click', () => { const s = session(); if (s.tour) cancelIllustration(true); s.playing = false; s.seek = null; advance(s,.02); chooseCollision(s,true); sample(s); accumulator = 0; updateControls(); render(); });
   $('reset').addEventListener('click', reset); $('start').addEventListener('click',launch); $('capture').addEventListener('click',capture);
   $('stop').addEventListener('click', () => { const s = session(); if (s.cycle) s.cycle.running=false; if (s.tour) cancelIllustration(); for (const sim of states(s)) sim.stopMotion(); sample(s); updateControls(); render(); notify('Piston arrêté : les prochains chocs ne fournissent plus de travail, même si la pression reste non nulle.'); });
@@ -713,6 +746,6 @@
   selectExperiment('pressure'); requestAnimationFrame(frame);
   Object.defineProperty(window,'gaz2D',{value:{
     get metrics(){return {...session().sim.metrics};}, get comparisonMetrics(){return session().other ? {...session().other.metrics} : null;},
-    get paused(){return !session().playing;}, get analysis(){const s=session();return {experiment:active,chartType:s.chart,pressureSource:s.source,count:N,history:s.history.map(r=>({...r})),collision:s.focus,plot:chartData(),recordPlot:recordPlotData(),alpha:s.alpha,autoRecords:s.autoRecords,radiusRecords:s.radiusRecords.map(r=>({...r,correctedRatio:recordFields.correctedRatio.value(r)})),run:s.run,lesson:s.lesson?lessonSummary(s.lesson):null,lastLesson:s.lastLesson,batch:s.batch?{...s.batch}:null,cycle:s.cycle?{...s.cycle}:null,seek:!!s.seek,tour:s.tour?.view ?? null,lastTour:s.lastTour};}
+    get paused(){return !session().playing;}, get analysis(){const s=session();return {experiment:active,chartType:s.chart,pressureSource:s.source,count:N,history:s.history.map(r=>({...r})),collision:s.focus,plot:chartData(),recordPlot:recordPlotData(),alpha:s.alpha,autoRecords:s.autoRecords,radiusRecords:s.radiusRecords.map(r=>({...r,correctedRatio:recordFields.correctedRatio.value(r)})),run:s.run,returning:s.returning?{phase:s.returning.phase,zoom:s.returning.zoom,rate:s.returning.rate}:null,lesson:s.lesson?lessonSummary(s.lesson):null,lastLesson:s.lastLesson,batch:s.batch?{...s.batch}:null,cycle:s.cycle?{...s.cycle}:null,seek:!!s.seek,tour:s.tour?.view ?? null,lastTour:s.lastTour};}
   },writable:false});
 })();

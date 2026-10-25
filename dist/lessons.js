@@ -7,19 +7,18 @@
   function line(c,x,y,X,Y,color,width=1){c.beginPath();c.moveTo(x,y);c.lineTo(X,Y);c.strokeStyle=color;c.lineWidth=width;c.stroke();}
   function arrow(c,x,y,dx,dy,color){const a=Math.atan2(dy,dx);line(c,x,y,x+dx,y+dy,color,2);line(c,x+dx,y+dy,x+dx-5*Math.cos(a-.5),y+dy-5*Math.sin(a-.5),color,2);line(c,x+dx,y+dy,x+dx-5*Math.cos(a+.5),y+dy-5*Math.sin(a+.5),color,2);}
   function text(c,str,x,y,color='#294b5b',size=12){c.font=size+'px system-ui';c.fillStyle=color;c.textAlign='left';c.fillText(str,x,y);}
-  function dot(c,x,y,r,color){c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.fillStyle=color;c.fill();}
   class PressureWindow {
-    constructor(sim,{cinematic=false}={}){this.cinematic=cinematic;this.cameraTime=0;this.accumulator=0;this.kind='pressure';this.start=sim.time;this.duration=2;this.y0=sim.height*.25;this.y1=sim.height*.75;this.width=sim.width;this.lastId=sim._collisions;this.events=[];this.elapsed=0;this.paused=false;this.phase=cinematic?'overview':'collect';}
+    constructor(sim,{cinematic=false,speed=1}={}){this.speed=speed;this.cinematic=cinematic;this.cameraTime=0;this.accumulator=0;this.kind='pressure';this.start=sim.time;this.duration=2;this.y0=sim.height*.25;this.y1=sim.height*.75;this.width=sim.width;this.lastId=sim._collisions;this.events=[];this.elapsed=0;this.paused=false;this.phase=cinematic?'overview':'collect';}
     collect(sim){
       for(const e of sim._events)if(e.id>this.lastId&&e.time>this.start&&e.time<=this.start+this.duration+1e-9&&e.wall==='right'&&e.y>=this.y0&&e.y<=this.y1)this.events.push({...e});
       this.lastId=sim._collisions;this.events.sort((a,b)=>a.time-b.time||a.id-b.id);
       this.elapsed=Math.min(this.duration,sim.time-this.start);if(this.elapsed>=this.duration-1e-9)this.phase='done';
     }
+    get rate(){return this.paused||this.phase==='done'?0:this.phase==='overview'?(this.speed??1):this.phase==='zoom'?(this.speed??1)+(Math.min(.25,this.speed??1)-(this.speed??1))*this.zoom:Math.min(.25,this.speed??1);}
     get zoom(){return this.phase==='overview'?0:this.phase==='zoom'?ease(this.cameraTime/1.4):1;}
     tick(seconds,sim,advance,speed=1){
       if(this.paused||this.phase==='done')return;
-      const phase=this.phase;
-      const rate=phase==='overview'?speed:phase==='zoom'?speed+(Math.min(.25,speed)-speed)*this.zoom:Math.min(.25,speed);
+      this.speed=speed;const phase=this.phase,rate=this.rate;
       this.accumulator=Math.min(.15,this.accumulator+seconds*rate);
       for(let i=0;i<24&&this.accumulator>=1/120&&this.phase!=='done';i++){
         const dt=phase==='collect'?Math.min(1/120,this.duration-this.elapsed):1/120;
@@ -54,37 +53,73 @@
     get counted(){return Math.round(clamp((this.elapsed-11)/4)*this.local.length);}
     get partialEnergy(){return this.local.slice(0,this.counted).reduce((s,p)=>s+p.energy,0);}
   }
+  // Time ramps advance the real simulator in bounded steps; they never scale velocities.
+  function advanceTime(dt,advance){while(dt>1e-12){const h=Math.min(1/120,dt);advance(h);dt-=h;}}
+  class TemperatureLesson extends TemperatureSnapshot {
+    constructor(sim,{speed=1,playing=true}={}){super(sim);this.entry='slowdown';this.entryTime=0;this.startRate=playing?speed:0;}
+    get phase(){return this.entry||super.phase;}
+    get rate(){return !this.paused&&this.entry==='slowdown'?this.startRate*(1-ease(this.entryTime/1.6)):0;}
+    get visual(){return {zoom:this.entry?0:ease(this.elapsed/2),selection:this.entry==='slowdown'?0:this.entry==='frame'?ease(this.entryTime):1,arrange:ease((this.elapsed-5)/3),energyMix:ease((this.elapsed-8)/3),opacity:1};}
+    tick(seconds,sim,advance){
+      if(this.paused)return;
+      if(!this.entry){super.tick(seconds);return;}
+      const phase=this.entry,duration=phase==='slowdown'?1.6:1,dt=Math.min(seconds,duration-this.entryTime),before=this.rate;
+      this.entryTime+=dt;
+      if(phase==='slowdown')advanceTime(dt*(before+this.rate)/2,advance);
+      if(this.entryTime>=duration-1e-9){
+        if(phase==='slowdown')Object.assign(this,new TemperatureSnapshot(sim));
+        this.entry=phase==='slowdown'?'frame':null;this.entryTime=0;
+      }
+    }
+  }
+  class SimulationReturn {
+    constructor({zoom=0,rate=0,speed=1,visual=null}={}){
+      this.startZoom=zoom;this.startRate=rate;this.speed=speed;this.original=visual;
+      this.phase=visual?.arrange>0?'restore':'zoomOut';this.elapsed=0;
+    }
+    get duration(){return this.phase==='restore'?1.1:this.phase==='zoomOut'?1.4:1.6;}
+    get progress(){return ease(this.elapsed/this.duration);}
+    get zoom(){return this.phase==='restore'?this.startZoom:this.phase==='zoomOut'?this.startZoom*(1-this.progress):0;}
+    get rate(){return this.phase==='zoomOut'?this.startRate*(1-this.progress):this.phase==='resume'?this.speed*this.progress:0;}
+    get visual(){const q=this.phase==='restore'?1-this.progress:0;return {...this.original,zoom:this.zoom,arrange:(this.original?.arrange??0)*q,energyMix:(this.original?.energyMix??0)*q,opacity:this.phase==='restore'?1:this.phase==='zoomOut'?1-this.progress:0,selection:(this.original?.selection??0)*(this.phase==='restore'?1:this.phase==='zoomOut'?1-this.progress:0)};}
+    tick(seconds,advance){
+      if(this.phase==='done')return;
+      const dt=Math.min(seconds,this.duration-this.elapsed),before=this.rate;this.elapsed+=dt;
+      advanceTime(dt*(before+this.rate)/2,advance);
+      if(this.elapsed>=this.duration-1e-9){this.phase=this.phase==='restore'?'zoomOut':this.phase==='zoomOut'?'resume':'done';this.elapsed=0;}
+    }
+  }
   function pressureChamber(canvas,sim,story,options={}){
     // Reuse the normal simulation renderer: same particles, radii, colors and walls.
-    root.LabGraphics.chamber(canvas,sim,{...options,region:{x:sim.width,y:(story.y0+story.y1)/2,y0:story.y0,y1:story.y1,zoom:story.zoom,events:story.events}});
+    root.LabGraphics.chamber(canvas,sim,{...options,region:{x:sim.width,y:(story.y0+story.y1)/2,y0:story.y0,y1:story.y1,zoom:options.zoom??story.zoom,opacity:options.opacity??1,events:story.events}});
   }
-  function temperatureChamber(canvas,story){
-    const surf=root.LabGraphics.setup(canvas);if(!surf)return;const{ctx:c,w,h}=surf;
-    const t=story.elapsed,b=story.bounds,returning=clamp((t-15)/3),zoom=ease(t/2)*(1-ease(returning));
-    const scale0=Math.min((w-45)/story.width,(h-60)/story.height),scale1=Math.min((w-95)/(2*b.half),(h-95)/(2*b.half)),scale=scale0+(scale1-scale0)*zoom;
-    const X=x=>w/2+(x-b.cx)*scale,Y=y=>h/2-(y-b.cy)*scale;
-    const arrange=ease((t-5)/3),energyMix=ease((t-8)/3),vanish=1-ease(returning);
+  function temperatureChamber(canvas,sim,story,options={}){
+    const v=options.visual??story.visual,t=story.elapsed,b=story.bounds;
+    const area={...b,zoom:v.zoom,selection:v.selection,opacity:1-v.arrange};
+    root.LabGraphics.chamber(canvas,sim,{...options,vectors:false,area,particleOpacity:1-v.arrange});
+    const c=canvas.getContext('2d'),{width:w,height:h}=canvas.getBoundingClientRect();if(!w||!h)return;
+    const {X,Y}=root.LabGraphics.chamberCamera(w,h,sim,{area});
+    const arrange=v.arrange,energyMix=v.energyMix;
     c.save();c.beginPath();c.rect(8,25,w-16,h-45);c.clip();
-    if(t<8||t>=15){
-      line(c,X(0),Y(0),X(story.width),Y(0),'#9db1b9',2);line(c,X(story.width),Y(0),X(story.width),Y(story.height),'#9db1b9',4);line(c,X(0),Y(story.height),X(story.width),Y(story.height),'#9db1b9',2);line(c,X(0),Y(0),X(0),Y(story.height),'#9db1b9',2);
-      for(const p of story.particles){c.globalAlpha=t<8?1-arrange*.9:1;dot(c,X(p.x),Y(p.y),Math.max(1.5,story.radius*scale),story.localIds.has(p.id)?'#cb8a37':'#83b6c0');}c.globalAlpha=1;
-      c.setLineDash([5,4]);c.strokeStyle='#cb8a37';c.strokeRect(X(b.cx-b.half),Y(b.cy+b.half),2*b.half*scale,2*b.half*scale);c.setLineDash([]);
-    }
-    if(t>=2&&t<18){
+    if(t>=2){
       const cols=w<380?1:2,rows=Math.ceil(story.local.length/cols),rowH=Math.min(40,(h-75)/rows),cellW=(w-35)/cols,unit=Math.min(75,cellW-100)/story.maxSpeed;
       story.local.forEach((p,i)=>{
         const col=Math.floor(i/rows),row=i%rows,tx=30+col*cellW,ty=45+row*rowH;
-        const a=arrange*(1-ease(returning)),x=X(p.x)+(tx-X(p.x))*a,y=Y(p.y)+(ty-Y(p.y))*a;
+        const a=arrange,x=X(p.x)+(tx-X(p.x))*a,y=Y(p.y)+(ty-Y(p.y))*a;
         // Rotating and translating the drawing preserves every original norm.
         const angle=Math.atan2(-p.vy,p.vx)*(1-a),len=p.speed*unit;
-        c.globalAlpha=vanish;
-        if(energyMix<1)arrow(c,x,y,len*Math.cos(angle),len*Math.sin(angle),'#268985');
-        if(a>.9){text(c,String(i+1),x-22,y+3,'#82949d',9);text(c,f(p.speed*U.scales.velocity,0)+' m/s',x,y-7,'#278982',10);}
-        if(energyMix>0){c.fillStyle='#d4974c';c.fillRect(tx,ty+3,energyMix*p.energy/story.maxEnergy*Math.min(85,cellW-95),7);text(c,f(p.energy*U.scales.energy,3)+' J',tx+Math.min(90,cellW-90),ty+10,'#9b672e',9);}
-      });c.globalAlpha=1;
+        c.globalAlpha=v.opacity*(1-energyMix);
+        arrow(c,x,y,len*Math.cos(angle),len*Math.sin(angle),'#268985');
+        c.globalAlpha=v.opacity*a;
+        if(a>.01){text(c,String(i+1),x-22,y+3,'#82949d',9);text(c,f(p.speed*U.scales.velocity,0)+' m/s',x,y-7,'#278982',10);}
+        c.globalAlpha=v.opacity*energyMix;
+        if(energyMix>0){c.fillStyle='#d4974c';c.fillRect(x,y+3,p.energy/story.maxEnergy*Math.min(85,cellW-95),7);text(c,f(p.energy*U.scales.energy,3)+' J',x+Math.min(90,cellW-90),y+10,'#9b672e',9);}
+      });
     }
-    c.restore();text(c,'Instant figé : t = '+U.text('time',story.time),18,17);
-    text(c,t<5?'Toutes les vitesses de la zone encadrée':t<8?'On déplace et oriente les dessins, sans changer les normes':t<15?'Même masse : Ec = ½ m |v|² pour chaque marqueur':'Retour aux '+story.particles.length+' particules du système',18,h-7,'#687f8a',10);
+    c.restore();c.globalAlpha=v.opacity;
+    if(story.phase!=='slowdown')text(c,'Instant figé : t = '+U.text('time',story.time),18,17);
+    if(t>=2)text(c,t<5?'Toutes les vitesses de la zone encadrée':t<8?'On déplace et oriente les dessins, sans changer les normes':t<15?'Même masse : Ec = ½ m |v|² pour chaque marqueur':'La même méthode s’applique aux 1 000 particules',18,h-7,'#687f8a',10);
+    c.globalAlpha=1;
   }
   function pressureGraph(canvas,s){
     const surf=root.LabGraphics.setup(canvas);if(!surf)return;const{ctx:c,w,h}=surf;const left=35,right=w-18,X=t=>left+(t-s.start)/s.duration*(right-left),max=Math.max(1,...s.events.map(e=>e.impulse));
@@ -118,5 +153,5 @@
       text(c,'T = E totale / (nR) = '+f(s.temperature)+' K',25,241,'#248b7c',16);
     }else text(c,'Puis on fait la même somme sur tout le gaz.',25,165,'#687f8a');
   }
-  root.GasLessons={PressureWindow,TemperatureSnapshot,pressureChamber,temperatureChamber,pressureGraph,temperatureGraph};
+  root.GasLessons={PressureWindow,TemperatureSnapshot,TemperatureLesson,SimulationReturn,pressureChamber,temperatureChamber,pressureGraph,temperatureGraph};
 })(typeof globalThis!=='undefined'?globalThis:window);

@@ -136,7 +136,7 @@ test('pressure illustration follows a future collision, restores playback and ke
   assert.equal(lab.nodes.get('energyBalance').hidden,true);assert.equal(lab.nodes.get('motionChoice').hidden,true);assert.equal(lab.nodes.get('workLesson').hidden,true);
   lab.finishTour();const e=lab.analysis.lastTour.events[0];assert.ok(e.time>initial);assert.equal(e.wall,'right');assert.ok(e.impulse>0);assert.equal(e.wallVelocity,0);
   assert.ok(Math.abs(e.energyAfter-e.energyBefore)<1e-10);assert.equal(lab.analysis.lesson.phase,'overview');assert.equal(lab.analysis.lesson.zoom,0);
-  assert.ok(!lab.nodes.has('illustratePressureSum'));lab.advance(12);assert.equal(lab.analysis.lesson.phase,'done');lab.click('finishMeasurementStory');assert.equal(lab.paused,false);
+  assert.ok(!lab.nodes.has('illustratePressureSum'));lab.advance(12);assert.equal(lab.analysis.lesson.phase,'done');lab.click('illustrate');assert.ok(lab.analysis.returning);lab.advance(3.2);assert.equal(lab.paused,false);
   assert.equal(lab.nodes.get('timeScale').value,'0.25');assert.equal(lab.nodes.get('timeScale').disabled,false);assert.equal(lab.nodes.get('tourStatus').hidden,true);
   const time=lab.metrics.time;lab.advance(.4);assert.ok(lab.metrics.time>time+.08&&lab.metrics.time<time+.12);
 });
@@ -374,21 +374,44 @@ test('cycles repeat compression and expansion, preserve energy balance and can s
   lab.click('start');lab.advance(.1);lab.click('stop');const width=lab.metrics.width;lab.advance(.2);assert.equal(lab.metrics.width,width);assert.equal(lab.analysis.cycle.running,false);
 });
 
-test('temperature lesson freezes physical time, pauses and completes the sum on all particles',()=>{
- const lab=laboratory();lab.click('tab-temperature');lab.advance(.1);const time=lab.metrics.time,energy=lab.metrics.energy;
- lab.click('illustrateTemperature');lab.advance(5.2);assert.equal(lab.metrics.time,time);assert.equal(lab.analysis.lesson.phase,'align');
+test('temperature lesson enters continuously, holds the result and returns through its launch button',()=>{
+ const lab=laboratory();lab.click('tab-temperature');lab.advance(.1);const initial=lab.metrics.time,energy=lab.metrics.energy;
+ lab.click('illustrateTemperature');assert.equal(lab.analysis.lesson.phase,'slowdown');assert.equal(lab.analysis.lesson.zoom,0);
+ assert.equal(lab.nodes.get('illustrateTemperature').textContent,'Retour à la simulation');assert.equal(lab.nodes.get('nextTemperatureStage').disabled,true);
+ lab.advance(.8);assert.ok(lab.metrics.time>initial);assert.equal(lab.analysis.lesson.zoom,0);assert.ok(lab.analysis.lesson.rate>0&&lab.analysis.lesson.rate<1);
+ lab.advance(.9);const time=lab.metrics.time;assert.equal(lab.analysis.lesson.phase,'frame');assert.equal(lab.analysis.lesson.time,time);
+ lab.advance(6.2);assert.equal(lab.metrics.time,time);assert.equal(lab.analysis.lesson.phase,'align');
  lab.click('pause');const elapsed=lab.analysis.lesson.elapsed;lab.advance(1);assert.equal(lab.analysis.lesson.elapsed,elapsed);lab.click('pause');
- lab.advance(14);assert.equal(lab.analysis.lesson.phase,'done');assert.equal(lab.analysis.lesson.count,1000);assert.ok(lab.analysis.lesson.localCount<1000);
- assert.equal(lab.metrics.energy,energy);assert.equal(lab.metrics.time,time);assert.match(lab.nodes.get('storyFormula').textContent,/300,00 K/);
- lab.click('pause');assert.equal(lab.analysis.lesson,null);lab.advance(.1);assert.ok(lab.metrics.time>time);
- lab.click('illustrateTemperature');lab.click('nextTemperatureStage');assert.equal(lab.analysis.lesson.phase,'vectors');const at=lab.analysis.lesson.elapsed;lab.advance(.2);assert.equal(lab.analysis.lesson.elapsed,at);lab.click('reset');assert.equal(lab.analysis.lesson,null);assert.equal(lab.metrics.time,0);
+ lab.advance(16);assert.equal(lab.analysis.lesson.phase,'done');assert.equal(lab.analysis.lesson.count,1000);assert.ok(lab.analysis.lesson.localCount<1000);
+ assert.ok(Math.abs(lab.metrics.energy-energy)<1e-8);assert.equal(lab.metrics.time,time);assert.match(lab.nodes.get('storyFormula').textContent,/300,00 K/);
+ assert.equal(lab.analysis.lesson.zoom,1);lab.advance(2);assert.equal(lab.metrics.time,time);
+ lab.click('illustrateTemperature');assert.equal(lab.analysis.returning.phase,'restore');assert.equal(lab.nodes.get('illustrateTemperature').disabled,true);
+ lab.advance(1.2);assert.equal(lab.analysis.returning.phase,'zoomOut');assert.equal(lab.metrics.time,time);
+ lab.advance(1.4);assert.equal(lab.analysis.returning.phase,'resume');assert.equal(lab.analysis.returning.zoom,0);lab.advance(1.8);
+ assert.equal(lab.analysis.lesson,null);assert.equal(lab.analysis.returning,null);assert.ok(lab.metrics.time>time);assert.equal(lab.nodes.get('illustrateTemperature').textContent,'▶ Des vitesses à la température');
+ lab.click('illustrateTemperature');lab.advance(2.8);lab.click('nextTemperatureStage');assert.equal(lab.analysis.lesson.phase,'vectors');const at=lab.analysis.lesson.elapsed;lab.advance(.2);assert.equal(lab.analysis.lesson.elapsed,at);lab.click('reset');assert.equal(lab.analysis.lesson,null);assert.equal(lab.metrics.time,0);
 });
 
-test('pressure illustration accumulates a real surface-window and restores prior playback',()=>{
+test('pressure illustration accumulates a real surface-window and waits for a smooth return',()=>{
  const lab=laboratory();lab.advance(.1);lab.click('pause');lab.click('illustrate');lab.finishTour();const transitionTime=lab.metrics.time;lab.advance(1.3);assert.equal(lab.analysis.lesson.phase,'zoom');assert.ok(lab.analysis.lesson.zoom>0&&lab.analysis.lesson.zoom<1);assert.equal(lab.analysis.lesson.events.length,0);lab.advance(11);assert.ok(lab.analysis.lesson.start>transitionTime);
  const l=lab.analysis.lesson;assert.equal(l.phase,'done');assert.ok(l.events.length>10);assert.ok(l.pressure>0);
  assert.ok(Math.abs(l.pressure-l.impulse/((l.y1-l.y0)*l.elapsed))<1e-10);
  assert.equal(lab.metrics.work,0);assert.equal(lab.metrics.heat,0);assert.match(lab.nodes.get('storyDetails').textContent,/moitié|S =/);
- lab.click('finishMeasurementStory');assert.equal(lab.analysis.lesson,null);assert.ok(lab.paused);
- const time=lab.metrics.time;lab.advance(.1);assert.equal(lab.metrics.time,time);
+ const time=lab.metrics.time;lab.advance(2);assert.equal(lab.metrics.time,time);
+ assert.equal(lab.nodes.get('illustrate').textContent,'Retour à la simulation');assert.ok(!lab.nodes.has('finishMeasurementStory'));
+ lab.click('illustrate');lab.advance(.7);assert.ok(lab.analysis.returning.zoom>0&&lab.analysis.returning.zoom<1);assert.equal(lab.metrics.time,time);
+ lab.advance(.8);assert.equal(lab.analysis.returning.phase,'resume');assert.equal(lab.analysis.returning.zoom,0);
+ lab.advance(2);assert.equal(lab.analysis.lesson,null);assert.equal(lab.paused,false);assert.ok(lab.metrics.time>time);
+});
+
+
+test('return button also exits early pressure and temperature sequences and survives tab changes',()=>{
+ const lab=laboratory();lab.click('illustrate');lab.advance(1);
+ assert.equal(lab.nodes.get('illustrate').disabled,false);assert.equal(lab.nodes.get('endIllustration').hidden,true);
+ lab.click('illustrate');assert.ok(lab.analysis.returning);lab.click('tab-temperature');lab.click('tab-pressure');assert.ok(lab.analysis.returning);
+ lab.advance(3.2);assert.equal(lab.analysis.returning,null);assert.equal(lab.analysis.tour,null);assert.equal(lab.analysis.lesson,null);
+ lab.click('tab-temperature');lab.click('illustrateTemperature');lab.advance(.5);const time=lab.metrics.time;
+ lab.click('illustrateTemperature');assert.equal(lab.analysis.returning.zoom,0);assert.ok(lab.analysis.returning.rate>0);
+ lab.advance(3.2);assert.equal(lab.analysis.lesson,null);assert.ok(lab.metrics.time>time);
+ lab.click('illustrateTemperature');lab.advance(5);lab.click('illustrateTemperature');lab.click('reset');assert.equal(lab.analysis.returning,null);assert.equal(lab.analysis.lesson,null);
 });

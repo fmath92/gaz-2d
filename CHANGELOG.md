@@ -1,3 +1,11 @@
+## 0.15.0 — Entrée et retour progressifs des illustrations
+
+- Température : ralentissement en vue générale, capture à l’arrêt, tracé du cadre, puis zoom sur les vitesses.
+- Même rendu du gaz et du piston pendant toutes les transitions, sans déplacer ni modifier les particules pour les besoins du dessin.
+- Résultat maintenu à l’écran jusqu’au retour demandé ; le bouton de lancement devient « Retour à la simulation » pour la pression et la température.
+- Retour progressif : restitution des flèches, dézoom complet, puis reprise graduelle du temps à la vitesse choisie. Retour anticipé également possible.
+- Tests des rampes de lecture, de la caméra, du gaz témoin, des boutons et des interruptions.
+
 ## 0.14.0 — Un parcours continu pour la pression
 
 - Un seul bouton : choc individuel, dézoom, vue d’ensemble, puis zoom sur le cumul des poussées.

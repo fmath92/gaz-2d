@@ -65,3 +65,49 @@ test('region camera shares normal coordinates at zero zoom and never changes par
  const middle=G.chamberCamera(700,340,sim,{region:{...region,zoom:.5}}),end=G.chamberCamera(700,340,sim,{region:{...region,zoom:1}});
  assert.ok(middle.scale>start.scale&&middle.scale<end.scale);assert.equal(end.X(11),.72*700);assert.equal(JSON.stringify(sim.particles),before);
 });
+
+test('temperature entry slows the live gas before capturing, framing, then zooming without altering dynamics',()=>{
+ const {TemperatureLesson}=globalThis.GasLessons;
+ const sim=new GasSimulation({count:1000,width:11,temperature:1.5,particleModel:'hard-disks',particleRadius:.04,seed:314159}),control=sim.fork();
+ const l=new TemperatureLesson(sim),advance=h=>{sim.step(h);control.step(h);};
+ let previous=l.rate;
+ for(let i=0;i<96;i++){
+  assert.equal(l.visual.zoom,0);assert.equal(l.visual.selection,0);
+  l.tick(1/60,sim,advance);assert.ok(l.rate<=previous);previous=l.rate;
+ }
+ assert.equal(l.phase,'frame');assert.ok(Math.abs(sim.time-.8)<1e-8);assert.equal(l.time,sim.time);
+ assert.deepEqual(sim.particles,control.particles);
+ const frozen=JSON.stringify(sim.particles),time=sim.time;
+ for(let i=0;i<30;i++)l.tick(1/60,sim,advance);
+ assert.equal(l.visual.zoom,0);assert.ok(l.visual.selection>0&&l.visual.selection<1);
+ for(let i=0;i<90;i++)l.tick(1/60,sim,advance);
+ assert.equal(l.phase,'zoom');assert.ok(l.visual.zoom>0&&l.visual.zoom<1);
+ for(let i=0;i<1500;i++)l.tick(1/60,sim,advance);
+ assert.equal(l.phase,'done');assert.equal(l.visual.zoom,1);assert.equal(l.visual.arrange,1);
+ assert.equal(sim.time,time);assert.equal(JSON.stringify(sim.particles),frozen);
+});
+
+test('return restores the temperature diagram, zooms out while frozen, then gradually resumes the same gas',()=>{
+ const {SimulationReturn}=globalThis.GasLessons;
+ const sim=new GasSimulation({count:100,width:11,temperature:1.5}),control=sim.fork();
+ const r=new SimulationReturn({zoom:1,rate:0,speed:2,visual:{zoom:1,arrange:1,energyMix:1,selection:1,opacity:1}});
+ const advance=h=>{sim.step(h);control.step(h);};let previousZoom=1,previousRate=0,steps=0;
+ while(r.phase!=='done'&&steps++<400){
+  const phase=r.phase;r.tick(1/60,advance);
+  assert.ok(r.zoom<=previousZoom);previousZoom=r.zoom;
+  if(phase==='restore'){assert.equal(r.zoom,1);assert.equal(sim.time,0);}
+  if(phase==='zoomOut'){assert.equal(sim.time,0);assert.equal(r.visual.arrange,0);}
+  if(r.phase==='resume'){assert.equal(r.zoom,0);assert.ok(r.rate>=previousRate);previousRate=r.rate;}
+ }
+ assert.equal(r.phase,'done');assert.ok(Math.abs(sim.time-1.6)<1e-8);assert.deepEqual(sim.particles,control.particles);
+});
+
+test('area camera starts and ends at the actual full piston view at desktop and mobile sizes',()=>{
+ const G=globalThis.LabGraphics,sim=new GasSimulation({count:100,width:11,temperature:1.5});
+ for(const [w,h] of [[700,340],[320,300]]){
+  const area={cx:5.5,cy:sim.height/2,half:.6,zoom:0},normal=G.chamberCamera(w,h,sim),full=G.chamberCamera(w,h,sim,{area});
+  for(const p of sim.particles){assert.equal(full.X(p.x),normal.X(p.x));assert.equal(full.Y(p.y),normal.Y(p.y));}
+  assert.ok(full.X(sim.width)<w-20);assert.ok(full.Y(0)<h);assert.ok(full.Y(sim.height)>0);
+  const zoom=G.chamberCamera(w,h,sim,{area:{...area,zoom:1}});assert.ok(Math.abs(zoom.X(area.cx)-w/2)<1e-9);assert.ok(zoom.scale>full.scale);
+ }
+});
