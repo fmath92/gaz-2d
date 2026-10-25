@@ -1,6 +1,7 @@
 (function () {
   'use strict';
   const $ = id => document.getElementById(id);
+  const MAX_RECORDS = 10000, RECORD_PAGE_SIZE = 100;
   const N = 1000, G = LabGraphics, U = GasUnits;
   const format = (v, digits = 2) => v == null || !Number.isFinite(v) ? '—' : (Math.abs(v) < 0.5 * Math.pow(10,-digits) ? 0 : v).toLocaleString('fr-FR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
   const experiments = {
@@ -21,7 +22,7 @@
   const snapshots = sim => ({ speeds: sim.particles.map(p => Math.hypot(p.vx, p.vy)), energies: sim.particles.map(p => (p.vx ** 2 + p.vy ** 2) / 2) });
   function createSession(key, previous) {
     const config = experiments[key];
-    const s = { key, model: 'hard-disks', radius: key === 'comparison' ? (previous?.radius ?? .04) : .04, radiusRecords: previous?.radiusRecords ?? [], recordX: previous?.recordX ?? 'radius', recordY: previous?.recordY ?? 'ratio', lastRecordTime: null, initialTemperature: previous?.initialTemperature || 1.5,
+    const s = { key, model: 'hard-disks', radius: key === 'comparison' ? (previous?.radius ?? .04) : .04, radiusRecords: previous?.radiusRecords ?? [], recordX: previous?.recordX ?? 'radius', recordY: previous?.recordY ?? 'ratio', lastRecordTime: null, alpha: previous?.alpha ?? 1, fitEnabled: previous?.fitEnabled ?? true, autoRecords: previous?.autoRecords ?? false, recordPage: previous?.recordPage ?? 0, initialTemperature: previous?.initialTemperature || 1.5,
       action: previous?.action ?? config.action, duration: 72, ratio: key === 'free' ? 200 : (previous?.action ?? config.action) === 'compression' ? 70 : 140,
       source: config.source, chart: config.chart, zoom: config.zoom, speed: config.speed, playing: true, vectors: false,
       bath: previous?.bath ?? 3, accommodation: previous?.accommodation ?? 1, allWalls: previous?.allWalls ?? false,
@@ -77,6 +78,7 @@
     $('radiusControls').hidden = active !== 'comparison';
     $('recordAnalysis').hidden = active !== 'comparison';
     $('recordX').value = s.recordX; $('recordY').value = s.recordY;
+    $('alpha').value = s.alpha; $('alphaNumber').value = s.alpha; $('alphaNumber').setAttribute('aria-invalid','false'); $('linearFit').checked = s.fitEnabled; $('autoRecords').checked = s.autoRecords;
     $('particleRadius').value = Math.round(s.radius * 1000);
     $('radiusValue').value = format(s.radius * U.scales.length * 1000) + ' mm';
     $('microTitle').textContent = s.other ? 'Deux états microscopiques' : active === 'heat' ? 'Le gaz et la paroi gauche' : 'Le gaz et son piston';
@@ -335,14 +337,16 @@
       : 'Le zoom reste fixe dans le laboratoire. Après le choc, comparez le rebond réel au rebond hypothétique sur un piston immobile.';
     $('heatFlux').textContent = 'Flux moyen à gauche : ' + U.text('flux', m.heatFluxByWall.left);
     $('diskRatio').textContent = format(ratio(m));
-    $('correctedRatio').textContent = format(ratio(m) == null ? null : ratio(m)*(1-m.packingFraction));
-    $('recordRadius').disabled = active !== 'comparison' || m.time < nextRecordTime(s);
+    $('correctedRatio').textContent = format(ratio(m) == null ? null : ratio(m)*(1-s.alpha*m.packingFraction));
+    $('recordRadius').disabled = active !== 'comparison' || m.time < nextRecordTime(s) || s.radiusRecords.length >= MAX_RECORDS;
     const windowText = U.text('time',s.sim.measurementWindow,3);
-    $('radiusStatus').textContent = m.time < s.sim.measurementWindow
+    $('recordCount').textContent = s.radiusRecords.length.toLocaleString('fr-FR')+' / 10 000 relevés · les 10 derniers ci-dessous';
+    $('autoRecords').disabled = s.radiusRecords.length >= MAX_RECORDS;
+    $('radiusStatus').textContent = s.radiusRecords.length >= MAX_RECORDS ? 'Limite de 10 000 atteinte : exportez avant d’effacer. Aucun relevé n’a été supprimé.' : m.time < s.sim.measurementWindow
       ? 'Démarrage écarté : encore '+U.text('time',s.sim.measurementWindow-m.time,3)+' de temps simulé, puis une fenêtre complète de '+windowText+'.'
       : m.time < nextRecordTime(s) ? 'Fenêtre en cours : encore '+U.text('time',nextRecordTime(s)-m.time,3)+' de temps simulé avant un relevé sans chevauchement.'
       : 'Prêt : fenêtre de '+U.text('time',m.measurementStart,3)+' à '+U.text('time',m.time,3)+'. Les observations ne seront pas reprises dans le prochain relevé.';
-    $('radiusRecords').innerHTML = s.radiusRecords.map(r => '<li>r = ' + format(r.radius * U.scales.length * 1000) + ' mm · PV/(nRT) = ' + format(r.ratio) + ' · T = ' + U.text('temperature',r.temperature) + ' · fenêtre : ' + U.text('time',r.windowStart,3) + ' → ' + U.text('time',r.time,3) + ' · ' + (r.source === 'mean' ? 'toutes les parois' : 'piston') + '</li>').join('');
+    $('radiusRecords').innerHTML = s.radiusRecords.slice(-10).map(r => '<li>r = ' + format(r.radius * U.scales.length * 1000) + ' mm · PV/(nRT) = ' + format(r.ratio) + ' · T = ' + U.text('temperature',r.temperature) + ' · fenêtre : ' + U.text('time',r.windowStart,3) + ' → ' + U.text('time',r.time,3) + ' · ' + (r.source === 'mean' ? 'toutes les parois' : 'piston') + '</li>').join('');
     $('pairCount').textContent = format(other?.pairCollisions ?? m.pairCollisions,0);
     $('packingFraction').textContent = 'Surface des disques : ' + format((other?.packingFraction ?? m.packingFraction) * 100,1) + ' %';
     $('directionTemperatures').textContent = 'Tₓ = ' + U.text('temperature', m.temperatureX) + ' ; Tᵧ = ' + U.text('temperature', m.temperatureY) + (other ? ' · Disques : Tₓ = ' + U.text('temperature', other.temperatureX) + ' ; Tᵧ = ' + U.text('temperature', other.temperatureY) : '');
@@ -372,7 +376,7 @@
   const recordFields = {
     radius: {label:'Rayon (mm)', value:r => r.radius * U.scales.length * 1000},
     ratio: {label:'PV/(nRT)', value:r => r.ratio},
-    correctedRatio: {label:'P(V − V occupé)/(nRT)', value:r => r.correctedRatio},
+    correctedRatio: {label:'P(V − αV occupé)/(nRT)', value:r => r.ratio*(1-session().alpha*r.packing)},
     meanFreePath: {label:'Libre parcours moyen (mm)', value:r => r.meanFreePath == null ? null : r.meanFreePath * U.scales.length * 1000},
     packing: {label:'Surface occupée (%)', value:r => r.packing * 100},
     pressure: {label:'Pression (bar)', value:r => U.value('pressure',r.pressure)},
@@ -390,7 +394,13 @@
       xRange[0] = Math.min(xRange[0],.95); xRange[1] = Math.max(xRange[1],1.05);
       series.unshift({color:'#8c9eaa',dashed:true,points:yRange.map(y=>({x:1,y}))});
     }
-    return {series,xRange,yRange,xLabel:xf.label,yLabel:yf.label,points};
+    const fit = s.fitEnabled ? GasAnalysis.linearRegression(points) : null;
+    if (fit) {
+      const endpoints = xRange.map(x=>({x,y:fit.slope*x+fit.intercept}));
+      yRange[0] = Math.min(yRange[0],...endpoints.map(p=>p.y)); yRange[1] = Math.max(yRange[1],...endpoints.map(p=>p.y));
+      series.push({color:'#ce8033',points:endpoints,lineWidth:2});
+    }
+    return {series,xRange,yRange,xLabel:xf.label,yLabel:yf.label,points,fit};
   }
   function drawRecordPlot() {
     if (active !== 'comparison') return;
@@ -398,7 +408,20 @@
     $('recordChart').setAttribute('aria-label',data.yLabel+' en fonction de '+data.xLabel);
     $('recordPlotHint').textContent = s.radiusRecords.length ? data.points.length+' point(s) sur '+s.radiusRecords.length+' relevé(s). Chaque point est un relevé conservé ; les points ne sont pas reliés.'+(data.points.length<s.radiusRecords.length?' Les mesures indisponibles sont omises.':'') : 'Relevez au moins une mesure avec « Relever ce rayon », puis changez le rayon pour comparer.';
     $('exportRecords').disabled = !s.radiusRecords.length;
-    $('recordTable').innerHTML = s.radiusRecords.map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+format(recordFields.radius.value(r))+'</td><td>'+format(r.ratio,3)+'</td><td>'+format(r.correctedRatio,3)+'</td><td>'+format(recordFields.meanFreePath.value(r))+'</td><td>'+format(recordFields.packing.value(r))+'</td><td>'+format(recordFields.pressure.value(r),3)+'</td><td>'+format(recordFields.temperature.value(r))+'</td><td>'+format(recordFields.meanCollisionTime.value(r))+'</td><td>'+r.completedFlights+'</td><td>'+U.text('time',r.windowStart,3)+' → '+U.text('time',r.time,3)+'</td><td>'+(r.source==='mean'?'Toutes les parois':'Piston')+'</td></tr>').join('');
+    $('alphaValue').textContent = format(s.alpha,3);
+    const best = GasAnalysis.optimalAlpha(s.radiusRecords);
+    $('optimizeAlpha').disabled = !best;
+    let error=0; for (const r of s.radiusRecords) error+=(r.ratio*(1-s.alpha*r.packing)-1)**2;
+    $('alphaScore').textContent = s.radiusRecords.length ? 'Écart quadratique moyen à 1 (RMS) : '+format(Math.sqrt(error/s.radiusRecords.length),4)+' · chaque relevé a le même poids.' : 'α = 0 : aucune correction · α = 1 : volume matériel · α ≈ 2 : référence diluée 2D.';
+    const significant = v => v == null || !Number.isFinite(v) ? 'indéfini' : v.toLocaleString('fr-FR',{maximumSignificantDigits:5});
+    const fit = data.fit;
+    $('fitEquation').textContent = !s.fitEnabled ? 'Régression désactivée.' : !fit ? (data.points.length<3 ? 'Il faut au moins 3 relevés valides pour estimer les incertitudes.' : 'Les abscisses doivent varier pour déterminer une pente.') : 'y = ('+significant(fit.slope)+') x '+(fit.intercept<0?'− ':'+ ')+significant(Math.abs(fit.intercept))+' · R² = '+significant(fit.rSquared);
+    $('fitUncertainty').textContent = fit ? 'a = '+significant(fit.slope)+' ± '+significant(fit.slopeSE)+' ; b = '+significant(fit.intercept)+' ± '+significant(fit.interceptSE)+' (incertitudes-types, 1 σ) · n = '+fit.count+' · degrés de liberté = '+fit.degreesOfFreedom+'. Unités : a en unité Y / unité X ; b en unité Y.' : '';
+    const pages = Math.max(1,Math.ceil(s.radiusRecords.length/RECORD_PAGE_SIZE));
+    s.recordPage = Math.max(0,Math.min(s.recordPage,pages-1));
+    $('recordPageStatus').textContent = 'Page '+(s.recordPage+1)+' / '+pages+' · 100 lignes par page ; graphique, régression et export : tous les relevés.';
+    $('recordsPrevious').disabled = s.recordPage===0; $('recordsNext').disabled = s.recordPage===pages-1;
+    $('recordTable').innerHTML = s.radiusRecords.slice(s.recordPage*RECORD_PAGE_SIZE,(s.recordPage+1)*RECORD_PAGE_SIZE).map((r,i)=>'<tr><td>'+(s.recordPage*RECORD_PAGE_SIZE+i+1)+'</td><td>'+format(recordFields.radius.value(r))+'</td><td>'+format(r.ratio,3)+'</td><td>'+format(recordFields.correctedRatio.value(r),3)+'</td><td>'+format(recordFields.meanFreePath.value(r))+'</td><td>'+format(recordFields.packing.value(r))+'</td><td>'+format(recordFields.pressure.value(r),3)+'</td><td>'+format(recordFields.temperature.value(r))+'</td><td>'+format(recordFields.meanCollisionTime.value(r))+'</td><td>'+r.completedFlights+'</td><td>'+U.text('time',r.windowStart,3)+' → '+U.text('time',r.time,3)+'</td><td>'+(r.source==='mean'?'Toutes les parois':'Piston')+'</td></tr>').join('');
   }
   function render() { readings(); draw(); drawChart(); drawRecordPlot(); }
   function changeChart(key) { const s = session(); s.chart = key; $('extraChart').value = key; render(); }
@@ -420,6 +443,7 @@
         if (performance.now() - started > 12) break;
       }
     }
+    if (active === 'comparison' && s.autoRecords && s.playing && s.sim.time >= nextRecordTime(s)) recordRadius();
     draw();
     if (timestamp - lastUI > 100) { readings(); drawChart(); lastUI = timestamp; }
     requestAnimationFrame(frame);
@@ -460,23 +484,39 @@
     session().radius = Math.max(.005, Math.min(.07, +$('particleRadius').value / 1000)); reset();
     notify('Nouveau rayon appliqué : le gaz redémarre au même volume et à 300 K par défaut. Les relevés précédents sont conservés.');
   });
-  $('recordRadius').addEventListener('click', () => {
+  function recordRadius() {
     const s = session(), m = s.sim.metrics;
-    if (active !== 'comparison' || m.time < nextRecordTime(s) || ratio(m) == null) return;
-    s.radiusRecords.push({radius:s.radius, ratio:ratio(m), time:m.time, temperature:m.temperature, source:s.source, pressure:pressure(m), volume:m.volume, packing:m.packingFraction, meanFreePath:m.windowMeanFreePath, meanCollisionTime:m.windowMeanCollisionTime, completedFlights:m.windowCompletedFlights, windowStart:m.measurementStart, correctedRatio:ratio(m)*(1-m.packingFraction)});
+    if (active !== 'comparison' || m.time < nextRecordTime(s) || ratio(m) == null || s.radiusRecords.length >= MAX_RECORDS) return;
+    GasAnalysis.appendRecord(s.radiusRecords, {radius:s.radius, ratio:ratio(m), time:m.time, temperature:m.temperature, source:s.source, pressure:pressure(m), volume:m.volume, packing:m.packingFraction, meanFreePath:m.windowMeanFreePath, meanCollisionTime:m.windowMeanCollisionTime, completedFlights:m.windowCompletedFlights, windowStart:m.measurementStart}, MAX_RECORDS);
     s.lastRecordTime = m.time;
-    if (s.radiusRecords.length > 30) s.radiusRecords.shift();
+    if (s.radiusRecords.length >= MAX_RECORDS) { s.autoRecords=false; $('autoRecords').checked=false; }
     render(); notify('Relevé conservé. Un nouveau relevé attendra '+U.text('time',s.sim.measurementWindow,3)+' de temps simulé ; changer d’axe ou effacer la liste ne raccourcit pas cette attente.');
+  }
+  $('recordRadius').addEventListener('click', recordRadius);
+  $('autoRecords').addEventListener('input', () => { session().autoRecords=$('autoRecords').checked; });
+  $('linearFit').addEventListener('input', () => { session().fitEnabled=$('linearFit').checked; drawRecordPlot(); });
+  function setAlpha(value) {
+    if (!Number.isFinite(value) || value<0 || value>5) { $('alphaNumber').setAttribute('aria-invalid','true'); return; }
+    const s=session(); s.alpha=value; $('alpha').value=value; $('alphaNumber').value=value; $('alphaNumber').setAttribute('aria-invalid','false');
+    readings(); drawRecordPlot();
+  }
+  $('alpha').addEventListener('input',()=>setAlpha(+$('alpha').value));
+  $('alphaNumber').addEventListener('input',()=>setAlpha($('alphaNumber').value.trim()===''?NaN:Number($('alphaNumber').value)));
+  $('optimizeAlpha').addEventListener('click',()=>{
+    const best=GasAnalysis.optimalAlpha(session().radiusRecords); if (!best) return;
+    setAlpha(best.alpha); notify('α ajusté sur '+best.count+' relevés : minimum de Σ[Z(1 − αφ) − 1]², avec 0 ≤ α ≤ 5.'+(best.bounded?' Minimum atteint à une borne du réglage.':''));
   });
+  $('recordsPrevious').addEventListener('click',()=>{session().recordPage--;drawRecordPlot();});
+  $('recordsNext').addEventListener('click',()=>{session().recordPage++;drawRecordPlot();});
   for (const id of ['recordX','recordY']) $(id).addEventListener('input', () => { session()[id] = $(id).value; drawRecordPlot(); });
   $('exportRecords').addEventListener('click', () => {
     const number = v => v == null || !Number.isFinite(v) ? '' : v.toPrecision(10).replace('.',',');
-    const rows = session().radiusRecords.map((r,i)=>[i+1,...Object.values(recordFields).map(f=>number(f.value(r))),number(U.value('time',r.windowStart)),number(U.value('time',r.time)),r.source].join(';'));
-    const header = 'releve;rayon_mm;PV_sur_nRT;P_V_moins_Voccupe_sur_nRT;libre_parcours_moyen_mm;surface_occupee_pct;pression_bar;temperature_K;temps_moyen_entre_chocs_us;trajets_complets_fenetre;debut_fenetre_ms;fin_fenetre_ms;capteur';
+    const rows = session().radiusRecords.map((r,i)=>[i+1,...Object.values(recordFields).map(f=>number(f.value(r))),number(U.value('time',r.windowStart)),number(U.value('time',r.time)),r.source,number(session().alpha)].join(';'));
+    const header = 'releve;rayon_mm;PV_sur_nRT;P_V_moins_alpha_Voccupe_sur_nRT;libre_parcours_moyen_mm;surface_occupee_pct;pression_bar;temperature_K;temps_moyen_entre_chocs_us;trajets_complets_fenetre;debut_fenetre_ms;fin_fenetre_ms;capteur;alpha_analyse';
     const url=URL.createObjectURL(new Blob(['\uFEFF'+header+'\r\n'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'}));
     const a=document.createElement('a');a.href=url;a.download='gaz-2d-releves.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   });
-  $('clearRadiusRecords').addEventListener('click', () => { session().radiusRecords = []; render(); });
+  $('clearRadiusRecords').addEventListener('click', () => { session().radiusRecords = []; session().recordPage=0; render(); });
   $('initialTemperature').addEventListener('input', () => { $('initialTemperatureValue').value = U.text('temperature', +$('initialTemperature').value / 200); });
   $('applyInitial').addEventListener('click', () => { session().initialTemperature = +$('initialTemperature').value / 200; reset(); });
   $('pressureSource').addEventListener('input', () => { session().source = $('pressureSource').value; render(); });
@@ -497,6 +537,6 @@
   selectExperiment('pressure'); requestAnimationFrame(frame);
   Object.defineProperty(window,'gaz2D',{value:{
     get metrics(){return {...session().sim.metrics};}, get comparisonMetrics(){return session().other ? {...session().other.metrics} : null;},
-    get paused(){return !session().playing;}, get analysis(){const s=session();return {experiment:active,chartType:s.chart,pressureSource:s.source,count:N,history:s.history.map(r=>({...r})),collision:s.focus,plot:chartData(),recordPlot:recordPlotData(),radiusRecords:s.radiusRecords.map(r=>({...r})),run:s.run,seek:!!s.seek,tour:s.tour?.view ?? null,lastTour:s.lastTour};}
+    get paused(){return !session().playing;}, get analysis(){const s=session();return {experiment:active,chartType:s.chart,pressureSource:s.source,count:N,history:s.history.map(r=>({...r})),collision:s.focus,plot:chartData(),recordPlot:recordPlotData(),alpha:s.alpha,autoRecords:s.autoRecords,radiusRecords:s.radiusRecords.map(r=>({...r,correctedRatio:recordFields.correctedRatio.value(r)})),run:s.run,seek:!!s.seek,tour:s.tour?.view ?? null,lastTour:s.lastTour};}
   },writable:false});
 })();

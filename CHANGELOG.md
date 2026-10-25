@@ -1,3 +1,11 @@
+## 0.10.0 — α ajustable, collecte et régressions
+
+- α réglable de 0 à 5 ; recalcul des relevés et ajustement automatique du rapprochement à 1 par moindres carrés.
+- Explication de la référence diluée α ≈ 2 pour les disques 2D et de ses limites.
+- 10 000 relevés conservés sans éviction, collecte automatique respectant les fenêtres, tableau paginé.
+- Régression OLS sur les axes choisis : équation, R², incertitudes-types sur pente/interception et hypothèses explicites.
+- Export des ratios corrigés avec l’α courant ; tests analytiques des erreurs-types et de l’ajustement d’α.
+
 ## 0.9.1 — Fenêtres de relevé et correction de volume
 
 - Relevés sur une même fenêtre glissante, après une fenêtre initiale de démarrage écartée ; délai d’au moins une fenêtre entre deux clics.

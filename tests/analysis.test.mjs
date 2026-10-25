@@ -100,3 +100,30 @@ test('short or tiny transformations explain why no exponent can be estimated', (
   assert.match(tiny.reason, /variation de volume/);
   assert.equal(A.logarithmicFit([]).fit, null);
 });
+
+test('OLS standard uncertainties agree with an analytic noisy fixture',()=>{
+  const f=A.linearRegression([{x:0,y:1},{x:1,y:2},{x:2,y:2},{x:3,y:4}]);
+  const close=(a,b)=>assert.ok(Math.abs(a-b)<1e-12,`${a} != ${b}`);
+  close(f.slope,.9);close(f.intercept,.9);close(f.residualSumSquares,.7);
+  close(f.slopeSE,Math.sqrt(.07));close(f.interceptSE,Math.sqrt(.245));
+  close(f.rSquared,1-.7/4.75);assert.equal(f.degreesOfFreedom,2);
+  assert.equal(A.linearRegression([{x:1,y:2},{x:2,y:3}]),null);
+  assert.equal(A.linearRegression([{x:1,y:2},{x:1,y:3},{x:1,y:4}]),null);
+  const constant=A.linearRegression([{x:0,y:2},{x:1,y:2},{x:2,y:2}]);
+  assert.equal(constant.rSquared,null);assert.equal(constant.slopeSE,0);
+});
+test('alpha optimization minimizes the stated objective, supports bounds and leaves observations untouched',()=>{
+  const records=[.01,.03,.08,.15].map(packing=>({packing,ratio:1/(1-2*packing)}));
+  const original=JSON.stringify(records),fit=A.optimalAlpha(records);
+  assert.ok(Math.abs(fit.alpha-2)<1e-12);assert.ok(fit.rmse<1e-12);
+  assert.equal(JSON.stringify(records),original);assert.equal(A.optimalAlpha([]),null);
+  assert.equal(A.optimalAlpha([{packing:0,ratio:1}]),null);
+  assert.equal(A.optimalAlpha([{packing:.01,ratio:2}]).alpha,5);
+});
+test('ten thousand records remain retained and all contribute to regression',()=>{
+  const rows=[];
+  for(let i=0;i<10000;i++) assert.equal(A.appendRecord(rows,{x:i,y:2*i+3}),true);
+  assert.equal(A.appendRecord(rows,{x:10000,y:0}),false);
+  assert.equal(rows.length,10000);assert.equal(rows[0].x,0);assert.equal(rows.at(-1).x,9999);
+  const f=A.linearRegression(rows);assert.equal(f.count,10000);assert.equal(f.slope,2);assert.equal(f.intercept,3);
+});

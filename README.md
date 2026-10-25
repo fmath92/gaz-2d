@@ -2,7 +2,7 @@
 
 **[Ouvrir le démonstrateur](https://fmath92.github.io/gaz-2d/)** · [Code source](https://github.com/fmath92/gaz-2d)
 
-Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.9.1 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
+Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.10.0 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
 
 ## La visite
 
@@ -54,7 +54,7 @@ Le repérage emploie une copie indépendante du moteur, comprenant l’état du 
 
 Les paramètres physiques sont verrouillés pendant le parcours. **Quitter le zoom**, Pause, un changement d’onglet ou une remise à zéro l’interrompent sans revenir en arrière dans le temps. La vitesse antérieure est conservée. Une préférence système de réduction des animations supprime la transition progressive de caméra. Si aucun choc adapté n’existe dans l’horizon de recherche (8 u.t., ou la fin du trajet pour le travail), l’interface le signale ; elle ne fabrique aucun choc. Le bouton thermique est désactivé pour une paroi isolée ou une accommodation nulle.
 
-Dans le dernier onglet, **Isoler un choc mutuel** présente uniquement le vrai choc entre deux disques, avec les flèches avant/après. Le réglage de rayon est une préparation d’expérience : « Appliquer le rayon et recommencer » reconstruit les positions sans recouvrement et réinitialise les mesures à n, V et T initiale identiques. Il ne gonfle pas des particules en pleine simulation et n’invente pas un travail associé. Les relevés manuels (30 derniers au plus) survivent à cette réinitialisation et sont effaçables. Un relevé devient possible après quatre unités internes (≈ 0,46 ms) ; cette durée ne garantit pas à elle seule l’équilibre, les fluctuations restent visibles. Les relevés donnent le rayon, PV/(nRT), T, t et le capteur utilisé. L’export CSV porte sur l’historique du rayon courant.
+Dans le dernier onglet, **Isoler un choc mutuel** présente uniquement le vrai choc entre deux disques, avec les flèches avant/après. Le réglage de rayon est une préparation d’expérience : « Appliquer le rayon et recommencer » reconstruit les positions sans recouvrement et réinitialise les mesures à n, V et T initiale identiques. Il ne gonfle pas des particules en pleine simulation et n’invente pas un travail associé. Les relevés (jusqu’à 10 000, sans éviction des anciens) survivent à cette réinitialisation et sont effaçables. Un relevé devient possible après quatre unités internes (≈ 0,46 ms) ; cette durée ne garantit pas à elle seule l’équilibre, les fluctuations restent visibles. Les relevés donnent le rayon, PV/(nRT), T, t et le capteur utilisé. L’export CSV porte sur l’historique du rayon courant.
 
 ## Pression, travail et chaleur
 
@@ -140,7 +140,7 @@ Les tests vérifient les conservations, le confinement, les collisions, les ther
 GitHub Pages publie automatiquement la branche `main`, depuis la racine du dépôt. `index.html` redirige vers `dist/` et `.nojekyll` demande un service statique sans transformation. Le dépôt est public : pousser les changements sur `main` met à jour le démonstrateur.
 
 
-## Graphique des relevés (0.9.1)
+## Graphique des relevés (0.10.0)
 
 Dans « Rayon & loi des gaz », le panneau **Comparer les relevés** trace une grandeur sauvegardée en fonction d’une autre. Les deux axes proposent PV/(nRT), rayon (mm), libre parcours moyen (mm), surface occupée (%), pression (bar), température (K), temps moyen entre collisions mutuelles (µs) et nombre de trajets complets. Les points ne sont pas reliés ; une ligne de référence à 1 accompagne un axe PV/(nRT). Le tableau et l’export dédié `gaz-2d-releves.csv` conservent les conditions de chaque mesure, même après changement de rayon. L’export habituel reste celui de l’historique courant.
 
@@ -149,4 +149,15 @@ Le moteur intègre la distance réellement parcourue par chaque disque. Une coll
 Pression et statistiques de trajets emploient la même fenêtre de 2 unités internes (≈ 0,230 ms). La première fenêtre sert au démarrage et est écartée ; le premier relevé est donc autorisé à partir de 4 unités internes (≈ 0,459 ms). Les suivants doivent attendre au moins 2 unités simulées après le précédent. Une pause ne consomme pas ce délai, et effacer la liste, changer les axes ou le capteur ne le supprime pas. Appliquer un nouveau rayon ou recommencer recrée le gaz et impose à nouveau démarrage + fenêtre. Le bouton et le gestionnaire du clic vérifient cette condition. Les fenêtres sont ouvertes à gauche, fermées à droite : un événement sur la borne n’est pas compté deux fois. T et V sont constants dans cette expérience isolée à piston fixe : la valeur instantanée coïncide avec sa moyenne, aux arrondis près. Les moyennes cumulées du moteur restent disponibles dans les diagnostics techniques, mais ne servent plus aux relevés. Des fenêtres sans chevauchement ne garantissent pas une indépendance statistique complète. Une observation courte sous-échantillonne les longs trajets ; le nombre de trajets et l’instant du relevé permettent de juger la durée d’observation, sans garantir l’équilibre. En 2D, l’occupation est Nπr²/(LH), égale à la fraction du volume équivalent pour des disques extrudés sur la profondeur conventionnelle. Aucun volume de sphères 3D n’est utilisé.
 
 
-Le ratio corrigé **P(V − V occupé)/(nRT)** est affiché dans le dernier onglet et disponible sur les deux axes, dans le tableau et dans l’export des relevés. Il vaut Z(1−φ), où Z = PV/(nRT), φ = Nπr²/(LH) et V occupé = φV. Cette soustraction géométrique est une hypothèse à explorer, pas une équation d’état imposée : le volume inaccessible aux centres des autres particules diffère du volume matériel occupé. Les deux ratios se comparent à la référence 1. Chaque relevé exporte les bornes temporelles exactes de sa fenêtre.
+Le ratio corrigé **P(V − αV occupé)/(nRT)** est affiché dans le dernier onglet et disponible sur les deux axes, dans le tableau et dans l’export des relevés. Il vaut Z(1−αφ), où Z = PV/(nRT), φ = Nπr²/(LH) et V occupé = φV. Cette soustraction géométrique est une hypothèse à explorer, pas une équation d’état imposée : le volume inaccessible aux centres des autres particules diffère du volume matériel occupé. Les deux ratios se comparent à la référence 1. Chaque relevé exporte les bornes temporelles exactes de sa fenêtre.
+
+
+### α, collecte et régression (0.10.0)
+
+α est un paramètre d’analyse compris entre 0 et 5, modifiable par curseur ou saisie numérique. Tous les ratios corrigés sont recalculés depuis Z et φ sauvegardés, sans modifier la dynamique. « Ajuster α » minimise Σ[Zᵢ(1−αφᵢ)−1]² avec poids égaux par relevé ; le minimum non contraint est Σ[Zᵢφᵢ(Zᵢ−1)]/Σ(Zᵢφᵢ)², puis borné à [0,5]. Le RMS à 1 est affiché ; répéter plus souvent un rayon augmente son poids. Le CSV indique l’α utilisé pour l’analyse exportée.
+
+La référence diluée 2D α ≈ 2 et son lien avec le second coefficient du viriel sont expliqués dans l’interface, avec cette [référence sur le gaz de disques](https://landau.unex.es/~sphinx/santos/PUBLICATIONS/a98HaroSanYusEJPv19p281_n33.pdf). L’ajustement à densité finie ne constitue pas une validation de cette limite théorique.
+
+La collecte automatique est facultative. Elle suit l’expérience visible, respecte le démarrage et le délai entre fenêtres, s’arrête en pause et reprend avec les mêmes conditions après un changement de rayon. À 10 000 relevés elle s’arrête sans supprimer les anciens. La liste abrégée affiche les 10 derniers ; le tableau est paginé par 100. Les graphiques, régressions, ajustements d’α et exports utilisent tous les relevés valides conservés. Les données restent en mémoire jusqu’au rechargement : exporter avant de quitter.
+
+La régression OLS affiche y = ax + b, R², n et les incertitudes-types u(a), u(b), calculées à partir de la variance résiduelle SSE/(n−2). Il faut 3 points et des X distincts ; R² reste indéfini pour Y constant. Les ± sont à 1 σ, pas à 95 %. Les [hypothèses OLS](https://itl.nist.gov/div898/handbook/pmd/section4/pmd431.htm) et les limites liées aux corrélations, aux erreurs sur X et à l’ajustement préalable d’α sont explicitées dans l’interface. Les unités sont celles des axes : Y/X pour a et Y pour b.

@@ -1723,3 +1723,10 @@ input[aria-invalid="true"] {
 .record-table table { border-collapse: collapse; width: 100%; font-size: 12px; }
 .record-table th, .record-table td { padding: 9px; text-align: right; white-space: nowrap; border-bottom: 1px solid #e5edef; }
 @media(max-width:600px) { .record-axes { flex-direction:column; } .record-analysis .panel-heading { flex-wrap:wrap; gap:10px; } }
+
+.alpha-controls { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:12px 0; }
+.alpha-controls input[type="range"] { flex:1; min-width:140px; }
+.alpha-controls input[type="number"] { width:90px; }
+.record-pagination { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:12px 0; }
+.analysis-methods { margin:12px 0; font-size:12px; color:#557082; line-height:1.6; }
+#fitEquation { color:#b56c25; }

@@ -48,7 +48,31 @@
     let residual = 0;
     for (const p of sample) residual += ((p.y - meanY) - slope * (p.x - meanX)) ** 2;
     const rSquared = yy > 0 ? Math.max(0, Math.min(1, 1 - residual / yy)) : null;
-    return { slope, intercept, rSquared, count: sample.length };
+    const degreesOfFreedom = sample.length - 2;
+    const residualVariance = residual / degreesOfFreedom;
+    return { slope, intercept, rSquared, count: sample.length, degreesOfFreedom,
+      residualSumSquares: residual, residualSD: Math.sqrt(residualVariance),
+      slopeSE: Math.sqrt(residualVariance / xx),
+      interceptSE: Math.sqrt(residualVariance * (1 / sample.length + meanX * meanX / xx)) };
+  }
+
+  function appendRecord(records, record, limit = 10000) {
+    if (records.length >= limit) return false;
+    records.push(record); return true;
+  }
+
+  function optimalAlpha(records, min = 0, max = 5) {
+    let numerator = 0, denominator = 0, count = 0;
+    for (const r of records) if (Number.isFinite(r.ratio) && Number.isFinite(r.packing) && r.packing > 0) {
+      const q = r.ratio * r.packing;
+      numerator += q * (r.ratio - 1); denominator += q * q; count++;
+    }
+    if (!(denominator > 0)) return null;
+    const unconstrained = numerator / denominator;
+    const alpha = Math.max(min,Math.min(max,unconstrained));
+    let error = 0;
+    for (const r of records) if (Number.isFinite(r.ratio) && Number.isFinite(r.packing) && r.packing > 0) error += (r.ratio*(1-alpha*r.packing)-1)**2;
+    return {alpha,unconstrained,count,rmse:Math.sqrt(error/count),bounded:alpha!==unconstrained};
   }
 
   function logarithmicFit(rows, { runId, legId, pressureKey = 'pressure', window = 2, minLogSpan = 0.02 } = {}) {
@@ -76,7 +100,7 @@
     return { points, fitPoints, fit, reason: fit ? '' : 'Les mesures ne permettent pas de déterminer une pente finie.' };
   }
 
-  const GasAnalysis = { histogram, linearRegression, logarithmicFit };
+  const GasAnalysis = { histogram, linearRegression, appendRecord, optimalAlpha, logarithmicFit };
   root.GasAnalysis = GasAnalysis;
   if (typeof module !== 'undefined' && module.exports) module.exports = { GasAnalysis };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

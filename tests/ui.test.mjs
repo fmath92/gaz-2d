@@ -289,8 +289,28 @@ test('recording excludes warm-up, blocks overlap including after clearing, and s
   lab.click('exportRecords');const csv=await lab.downloads.at(-1).blob.text();
   const lines=csv.trim().replace(/^\uFEFF/,'').split(/\r?\n/), header=lines[0].split(';');
   const row=Object.fromEntries(lines[1].split(';').map((v,i)=>[header[i],v]));
-  assert.ok(Math.abs(Number(row.P_V_moins_Voccupe_sur_nRT.replace(',','.'))-first.correctedRatio)<1e-8);
+  assert.ok(Math.abs(Number(row.P_V_moins_alpha_Voccupe_sur_nRT.replace(',','.'))-first.correctedRatio)<1e-8);
   assert.ok(Number(row.fin_fenetre_ms.replace(',','.'))>Number(row.debut_fenetre_ms.replace(',','.')));
   lab.click('clearRadiusRecords');lab.click('recordRadius');assert.equal(lab.analysis.radiusRecords.length,0);
   assert.equal(lab.nodes.get('recordRadius').disabled,true);
+});
+
+test('alpha reanalyses saved records without changing physics, and automatic collection respects the window',async()=>{
+  const lab=laboratory();lab.click('tab-comparison');lab.input('timeScale',4);lab.check('autoRecords',true);
+  lab.advance(1.3);assert.equal(lab.analysis.radiusRecords.length,1);
+  lab.advance(.6);assert.equal(lab.analysis.radiusRecords.length,2);
+  const saved=lab.analysis.radiusRecords;
+  assert.ok(saved[1].windowStart>=saved[0].time);
+  lab.click('pause');const before=lab.metrics;lab.advance(.6);assert.equal(lab.analysis.radiusRecords.length,2);
+  lab.input('recordY','correctedRatio');lab.input('alphaNumber','2');
+  assert.equal(lab.analysis.alpha,2);assert.equal(lab.metrics.time,before.time);assert.equal(lab.metrics.energy,before.energy);
+  assert.equal(lab.analysis.recordPlot.points[0].y,saved[0].ratio*(1-2*saved[0].packing));
+  lab.input('alphaNumber','');assert.equal(lab.analysis.alpha,2);assert.equal(lab.nodes.get('alphaNumber').getAttribute('aria-invalid'),'true');
+  lab.input('alpha',1.5);assert.equal(lab.analysis.alpha,1.5);
+  lab.click('optimizeAlpha');assert.ok(lab.analysis.alpha>=0&&lab.analysis.alpha<=5);
+  lab.click('exportRecords');const csv=await lab.downloads.at(-1).blob.text();assert.match(csv,/alpha_analyse/);
+  lab.input('particleRadius',70);lab.click('applyRadius');assert.equal(lab.analysis.autoRecords,true);
+  lab.input('timeScale',4);lab.advance(1.3);assert.equal(lab.analysis.radiusRecords.length,3);
+  assert.ok(lab.analysis.recordPlot.fit);assert.match(lab.nodes.get('fitEquation').textContent,/R²/);assert.match(lab.nodes.get('fitUncertainty').textContent,/1 σ/);
+  lab.check('linearFit',false);assert.equal(lab.analysis.recordPlot.fit,null);
 });
