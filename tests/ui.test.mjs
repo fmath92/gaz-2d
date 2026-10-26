@@ -87,6 +87,7 @@ function laboratory({welcome=false}={}) {
   });
   vm.runInContext(physics, scope, { filename: 'physics.js' });
   vm.runInContext(analysis, scope, { filename: 'analysis.js' });
+  vm.runInContext(readFileSync(new URL('../dist/radius-reference.js', import.meta.url), 'utf8'), scope);
   vm.runInContext(readFileSync(new URL('../dist/units.js', import.meta.url), 'utf8'), scope);
   vm.runInContext(graphics, scope, { filename: 'graphics.js' });
   const histogram = scope.GasAnalysis.histogram;
@@ -628,6 +629,7 @@ test('radius guide collects five distinct new manual readings before comparing t
  }
  assert.equal(lab.analysis.tutorial.title,'Revenir avec des disques plus grands');assert.equal(lab.analysis.tutorial.quiet,true);assert.equal(lab.analysis.recordPlot.points.length,5);
  assert.equal(lab.nodes.get('recordY').value,'ratio');
+ assert.equal(lab.analysis.recordPlot.curveFit.distinctCount,5);assert.match(lab.nodes.get('fitEquation').textContent,/Disques durs 2D.*φ².*R²/);assert.equal(lab.nodes.get('fitEquation').hidden,false);
  lab.click('tutorialNext');assert.equal(lab.analysis.tutorial.title,'Revenir avec des disques plus grands');
 });
 
@@ -643,3 +645,28 @@ test('radius guide collects five distinct new manual readings before comparing t
  assert.ok(html.indexOf('id="logAnalysis"')<html.indexOf('id="advanced"'));
  lab.input('extraChart','pv');assert.equal(lab.nodes.get('logAnalysis').hidden,true);
  });
+
+test('long pressure windows restart only the current experiment and keep prior readings',()=>{
+ const lab=laboratory();lab.click('tab-comparison');lab.input('timeScale',4);lab.advance(1.3);lab.click('recordRadius');
+ const saved=lab.analysis.radiusRecords[0];lab.input('radiusPrecision',20);
+ assert.equal(lab.analysis.radiusRecords.length,1);assert.equal(lab.analysis.radiusRecords[0].ratio,saved.ratio);
+ assert.equal(lab.metrics.time,0);lab.input('timeScale',4);lab.advance(1.3);lab.click('recordRadius');
+ assert.equal(lab.analysis.radiusRecords.length,1);assert.equal(lab.nodes.get('recordRadius').disabled,true);
+ assert.match(lab.nodes.get('radiusStatus').textContent,/Équilibrage contrôlé/);
+ lab.input('particleRadius',30);assert.equal(lab.nodes.get('radiusPrecision').value,'20');
+ lab.click('tab-pressure');lab.advance(2.1);assert.ok(lab.metrics.measurementDuration<=2);
+ lab.click('tab-comparison');lab.input('radiusPrecision',2);assert.equal(lab.metrics.time,0);assert.equal(lab.analysis.radiusRecords.length,1);
+});
+
+test('reference acquisition loads measured radii once without deleting personal readings and exports provenance',async()=>{
+ const lab=laboratory();lab.click('tab-comparison');lab.input('timeScale',4);lab.advance(1.3);lab.click('recordRadius');
+ const original=lab.analysis.radiusRecords[0];lab.click('loadRadiusReference');
+ assert.equal(lab.analysis.radiusRecords.length,27);assert.equal(lab.analysis.radiusRecords[0].ratio,original.ratio);
+ assert.equal(lab.analysis.radiusRecords.filter(r=>r.protocol==='reference').length,26);
+ assert.ok(lab.analysis.recordPlot.curveFit.rSquared>.99);assert.equal(lab.analysis.recordPlot.curveFit.wallCorrection,true);
+ assert.ok(lab.analysis.recordPlot.points.filter(p=>p.yError>0).length===26);
+ lab.click('loadRadiusReference');assert.equal(lab.analysis.radiusRecords.length,27);
+ lab.click('exportRecords');const csv=await lab.downloads.at(-1).blob.text();assert.match(csv,/protocole;erreur_type_ratio;fenetres;initialisations/);assert.match(csv,/reference/);
+ lab.click('clearRadiusRecords');assert.equal(lab.analysis.radiusRecords.length,0);assert.equal(lab.nodes.get('loadRadiusReference').disabled,false);
+ lab.click('loadRadiusReference');assert.equal(lab.analysis.radiusRecords.length,26);
+});

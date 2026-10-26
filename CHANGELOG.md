@@ -1,3 +1,14 @@
+## 0.20.12 — Disques durs à l’équilibre
+
+- Série reproductible de 26 rayons et deux initialisations indépendantes, avec contrôles d’équilibrage, longues fenêtres de pression et erreurs statistiques.
+- Comparaison à Henderson et à une correction géométrique approchée des parois, sans paramètre ajusté ; l’ancien modèle linéaire en rayon reste documenté dans le rapport comparatif.
+- Mode de mesure précise, import non destructif de la référence, barres d’erreur et export des conditions d’acquisition.
+
+## 0.20.11 — Courbe d’ajustement des rayons
+
+- À partir de cinq rayons distincts, ajustement automatique de P(V − a·r) = nRT, avec a comme seul paramètre.
+- Courbe sur l’intervalle mesuré, équation, a en L/mm et R² visibles sous le graphique ; tous les relevés valides contribuent aux moindres carrés.
+
 ## 0.20.10 — Mesurer l’exposant adiabatique
 
 - Le tutoriel guide la préparation et le lancement du trajet lent, attend sa fin et laisse le résultat visible avant de passer aux cycles, sans popup supplémentaire.

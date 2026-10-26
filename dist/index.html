@@ -6,15 +6,16 @@
   <meta name="theme-color" content="#f4f7f8">
   <meta name="description" content="Visite guidée d’un laboratoire de thermodynamique : des collisions aux mesures de pression, de travail et de chaleur.">
   <title>Gaz 2D — Visite guidée du laboratoire</title>
-  <link rel="stylesheet" href="styles.css?v=0.20.10">
-  <script defer src="physics.js?v=0.20.10"></script>
-  <script defer src="analysis.js?v=0.20.10"></script>
-  <script defer src="units.js?v=0.20.10"></script>
-  <script defer src="graphics.js?v=0.20.10"></script>
-  <script defer src="tour.js?v=0.20.10"></script>
-  <script defer src="lessons.js?v=0.20.10"></script>
-  <script defer src="tutorial.js?v=0.20.10"></script>
-  <script defer src="app.js?v=0.20.10"></script>
+  <link rel="stylesheet" href="styles.css?v=0.20.12">
+  <script defer src="physics.js?v=0.20.12"></script>
+  <script defer src="radius-reference.js?v=0.20.12"></script>
+  <script defer src="analysis.js?v=0.20.12"></script>
+  <script defer src="units.js?v=0.20.12"></script>
+  <script defer src="graphics.js?v=0.20.12"></script>
+  <script defer src="tour.js?v=0.20.12"></script>
+  <script defer src="lessons.js?v=0.20.12"></script>
+  <script defer src="tutorial.js?v=0.20.12"></script>
+  <script defer src="app.js?v=0.20.12"></script>
 </head>
 <body>
   <header id="appHeader" class="masthead">
@@ -84,6 +85,7 @@
           <div id="comparisonLesson" class="lesson" hidden>
             <div class="lesson-title"><strong>Mesurer ce rayon</strong><span id="packingFraction">Surface occupée : —</span></div>
             <div class="comparison-values" hidden><span class="disks">Rapport mesuré <b id="diskRatio">—</b></span><span hidden>Ratio corrigé <b id="correctedRatio">—</b></span><span hidden>Chocs mutuels <b id="pairCount">0</b></span></div>
+            <label for="radiusPrecision">Mesure de pression</label><select id="radiusPrecision"><option value="2">Exploration · fenêtre 0,23 ms</option><option value="20">Précision · fenêtre 2,30 ms et équilibrage contrôlé</option></select>
             <p id="radiusStatus" class="field-help"></p><button id="recordRadius" class="button secondary">Relever ce rayon</button><button id="clearRadiusRecords" class="text-button">Effacer les relevés</button><p id="recordCount" class="field-help"></p><label class="checkbox" hidden><input id="autoRecords" type="checkbox"> Relevés automatiques (fenêtres sans chevauchement)</label><ul hidden id="radiusRecords" class="field-help"></ul>
             <p id="comparisonExplanation" class="lesson-note">Réduire le rayon rapproche le modèle du gaz parfait. Augmenter le rayon accroît la surface occupée et peut faire dépasser PV/(nRT) = 1. Les fluctuations et la durée de mesure comptent aussi.</p>
           </div>
@@ -141,6 +143,7 @@
       <section id="recordAnalysis" class="panel record-analysis" hidden aria-labelledby="recordAnalysisTitle">
         <div class="panel-heading"><h2 id="recordAnalysisTitle">Comparer les relevés</h2><button id="exportRecords" class="button secondary">Exporter les relevés CSV</button></div>
         <div class="guided-choices"><button id="plotRadius" class="button secondary" aria-pressed="true">1 · L’effet du rayon</button><button id="plotExcludedVolume" class="button secondary" aria-pressed="false">2 · P(V − b) en fonction de T</button></div>
+        <details class="analysis-details"><summary>Comparer à une série de référence précise</summary><p>26 rayons, deux initialisations indépendantes par rayon. Au moins 6,90 ms d’équilibrage, contrôles de stabilité puis au moins huit fenêtres de 2,30 ms par initialisation. Cette série a été calculée avec le même moteur physique.</p><button id="loadRadiusReference" class="button secondary">Ajouter les 26 mesures de référence</button><p><a href="../data/radius-study.csv" download>Télécharger les données et erreurs statistiques</a> · <a href="../data/radius-study-report.html" target="_blank" rel="noopener">Protocole et comparaison des modèles</a></p></details>
         <p id="recordQuestion" class="prediction-text">Gaz dilué : PV/(nRT) est-il proche de 1 ?</p>
         <div id="temperatureProtocol" class="lesson" hidden>
           <p>À rayon fixé, préparez cinq états à <strong>200, 300, 400, 500 et 600 K</strong>. Le gaz se stabilise avant chaque mesure.</p>
@@ -155,10 +158,10 @@
         <label class="checkbox" hidden><input id="linearFit" type="checkbox" checked> Régression linéaire sur tous les points valides</label>
         <div class="record-axes" hidden><label>Abscisse X<select id="recordX" aria-label="Abscisse X"><option value="radius" selected>Rayon des particules (mm)</option><option value="ratio">Ratio PV/(nRT)</option><option value="correctedPV">P(V − b) (J), b = αV occupé</option><option value="correctedPVT">P(V − αV occupé)/T (J/K)</option><option value="inverseMeanFreePath">Inverse du libre parcours moyen (mm⁻¹)</option><option value="inverseMeanCollisionTime">Inverse du temps moyen entre chocs (µs⁻¹)</option><option value="correctedRatio">P(V − αV occupé)/(nRT)</option><option value="meanFreePath">Libre parcours moyen (mm)</option><option value="packing">Surface occupée (%)</option><option value="pressure">Pression (bar)</option><option value="temperature">Température (K)</option><option value="meanCollisionTime">Temps moyen entre chocs (µs)</option><option value="completedFlights">Nombre de trajets complets</option></select></label><label>Ordonnée Y<select id="recordY" aria-label="Ordonnée Y"><option value="radius">Rayon des particules (mm)</option><option value="ratio" selected>Ratio PV/(nRT)</option><option value="correctedPV">P(V − b) (J), b = αV occupé</option><option value="correctedPVT">P(V − αV occupé)/T (J/K)</option><option value="inverseMeanFreePath">Inverse du libre parcours moyen (mm⁻¹)</option><option value="inverseMeanCollisionTime">Inverse du temps moyen entre chocs (µs⁻¹)</option><option value="correctedRatio">P(V − αV occupé)/(nRT)</option><option value="meanFreePath">Libre parcours moyen (mm)</option><option value="packing">Surface occupée (%)</option><option value="pressure">Pression (bar)</option><option value="temperature">Température (K)</option><option value="meanCollisionTime">Temps moyen entre chocs (µs)</option><option value="completedFlights">Nombre de trajets complets</option></select></label></div>
         <canvas id="recordChart" aria-label="Graphique des relevés conservés"></canvas>
-<p id="recordReference" class="field-help"></p><p id="fitEquation" class="calculation"></p><p id="fitInterpretation" class="field-help"></p><details class="analysis-details"><summary>Incertitudes et méthode de mesure</summary><p id="fitUncertainty" class="field-help"></p>
+<p id="recordReference" class="field-help"></p><p id="fitEquation" class="calculation"></p><p id="fitInterpretation" class="field-help"></p><p class="field-help"><a href="https://landau.unex.es/~sphinx/santos/PUBLICATIONS/a95SaHaYuJCPv103p4622_n21.pdf" target="_blank" rel="noopener">Équations d’état des disques durs · Henderson, Santos et al.</a></p><details class="analysis-details"><summary>Incertitudes et méthode de mesure</summary><p id="fitUncertainty" class="field-help"></p><p>Pour la courbe des rayons : Cparois = LH(L + H − 4r)/[(L − 2r)(H − 2r)(L + H)], avec L et H les dimensions de la cavité. Le facteur est dérivé des distances accessibles aux centres et du calcul de la pression moyenne sur les parois. Le produit avec l’équation de Henderson est une approximation sans ajustement. Les barres de la série de référence indiquent une erreur-type statistique ; les écarts systématiques ne sont pas inclus.</p>
         <p id="recordPlotHint" class="field-help"></p>
         <p hidden class="field-help">Le libre parcours moyen est la longueur moyenne des trajets complets entre deux collisions entre particules, pour les trajets qui se terminent dans la fenêtre de mesure. Les rebonds aux parois prolongent le trajet ; ils ne le terminent pas. Les trajets commencés pendant le démarrage et ceux encore en cours sont exclus. Un trajet peut commencer avant la fenêtre, mais il n’est compté qu’à sa collision finale. Au début, les longs trajets restent sous-représentés. Ce calcul est indépendant de PV/(nRT).</p>
-        <p class="field-help">En 2D, la surface occupée vaut Nπr²/(L×H). Avec notre profondeur constante, c’est aussi la fraction du volume équivalent occupée par les disques extrudés. Pression, parcours et temps entre chocs : même fenêtre glissante de 0,230 ms. La première fenêtre est écartée comme démarrage, puis une fenêtre complète est requise. Deux relevés sont espacés d’au moins une fenêtre. V, le rayon et T sont constants dans cette expérience isolée à piston fixe. Des fenêtres disjointes ne garantissent pas une indépendance statistique complète.</p>
+        <p class="field-help">En 2D, la surface occupée vaut Nπr²/(L×H). Avec notre profondeur constante, c’est aussi la fraction du volume équivalent occupée par les disques extrudés. Pression, parcours et temps entre chocs : même fenêtre glissante de 0,230 ms en exploration, ou 2,30 ms en mode précision. Ce mode vérifie trois fenêtres stables après au moins 6,90 ms, puis attend une nouvelle fenêtre complète ; ce contrôle pratique ne garantit pas à lui seul l’équilibre. En exploration, la première fenêtre est écartée comme démarrage, puis une fenêtre complète est requise. Deux relevés sont espacés d’au moins une fenêtre. V, le rayon et T sont constants dans cette expérience isolée à piston fixe. Des fenêtres disjointes ne garantissent pas une indépendance statistique complète.</p>
         <details class="analysis-methods"><summary>Comprendre α, le volume exclu et les incertitudes</summary>
           <p>Le ratio corrigé est Z(1 − αφ), avec Z = PV/(nRT) et φ = V occupé/V. Modifier α recalcule tous les relevés, sans changer le gaz. Le bouton ajuste α dans [0 ; 5] en minimisant Σ[Zᵢ(1 − αφᵢ) − 1]² : chaque relevé compte autant, donc un rayon répété souvent pèse davantage.</p>
           <p>Pour deux disques de rayon r, le centre du second ne peut pas entrer dans un disque de rayon 2r autour du premier : l’aire interdite vaut 4πr². Le comptage des paires introduit un facteur 1/2, d’où un second coefficient du viriel de 2πr² et Z ≈ 1 + 2φ à faible occupation. Ainsi α ≈ 2 annule le premier écart à 1 dans ce modèle 2D dilué. Ce n’est pas α = 4, ni une loi exacte à toute densité : les effets de plusieurs voisins et des parois peuvent modifier l’ajustement. <a href="https://landau.unex.es/~sphinx/santos/PUBLICATIONS/a98HaroSanYusEJPv19p281_n33.pdf" target="_blank" rel="noopener">Référence : gaz de disques, Eur. J. Phys. ↗</a></p>
@@ -197,7 +200,7 @@
         <div class="panel distributions"><div><h2>Norme des vitesses</h2><canvas id="speedHistogram" aria-label="Distribution de la norme des vitesses"></canvas></div><div><h2>Énergie cinétique par marqueur</h2><canvas id="energyHistogram" aria-label="Distribution de l’énergie cinétique des particules"></canvas></div><p id="distributionLegend">État actuel et état initial, densités normalisées.</p></div>
       </details>
     </section>
-    <footer><span>Gaz 2D · version 0.20.10</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
+    <footer><span>Gaz 2D · version 0.20.12</span><span>Les expériences restent en mémoire jusqu’au rechargement de la page.</span></footer>
   </main>
   <div id="tutorialWelcome" class="tutorial-welcome" hidden>
     <section role="dialog" aria-modal="true" aria-labelledby="welcomeTitle" aria-describedby="welcomeDescription" class="welcome-card">

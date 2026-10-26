@@ -2,7 +2,7 @@
 
 **[Ouvrir le démonstrateur](https://fmath92.github.io/gaz-2d/)** · [Code source](https://github.com/fmath92/gaz-2d)
 
-Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.20.10 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
+Un laboratoire de thermodynamique pour relier les collisions microscopiques à la pression, au travail et à la chaleur. La version 0.20.12 réunit la simulation et les courbes sur le même écran de travail et organise la navigation par expériences.
 
 ## La visite
 
@@ -23,7 +23,7 @@ Chaque onglet garde son état, ses réglages, sa pause et ses mesures jusqu’au
 
 À chaque chargement, une invitation propose **Commencer la visite guidée** ou **Explorer librement**. Le film est suspendu tant que cette invitation est ouverte, sans modifier le réglage de lecture. Le bouton **Visite guidée**, dans l’en-tête, permet de la relancer.
 
-Le parcours comporte 36 étapes, avec une zone mise en lumière et des transitions animées. Il utilise les véritables contrôles du simulateur : regarder les séquences de pression et de température, réaliser deux détentes de Joule–Gay–Lussac, répondre aux comparaisons de vitesse, déplacer le piston, lancer des cycles, choisir cinq rayons distincts, enregistrer un relevé par rayon, comparer PV/(nRT) au rayon, lire les distributions et découvrir les exports. Les actions et les résultats réellement obtenus sont signalés, sans verrouiller la progression : **Continuer reste disponible dans les panneaux explicatifs**, même pour avancer sans faire une manipulation. Une fois une étape réalisée, elle reste validée.
+Le parcours comporte 38 étapes, avec une zone mise en lumière et des transitions animées. Il utilise les véritables contrôles du simulateur : regarder les séquences de pression et de température, réaliser deux détentes de Joule–Gay–Lussac, répondre aux comparaisons de vitesse, déplacer le piston, lancer des cycles, choisir cinq rayons distincts, enregistrer un relevé par rayon, comparer PV/(nRT) au rayon, lire les distributions et découvrir les exports. Les actions et les résultats réellement obtenus sont signalés, sans verrouiller la progression : **Continuer reste disponible dans les panneaux explicatifs**, même pour avancer sans faire une manipulation. Une fois une étape réalisée, elle reste validée.
 
 Les simples consignes de navigation, de lancement et de retour deviennent des boutons surlignés sans popup ; l’action fait avancer automatiquement la visite. Le bouton d’en-tête « Quitter la visite » et Échap restent disponibles. L’animation de pression affiche le commentaire du guide seulement au bilan. Pour la température, toutes les explications restent dans l’encadré de calcul à droite de la simulation ; aucun popup ne s’ajoute, même au bilan.
 
@@ -227,3 +227,13 @@ Le diagramme trace progressivement **une courbe continue P(V)** : les pressions 
 Chaque résultat attend **Cas suivant** sur l’animation. Le repos arrive en troisième : les chocs persistent, mais A et B sont confondus, la largeur du trajet sur P–V est nulle et W = 0. Le diagramme conserve les bornes du trajet de détente précédent et le rappelle en pointillés.
 
 Après les trois cas, **À vous de jouer librement** permet de déplacer le piston dans les deux sens. Les branches du diagramme restent dans l’ordre du parcours, avec leur sens et leurs aires signées ; elles ne sont pas triées par volume. **Nouveau tracé** remet à zéro uniquement la mesure du parcours, sans réinitialiser le gaz. Une préparation réelle est annoncée si la largeur initiale est inférieure à 7, pour laisser de la place à la compression. Retour à la simulation reste disponible à tout moment et arrête le piston avant le dézoom et la reprise progressive. Les réglages de transformation manuelle sont retrouvés ensuite.
+
+## Série précise des rayons (0.20.12)
+
+Dans **Rayon & loi des gaz**, « Précision » utilise une fenêtre de pression de 20 unités internes (≈ 2,30 ms), contre 2 en exploration. Après au moins 60 unités, trois fenêtres doivent montrer moins de 2 % de variation relative de pression et moins de 3 % d’anisotropie moyenne ; une nouvelle fenêtre complète est ensuite réservée au relevé. Changer de mode ou de rayon prépare un nouvel état et conserve les relevés. Le mode rapide reste identifié comme exploratoire.
+
+La série de référence peut être ajoutée avec le bouton dans « Comparer à une série de référence précise ». Elle vient de 26 rayons × 2 graines, au moins 8 fenêtres par graine après l’équilibrage. La collecte hors interface contrôle aussi l’occupation des quatre quarts de la cavité. Les données brutes, erreurs statistiques, comparaison des modèles et limites sont dans [le rapport](data/radius-study-report.html). Les barres représentent une erreur-type estimée par blocs et répliques, pas toute l’incertitude physique.
+
+La courbe utilise Henderson : Z = (1 + φ²/8)/(1 − φ)², avec φ = Nπr²/(LH), et une correction géométrique Cparois. Ce facteur est exact pour des centres indépendants de rayon fini ; son produit avec l’équation de Henderson est une approximation pour le gaz de disques en interaction. Aucun coefficient n’est ajusté aux points. Henderson seul reste affiché en gris pointillé.
+
+Reproduction : `node scripts/radius-study.mjs`, puis `python scripts/radius-report.py` (numpy et matplotlib). Les scripts conservent tous les blocs et vérifient que la collecte est complète avant de générer la référence affichable. Le moteur physique n’est pas modifié.

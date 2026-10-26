@@ -25,14 +25,14 @@
   const snapshots = sim => ({ speeds: sim.particles.map(p => Math.hypot(p.vx, p.vy)), energies: sim.particles.map(p => (p.vx ** 2 + p.vy ** 2) / 2) });
   function createSession(key, previous) {
     const config = experiments[key];
-    const s = { key, model: 'hard-disks', radius: sharedRadius, radiusRecords: previous?.radiusRecords ?? [], recordX: previous?.recordX ?? 'radius', recordY: previous?.recordY ?? 'ratio', lesson:null, returning:null, lastLesson:null, pressureSequence:null, batch:null, batchMessage:'', cycle:null, lastRecordTime: null, alpha: previous?.alpha ?? 1, fitEnabled: previous?.fitEnabled ?? true, autoRecords: previous?.autoRecords ?? false, recordPage: previous?.recordPage ?? 0, initialTemperature: previous?.initialTemperature || 1.5,
+    const s = { key, model: 'hard-disks', radius: sharedRadius, radiusRecords: previous?.radiusRecords ?? [], recordX: previous?.recordX ?? 'radius', recordY: previous?.recordY ?? 'ratio', lesson:null, returning:null, lastLesson:null, pressureSequence:null, batch:null, batchMessage:'', cycle:null, lastRecordTime: null, measurementWindow:previous?.measurementWindow??2, preciseProbe:{next:20,sum:0,count:0,blocks:[],readyAt:null}, referenceLoaded:previous?.referenceLoaded??false, alpha: previous?.alpha ?? 1, fitEnabled: previous?.fitEnabled ?? true, autoRecords: previous?.autoRecords ?? false, recordPage: previous?.recordPage ?? 0, initialTemperature: previous?.initialTemperature || 1.5,
       action: previous?.action ?? config.action, duration: 72, ratio: key === 'free' ? 200 : (previous?.action ?? config.action) === 'compression' ? 70 : 140,
       source: config.source, chart: config.chart, zoom: config.zoom, speed: config.speed, playing: true, vectors: false,
       bath: previous?.bath ?? 3, accommodation: previous?.accommodation ?? 1, allWalls: previous?.allWalls ?? false,
       thermalMode: previous?.thermalMode ?? (key === 'heat' ? 'thermostat' : 'isolated'), profile: previous?.profile || 'linear',
       gamma: previous?.gamma || 2, history: [], nextSample: 0, focus: null, focusAt: -Infinity, seek: null, tour: null, lastTour: null, run: null, runId: 0 };
     const thermal = { mode: key === 'heat' ? s.thermalMode : 'isolated', temperature: s.bath, accommodation: s.accommodation, pistonThermal: s.allWalls, walls: s.allWalls ? ['left', 'right', 'top', 'bottom'] : ['left'] };
-    s.sim = new GasSimulation({ count: N, width: config.width, temperature: s.initialTemperature, particleModel: 'hard-disks', particleRadius: s.radius, thermal, observeCollisions: true, seed: 314159 });
+    s.sim = new GasSimulation({ count: N, width: config.width, temperature: s.initialTemperature, particleModel: 'hard-disks', particleRadius: s.radius, measurementWindow:key==='comparison'?s.measurementWindow:2, thermal, observeCollisions: true, seed: 314159 });
     s.other = null;
     s.initial = s.sim.metrics; s.otherInitial = s.other?.metrics; s.initialParticles = snapshots(s.sim); s.baseWidth = config.width;
     sample(s); return s;
@@ -40,6 +40,13 @@
   function sample(s) {
     const run = s.run;
     const m = s.sim.metrics;
+    if(s.key==='comparison'&&s.measurementWindow===20&&!s.batch){
+      const p=s.preciseProbe;p.sum+=(m.temperatureX-m.temperatureY)/m.temperature;p.count++;
+      if(m.time>=p.next-1e-6){
+        p.blocks.push({end:m.time,ratio:ratio(m,s),anisotropy:p.sum/p.count});p.sum=0;p.count=0;p.next=m.time+20;
+        if(p.readyAt==null&&GasAnalysis.equilibriumReady(p.blocks))p.readyAt=m.time+20;
+      }
+    }
     s.history.push({ ...m, pistonPressure: m.pressureByWall.right, other: s.other?.metrics ?? null,
       runId: run?.id ?? 0, legId: s.cycle?.leg ?? 0, legStart: run?.start ?? 0, moving: !!s.sim.motion, freeExpansion: run?.free ?? false });
     if (s.history.length > (s.key === 'cycles' ? 20000 : 6000)) s.history.shift();
@@ -86,6 +93,7 @@
     $('recordX').value = s.recordX; $('recordY').value = s.recordY;
     $('alpha').value = s.alpha; $('alphaNumber').value = s.alpha; $('alphaNumber').setAttribute('aria-invalid','false'); $('linearFit').checked = s.fitEnabled; $('autoRecords').checked = s.autoRecords;
     $('particleRadius').value = s.radius * 1000;
+    $('radiusPrecision').value=String(s.measurementWindow);
     $('radiusValue').value = format(s.radius * U.scales.length * 1000) + ' mm';
     $('microTitle').textContent = s.other ? 'Deux états microscopiques' : active === 'heat' ? 'Le gaz et la paroi gauche' : 'Le gaz et son piston';
     $('zoomTitle').textContent = active === 'comparison' ? 'Zoom · un choc entre deux disques' : active === 'heat' ? 'Zoom · un échange sur la paroi gauche' : 'Zoom · une poussée sur le piston';
@@ -553,7 +561,7 @@
     return { series, xRange, yRange, yTicks, xLabel, yLabel, legend, hint };
   }
   function nextRecordTime(s) {
-    return Math.max(2*s.sim.measurementWindow, s.lastRecordTime == null ? 0 : s.lastRecordTime+s.sim.measurementWindow);
+    return Math.max(s.measurementWindow===20&&!s.batch?(s.preciseProbe.readyAt??Infinity):0,2*s.sim.measurementWindow, s.lastRecordTime == null ? 0 : s.lastRecordTime+s.sim.measurementWindow);
   }
   function readings() {
     const s = session(), m = s.sim.metrics, other = s.other?.metrics, event = s.focus;
@@ -616,11 +624,13 @@
     $('recordRadius').disabled = !!s.batch || active !== 'comparison' || m.time < nextRecordTime(s) || s.radiusRecords.length >= MAX_RECORDS;
     const windowText = U.text('time',s.sim.measurementWindow,3);
     $('recordCount').textContent = s.radiusRecords.length.toLocaleString('fr-FR')+' relevé(s) conservé(s)';
+    $('radiusPrecision').disabled=!!s.batch;
     $('autoRecords').disabled = !!s.batch || s.radiusRecords.length >= MAX_RECORDS;
     $('radiusStatus').textContent = s.radiusRecords.length >= MAX_RECORDS ? 'Limite de 10 000 atteinte : exportez avant d’effacer. Aucun relevé n’a été supprimé.' : m.time < s.sim.measurementWindow
       ? 'Démarrage écarté : encore '+U.text('time',s.sim.measurementWindow-m.time,3)+' de temps simulé, puis une fenêtre complète de '+windowText+'.'
       : m.time < nextRecordTime(s) ? 'Fenêtre en cours : encore '+U.text('time',nextRecordTime(s)-m.time,3)+' de temps simulé avant un relevé sans chevauchement.'
       : 'Prêt : fenêtre de '+U.text('time',m.measurementStart,3)+' à '+U.text('time',m.time,3)+'. Les observations ne seront pas reprises dans le prochain relevé.';
+    if(s.measurementWindow===20&&!s.batch&&s.preciseProbe.readyAt==null)$('radiusStatus').textContent='Équilibrage contrôlé en cours : au moins 6,90 ms, trois fenêtres de pression stables et agitation comparable selon les deux axes. Le premier relevé utilise ensuite une nouvelle fenêtre complète.';
     if(s.batch) $('radiusStatus').textContent='Série automatique en cours : le relevé attend la stabilisation puis une fenêtre complète.';
     $('radiusRecords').innerHTML = s.radiusRecords.slice(-10).map(r => '<li>r = ' + format(r.radius * U.scales.length * 1000) + ' mm · PV/(nRT) = ' + format(r.ratio) + ' · T = ' + U.text('temperature',r.temperature) + ' · fenêtre : ' + U.text('time',r.windowStart,3) + ' → ' + U.text('time',r.time,3) + ' · ' + (r.source === 'mean' ? 'toutes les parois' : 'piston') + '</li>').join('');
     $('pairCount').textContent = format(other?.pairCollisions ?? m.pairCollisions,0);
@@ -682,10 +692,10 @@
   function selectedRecords(s) { return s.recordY==='correctedPV' ? s.radiusRecords.filter(r=>Math.abs(r.radius-s.radius)<1e-12) : s.radiusRecords; }
   function recordPlotData() {
     const s = session(), xf = recordFields[s.recordX], yf = recordFields[s.recordY];
-    const points = selectedRecords(s).map((r,i) => ({x:xf.value(r), y:yf.value(r), index:i+1})).filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
+    const points = selectedRecords(s).map((r,i) => ({x:xf.value(r), y:yf.value(r), volume:U.value('volume',r.volume), packing:r.packing, width:r.volume/7.5*U.scales.length*1000, height:7.5*U.scales.length*1000, yError:s.recordY==='ratio'?r.ratioSE:null, index:i+1})).filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
     const reference = key => key === 'correctedPVT' ? U.scales.nR : ['ratio','correctedRatio'].includes(key) ? 1 : null;
     const xr = reference(s.recordX), yr = reference(s.recordY);
-    const xRange = G.dataRange(points.map(p=>p.x),[0,1]), yRange = G.dataRange(points.map(p=>p.y).concat(yr == null ? [] : [yr]),[0,1]);
+    const xRange = G.dataRange(points.map(p=>p.x),[0,1]), yRange = G.dataRange(points.flatMap(p=>[p.y-(p.yError??0),p.y+(p.yError??0)]).concat(yr == null ? [] : [yr]),[0,1]);
     const series = [{color:'#287db4',scatter:true,radius:4,points}];
     if (yr != null) series.unshift({color:'#8c9eaa',dashed:true,points:xRange.map(x=>({x,y:yr}))});
     if (xr != null) {
@@ -699,13 +709,20 @@
       yRange[0]=Math.min(yRange[0],...referencePoints.map(p=>p.y)); yRange[1]=Math.max(yRange[1],...referencePoints.map(p=>p.y));
       series.unshift({color:'#18857d',dashed:true,points:referencePoints,lineWidth:2});
     }
-    const fit = s.fitEnabled && !(s.recordX==='radius' && s.recordY==='ratio') ? GasAnalysis.linearRegression(points) : null;
+    const radiusPlot=s.recordX==='radius'&&s.recordY==='ratio';
+    const curveFit=radiusPlot?GasAnalysis.radiusTheory(points):null;
+    if(curveFit){
+      if(curveFit.wallCorrection)series.push({color:'#89999f',dashed:true,points:curveFit.bulkCurve,lineWidth:1.5});
+      series.push({color:'#ce8033',points:curveFit.curve,lineWidth:2});
+      yRange[0]=Math.min(yRange[0],...curveFit.curve.map(p=>p.y));yRange[1]=Math.max(yRange[1],...curveFit.curve.map(p=>p.y));
+    }
+    const fit = s.fitEnabled && !radiusPlot ? GasAnalysis.linearRegression(points) : null;
     if (fit) {
       const endpoints = xRange.map(x=>({x,y:fit.slope*x+fit.intercept}));
       yRange[0] = Math.min(yRange[0],...endpoints.map(p=>p.y)); yRange[1] = Math.max(yRange[1],...endpoints.map(p=>p.y));
       series.push({color:'#ce8033',points:endpoints,lineWidth:2});
     }
-    return {series,xRange,yRange,xLabel:xf.label,yLabel:yf.label,points,fit,excludedVolumePlot};
+    return {series,xRange,yRange,xLabel:xf.label,yLabel:yf.label,points,fit,curveFit,radiusPlot,excludedVolumePlot};
   }
   function drawRecordPlot() {
     if (active !== 'comparison') return;
@@ -716,8 +733,9 @@
     $('recordQuestion').textContent=data.excludedVolumePlot?'La correction de volume retrouve-t-elle la pente nR ?':'Gaz dilué : PV/(nRT) est-il proche de 1 ?';
     G.plot($('recordChart'),data);
     $('recordChart').setAttribute('aria-label',data.yLabel+' en fonction de '+data.xLabel);
-    $('recordPlotHint').textContent = s.radiusRecords.length ? data.points.length+' point(s) sur '+s.radiusRecords.length+' relevé(s). Chaque point est un relevé conservé ; les points ne sont pas reliés.'+(data.points.length<s.radiusRecords.length?' Seuls les relevés valides du rayon sélectionné sont tracés en mode température.':'') : data.excludedVolumePlot ? 'Gardez le rayon fixe et relevez au moins trois températures distinctes avec « Relever ce rayon ».' : 'Relevez au moins une mesure avec « Relever ce rayon », puis changez le rayon pour comparer.';
+    $('recordPlotHint').textContent = s.radiusRecords.length ? data.points.length+' point(s) sur '+s.radiusRecords.length+' relevé(s). Chaque point est un relevé conservé ; la courbe orange, si présente, est un ajustement des mesures.'+(data.points.length<s.radiusRecords.length?' Seuls les relevés valides du rayon sélectionné sont tracés en mode température.':'') : data.excludedVolumePlot ? 'Gardez le rayon fixe et relevez au moins trois températures distinctes avec « Relever ce rayon ».' : 'Relevez au moins une mesure avec « Relever ce rayon », puis changez le rayon pour comparer.';
     $('exportRecords').disabled = !s.radiusRecords.length;
+    $('loadRadiusReference').disabled=s.referenceLoaded||!globalThis.GasRadiusReference||s.radiusRecords.length+(globalThis.GasRadiusReference?.records.length??0)>MAX_RECORDS;
     $('alphaValue').textContent = format(s.alpha,3);
     const best = GasAnalysis.optimalAlpha(selectedRecords(s));
     $('optimizeAlpha').disabled = !best;
@@ -728,15 +746,21 @@
     const fit = data.fit;
     const interceptSymbol=data.excludedVolumePlot?'c':'b';
     $('recordReference').textContent = data.excludedVolumePlot ? 'b = αV occupé · pointillés verts : P(V − b) = nRT, pente nR = '+format(U.scales.nR,4)+' J/K, ordonnée à l’origine nulle. Orange : régression des mesures.'+' Rayon courant uniquement : '+format(s.radius*U.scales.length*1000)+' mm.' : '';
-    $('fitEquation').hidden=s.recordX==='radius'&&s.recordY==='ratio';
+    $('fitEquation').hidden=false;
     $('fitEquation').textContent = !s.fitEnabled ? 'Régression désactivée.' : !fit ? (data.points.length<3 ? 'Il faut au moins 3 relevés valides pour estimer les incertitudes.' : 'Les abscisses doivent varier pour déterminer une pente.') : 'y = ('+significant(fit.slope)+') x '+(fit.intercept<0?'− ':'+ ')+significant(Math.abs(fit.intercept))+' · R² = '+significant(fit.rSquared);
     $('fitUncertainty').textContent = fit ? 'a = '+significant(fit.slope)+' ± '+significant(fit.slopeSE)+' ; '+interceptSymbol+' = '+significant(fit.intercept)+' ± '+significant(fit.interceptSE)+' (incertitudes-types, 1 σ) · n = '+fit.count+' · degrés de liberté = '+fit.degreesOfFreedom+'. Unités : a en unité Y / unité X ; '+interceptSymbol+' en unité Y.' : '';
     $('fitInterpretation').textContent = ['correctedRatio','correctedPVT'].includes(s.recordY) ? 'On cherche ici une grandeur constante : une pente compatible avec zéro et une valeur proche de '+(s.recordY==='correctedPVT'?'nR = '+format(U.scales.nR,4)+' J/K':'1')+'. Un faible R² peut donc être attendu : il ne mesure pas la qualité de cette correction. Multiplier par nR ne change pas R².' : data.excludedVolumePlot ? 'Régression y = aT + c : comparer a à nR et c à zéro. c est l’ordonnée à l’origine, distincte du volume exclu b. Un R² élevé ne suffit pas à valider la correction ; varier aussi la densité permet de la mettre à l’épreuve.' : '';
+    if(data.radiusPlot){
+      const f=data.curveFit;
+      $('fitEquation').textContent=f?'Disques durs 2D : PV/(nRT) ≈ Cparois × (1 + φ²/8)/(1 − φ)² · R² = '+significant(f.rSquared):'Relevez au moins 5 rayons distincts au même volume pour comparer les mesures à la théorie des disques durs.';
+      $('fitUncertainty').textContent=f?'Henderson avec correction géométrique approchée des parois, sans paramètre ajusté, comparée à '+f.count+' relevés. Écart RMS sur PV/(nRT) : '+significant(f.rmse)+'. Chaque point a le même poids. R² est un indicateur d’accord avec la théorie, pas une preuve d’équilibre ; il peut être négatif ou indéfini pour une série constante.':'';
+      $('fitInterpretation').textContent=f?'φ = fraction de la cavité occupée par les disques. Orange : théorie 2D avec correction approchée des parois, sans ajustement ; gris : sans correction. Les barres indiquent l’erreur-type des mesures de référence.':'';
+    }
     const pages = Math.max(1,Math.ceil(s.radiusRecords.length/RECORD_PAGE_SIZE));
     s.recordPage = Math.max(0,Math.min(s.recordPage,pages-1));
     $('recordPageStatus').textContent = 'Page '+(s.recordPage+1)+' / '+pages+' · 100 lignes par page ; tableau et export : tous les relevés. Graphique thermique : rayon courant.';
     $('recordsPrevious').disabled = s.recordPage===0; $('recordsNext').disabled = s.recordPage===pages-1;
-    $('recordTable').innerHTML = s.radiusRecords.slice(s.recordPage*RECORD_PAGE_SIZE,(s.recordPage+1)*RECORD_PAGE_SIZE).map((r,i)=>'<tr><td>'+(s.recordPage*RECORD_PAGE_SIZE+i+1)+'</td><td>'+format(recordFields.radius.value(r))+'</td><td>'+format(r.ratio,3)+'</td><td>'+format(recordFields.correctedRatio.value(r),3)+'</td><td>'+format(recordFields.meanFreePath.value(r))+'</td><td>'+format(recordFields.packing.value(r))+'</td><td>'+format(recordFields.pressure.value(r),3)+'</td><td>'+format(recordFields.temperature.value(r))+'</td><td>'+format(recordFields.meanCollisionTime.value(r))+'</td><td>'+r.completedFlights+'</td><td>'+U.text('time',r.windowStart,3)+' → '+U.text('time',r.time,3)+'</td><td>'+(r.source==='mean'?'Toutes les parois':'Piston')+'</td></tr>').join('');
+    $('recordTable').innerHTML = s.radiusRecords.slice(s.recordPage*RECORD_PAGE_SIZE,(s.recordPage+1)*RECORD_PAGE_SIZE).map((r,i)=>'<tr><td>'+(s.recordPage*RECORD_PAGE_SIZE+i+1)+'</td><td>'+format(recordFields.radius.value(r))+'</td><td>'+format(r.ratio,3)+'</td><td>'+format(recordFields.correctedRatio.value(r),3)+'</td><td>'+format(recordFields.meanFreePath.value(r))+'</td><td>'+format(recordFields.packing.value(r))+'</td><td>'+format(recordFields.pressure.value(r),3)+'</td><td>'+format(recordFields.temperature.value(r))+'</td><td>'+format(recordFields.meanCollisionTime.value(r))+'</td><td>'+r.completedFlights+'</td><td>'+(r.protocol==='reference'?r.blocks+' fenêtres · '+r.replicas+' initialisations':U.text('time',r.windowStart,3)+' → '+U.text('time',r.time,3))+'</td><td>'+(r.source==='mean'?'Toutes les parois':'Piston')+'</td></tr>').join('');
   }
   function render() { readings(); draw(); drawChart(); drawRecordPlot(); }
   $('prepareLogStudy').addEventListener('click',()=>{
@@ -825,10 +849,22 @@
     if(Math.abs(radius-sharedRadius)>1e-12)applyRadius();
   });
   $('applyRadius').addEventListener('click',applyRadius);
+  $('radiusPrecision').addEventListener('input',()=>{
+    if(active!=='comparison'||session().batch)return;
+    session().measurementWindow=Number($('radiusPrecision').value)===20?20:2;reset();
+    notify('Fenêtre de mesure modifiée : nouvel état au même rayon. Les relevés précédents sont conservés.');
+  });
+  $('loadRadiusReference').addEventListener('click',()=>{
+    const s=session(),reference=globalThis.GasRadiusReference;
+    if(active!=='comparison'||!reference||s.referenceLoaded||s.radiusRecords.length+reference.records.length>MAX_RECORDS)return;
+    for(const r of reference.records)s.radiusRecords.push({...r});s.referenceLoaded=true;
+    s.recordX='radius';s.recordY='ratio';render();
+    notify('Série de référence ajoutée : 26 rayons, deux initialisations indépendantes, équilibrage contrôlé et longues moyennes. Vos relevés sont conservés.');
+  });
   function recordRadius() {
     const s = session(), m = s.sim.metrics;
     if (active !== 'comparison' || m.time < nextRecordTime(s) || ratio(m) == null || s.radiusRecords.length >= MAX_RECORDS) return;
-    GasAnalysis.appendRecord(s.radiusRecords, {radius:s.radius, ratio:ratio(m), time:m.time, temperature:m.temperature, source:s.source, pressure:pressure(m), volume:m.volume, packing:m.packingFraction, meanFreePath:m.windowMeanFreePath, meanCollisionTime:m.windowMeanCollisionTime, completedFlights:m.windowCompletedFlights, windowStart:m.measurementStart}, MAX_RECORDS);
+    GasAnalysis.appendRecord(s.radiusRecords, {radius:s.radius, ratio:ratio(m), time:m.time, temperature:m.temperature, source:s.source, pressure:pressure(m), volume:m.volume, packing:m.packingFraction, meanFreePath:m.windowMeanFreePath, meanCollisionTime:m.windowMeanCollisionTime, completedFlights:m.windowCompletedFlights, windowStart:m.measurementStart,protocol:s.measurementWindow===20?'long-window':'exploratory'}, MAX_RECORDS);
     s.lastRecordTime = m.time;
     if (s.radiusRecords.length >= MAX_RECORDS) { s.autoRecords=false; $('autoRecords').checked=false; }
     render(); notify('Relevé conservé. Un nouveau relevé attendra '+U.text('time',s.sim.measurementWindow,3)+' de temps simulé ; changer d’axe ou effacer la liste ne raccourcit pas cette attente.');
@@ -857,12 +893,12 @@
   for (const id of ['recordX','recordY']) $(id).addEventListener('input', () => { session()[id] = $(id).value; drawRecordPlot(); });
   $('exportRecords').addEventListener('click', () => {
     const number = v => v == null || !Number.isFinite(v) ? '' : v.toPrecision(10).replace('.',',');
-    const rows = session().radiusRecords.map((r,i)=>[i+1,...Object.values(recordFields).map(f=>number(f.value(r))),number(U.value('time',r.windowStart)),number(U.value('time',r.time)),r.source,number(session().alpha)].join(';'));
-    const header = 'releve;rayon_mm;PV_sur_nRT;P_V_moins_alpha_Voccupe_sur_nRT;P_V_moins_b_J;P_V_moins_alpha_Voccupe_sur_T_J_K;inverse_libre_parcours_mm_moins_1;inverse_temps_chocs_us_moins_1;libre_parcours_moyen_mm;surface_occupee_pct;pression_bar;temperature_K;temps_moyen_entre_chocs_us;trajets_complets_fenetre;debut_fenetre_ms;fin_fenetre_ms;capteur;alpha_analyse';
+    const rows = session().radiusRecords.map((r,i)=>[i+1,...Object.values(recordFields).map(f=>number(f.value(r))),number(U.value('time',r.windowStart)),number(U.value('time',r.time)),r.source,number(session().alpha),r.protocol??'exploratory',number(r.ratioSE),r.blocks??'',r.replicas??''].join(';'));
+    const header = 'releve;rayon_mm;PV_sur_nRT;P_V_moins_alpha_Voccupe_sur_nRT;P_V_moins_b_J;P_V_moins_alpha_Voccupe_sur_T_J_K;inverse_libre_parcours_mm_moins_1;inverse_temps_chocs_us_moins_1;libre_parcours_moyen_mm;surface_occupee_pct;pression_bar;temperature_K;temps_moyen_entre_chocs_us;trajets_complets_fenetre;debut_fenetre_ms;fin_fenetre_ms;capteur;alpha_analyse;protocole;erreur_type_ratio;fenetres;initialisations';
     const url=URL.createObjectURL(new Blob(['\uFEFF'+header+'\r\n'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'}));
     const a=document.createElement('a');a.href=url;a.download='gaz-2d-releves.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   });
-  $('clearRadiusRecords').addEventListener('click', () => { session().radiusRecords = []; session().recordPage=0; render(); });
+  $('clearRadiusRecords').addEventListener('click', () => { session().radiusRecords = []; session().referenceLoaded=false; session().recordPage=0; render(); });
   $('initialTemperature').addEventListener('input', () => { $('initialTemperatureValue').value = U.text('temperature', +$('initialTemperature').value / 200); });
   $('applyInitial').addEventListener('click', () => { session().initialTemperature = +$('initialTemperature').value / 200; reset(); });
   $('pressureSource').addEventListener('input', () => { session().source = $('pressureSource').value; render(); });

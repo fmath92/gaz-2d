@@ -56,6 +56,72 @@
       interceptSE: Math.sqrt(residualVariance * (1 / sample.length + meanX * meanX / xx)) };
   }
 
+  // Fit Z = 1 / (1 - a r / V) directly in Z, with b = a r.
+  // A single Z(r) curve requires measurements at the same cavity volume.
+  function radiusRegression(points) {
+    const sample=Array.from(points||[]).filter(p=>p&&Number.isFinite(p.x)&&p.x>=0&&Number.isFinite(p.y)&&Number.isFinite(p.volume)&&p.volume>0);
+    const xs=sample.map(p=>p.x).sort((a,b)=>a-b);
+    const distinct=xs.filter((x,i)=>!i||x-xs[i-1]>1e-9*Math.max(1,Math.abs(x)));
+    if(distinct.length<5)return null;
+    const volume=sample[0].volume;
+    if(sample.some(p=>Math.abs(p.volume-volume)>1e-9*volume))return null;
+    // Positive excluded volume, strictly below the cavity volume at every r.
+    const upper=volume/xs.at(-1)*(1-1e-8);
+    const predict=(a,r)=>1/(1-a*r/volume);
+    const objective=a=>sample.reduce((sum,p)=>sum+(p.y-predict(a,p.x))**2,0);
+    let best=0,bestError=objective(0),bestIndex=0;
+    for(let i=1;i<=64;i++){const a=upper*i/64,error=objective(a);if(error<bestError){best=a;bestError=error;bestIndex=i;}}
+    let lo=upper*Math.max(0,bestIndex-1)/64,hi=upper*Math.min(64,bestIndex+1)/64;
+    const g=(Math.sqrt(5)-1)/2;
+    let left=hi-g*(hi-lo),right=lo+g*(hi-lo),fl=objective(left),fr=objective(right);
+    for(let i=0;i<80;i++){
+      if(fl<fr){hi=right;right=left;fr=fl;left=hi-g*(hi-lo);fl=objective(left);}
+      else{lo=left;left=right;fl=fr;right=lo+g*(hi-lo);fr=objective(right);}
+    }
+    const a=(lo+hi)/2,error=objective(a);
+    if(error<bestError){best=a;bestError=error;}
+    const mean=sample.reduce((sum,p)=>sum+p.y/sample.length,0);
+    const total=sample.reduce((sum,p)=>sum+(p.y-mean)**2,0);
+    return {a:best,volume,count:sample.length,distinctCount:distinct.length,
+      rSquared:sample.every(p=>p.y===sample[0].y)?null:total>0?1-bestError/total:null,
+      curve:Array.from({length:101},(_,i)=>{const x=xs[0]+(xs.at(-1)-xs[0])*i/100;return {x,y:predict(best,x)};})};
+  }
+
+  function hardDiskCompressibility(phi) {
+    return Number.isFinite(phi)&&phi>=0&&phi<1?(1+phi*phi/8)/(1-phi)**2:null;
+  }
+  // Exact geometric factor for independent finite-radius centers in a rectangle.
+  // Multiplying the bulk hard-disk EOS by it is a finite-wall approximation,
+  // not an exact interacting-fluid result or a fitted parameter.
+  function wallGeometryFactor(radius,width,height) {
+    if(![radius,width,height].every(Number.isFinite)||radius<0||width<=2*radius||height<=2*radius)return null;
+    return width*height*(width+height-4*radius)/((width-2*radius)*(height-2*radius)*(width+height));
+  }
+  function radiusTheory(points) {
+    const sample=Array.from(points||[]).filter(p=>p&&p.x>0&&Number.isFinite(p.x)&&Number.isFinite(p.y)&&hardDiskCompressibility(p.packing)!=null);
+    const xs=sample.map(p=>p.x).sort((a,b)=>a-b),distinct=xs.filter((x,i)=>!i||x-xs[i-1]>1e-9*Math.max(1,Math.abs(x)));
+    if(distinct.length<5)return null;
+    const coefficient=sample[0].packing/sample[0].x**2;
+    if(sample.some(p=>Math.abs(p.packing/p.x**2-coefficient)>1e-8*Math.max(1,coefficient)))return null;
+    const geometry=sample.every(p=>wallGeometryFactor(p.x,p.width,p.height)!=null);
+    const width=sample[0].width,height=sample[0].height;
+    if(geometry&&sample.some(p=>Math.abs(p.width-width)>1e-8*width||Math.abs(p.height-height)>1e-8*height))return null;
+    const correction=x=>geometry?wallGeometryFactor(x,width,height):1;
+    const predictions=sample.map(p=>hardDiskCompressibility(p.packing)*correction(p.x));
+    const mean=sample.reduce((s,p)=>s+p.y/sample.length,0),total=sample.reduce((s,p)=>s+(p.y-mean)**2,0);
+    const residual=sample.reduce((s,p,i)=>s+(p.y-predictions[i])**2,0);
+    return {model:'Henderson',wallCorrection:geometry,count:sample.length,distinctCount:distinct.length,
+      rSquared:sample.every(p=>p.y===sample[0].y)?null:total>0?1-residual/total:null,
+      rmse:Math.sqrt(residual/sample.length),bulkCurve:Array.from({length:101},(_,i)=>{const x=xs[0]+(xs.at(-1)-xs[0])*i/100;return {x,y:hardDiskCompressibility(coefficient*x*x)};}),curve:Array.from({length:101},(_,i)=>{const x=xs[0]+(xs.at(-1)-xs[0])*i/100;return {x,y:hardDiskCompressibility(coefficient*x*x)*correction(x)};})};
+  }
+  function equilibriumReady(blocks,minimumTime=60) {
+    const last=blocks.slice(-3);
+    if(last.length<3||last.at(-1).end<minimumTime-1e-6)return false;
+    if(last.some(b=>!Number.isFinite(b.ratio)||b.ratio<=0||!Number.isFinite(b.anisotropy)))return false;
+    const mean=last.reduce((s,b)=>s+b.ratio/3,0);
+    return (Math.max(...last.map(b=>b.ratio))-Math.min(...last.map(b=>b.ratio)))/mean<.02&&Math.abs(last.reduce((s,b)=>s+b.anisotropy/3,0))<.03;
+  }
+
   function appendRecord(records, record, limit = 10000) {
     if (records.length >= limit) return false;
     records.push(record); return true;
@@ -100,7 +166,7 @@
     return { points, fitPoints, fit, reason: fit ? '' : 'Les mesures ne permettent pas de déterminer une pente finie.' };
   }
 
-  const GasAnalysis = { histogram, linearRegression, appendRecord, optimalAlpha, logarithmicFit };
+  const GasAnalysis = { histogram, linearRegression, appendRecord, optimalAlpha, logarithmicFit, radiusRegression, hardDiskCompressibility, radiusTheory, wallGeometryFactor, equilibriumReady };
   root.GasAnalysis = GasAnalysis;
   if (typeof module !== 'undefined' && module.exports) module.exports = { GasAnalysis };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -39,7 +39,13 @@
       else if (pen) ctx.lineTo(x, y);
       else { ctx.moveTo(x, y); pen = true; }
     }
-    if (scatter) ctx.fill(); else ctx.stroke();
+    if (scatter) {
+      ctx.fill();
+      for(const p of points)if(Number.isFinite(p.x)&&Number.isFinite(p.y)&&Number.isFinite(p.yError)&&p.yError>0){
+        const x=axes.X(p.x),lo=axes.Y(p.y-p.yError),hi=axes.Y(p.y+p.yError);
+        line(ctx,x,lo,x,hi,color,1);line(ctx,x-3,lo,x+3,lo,color,1);line(ctx,x-3,hi,x+3,hi,color,1);
+      }
+    } else ctx.stroke();
     ctx.setLineDash([]);
     if (arrows && points.length > 3) {
       for (let i = Math.max(1, Math.floor(points.length / 5)); i < points.length; i += Math.max(1, Math.floor(points.length / 4))) {
